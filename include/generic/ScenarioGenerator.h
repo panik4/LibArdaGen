@@ -5,10 +5,9 @@
 #include "flags/Flag.h"
 #include "areas/GameProvince.h"
 #include "areas/GameRegion.h"
-#include "parsing/ParserUtils.h"
 #include "RandNum.h"
 #include "areas/ScenarioContinent.h"
-#include "utils/ScenarioUtils.h"
+#include "utils/ArdaUtils.h"
 #include "areas/SuperRegion.h"
 #include <map>
 namespace Scenario {

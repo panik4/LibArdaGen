@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <string>
 
-namespace Scenario {
+namespace Arda::Parsing {
 template <typename T> void dumpRegions(const std::vector<T> &regions) {
   const auto &config = Fwg::Cfg::Values();
   std::string content = "";

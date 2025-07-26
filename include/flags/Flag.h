@@ -1,6 +1,6 @@
 #pragma once
 #include "FastWorldGenerator.h"
-#include "parsing/ParserUtils.h"
+#include "parsing/ArdaParserUtils.h"
 #include "io/Textures.h"
 
 namespace Scenario::Gfx {

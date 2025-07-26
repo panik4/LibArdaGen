@@ -2,7 +2,6 @@
 #include "FastWorldGenerator.h"
 #include <string>
 #include <vector>
-enum class GameType { Generic, Hoi4, Vic3, Eu4 };
 namespace Scenario::Utils {
 
 struct NoiseConfig {
@@ -24,8 +23,7 @@ struct ResConfig {
   bool random = false;
   NoiseConfig noiseConfig;
   bool considerClimate = false;
-  std::map<Fwg::Climate::Detail::ClimateTypeIndex, double>
-      climateEffects;
+  std::map<Fwg::Climate::Detail::ClimateTypeIndex, double> climateEffects;
   bool considerTrees = false;
   std::map<Fwg::Climate::Detail::TreeTypeIndex, double> treeEffects;
   bool considerSea = false;
@@ -70,13 +68,6 @@ static Coordinate strToPos(const std::vector<std::string> &tokens,
   p.rotation = std::stoi(tokens[positions[3]]);
   return p;
 }
-struct Pathcfg {
-  std::string modName;
-  std::string gamePath;
-  std::string gameModPath;
-  std::string gameModsDirectory;
-  std::string mappingPath;
-  std::string resourcePath;
-};
 
 }; // namespace Scenario::Utils
+

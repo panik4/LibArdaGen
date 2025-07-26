@@ -1,5 +1,3 @@
 #include "io/GenericParsing.h"
 
-namespace Scenario {
-
-}; // namespace Scenario
+namespace Arda::Parsing {}; // namespace Arda::Parsing

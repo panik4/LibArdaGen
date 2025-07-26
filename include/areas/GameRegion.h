@@ -3,7 +3,7 @@
 #include "areas/Region.h"
 #include "culture/Culture.h"
 #include "culture/Religion.h"
-#include "utils/ScenarioUtils.h"
+#include "utils/ArdaUtils.h"
 #include <map>
 namespace Scenario {
 class Country;
