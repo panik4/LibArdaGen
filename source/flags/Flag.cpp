@@ -1,6 +1,6 @@
 #include "flags/Flag.h"
 
-namespace Scenario::Gfx {
+namespace Arda::Gfx {
 using namespace Fwg;
 namespace PU = Fwg::Parsing;
 std::map<std::string, std::vector<Fwg::Gfx::Colour>> Flag::colourGroups;
@@ -221,4 +221,4 @@ void Flag::readSymbolTemplates() {
     }
   }
 }
-} // namespace Scenario::Gfx
+} // namespace Arda::Gfx

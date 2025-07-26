@@ -1,13 +1,13 @@
 #pragma once
 #include "FastWorldGenerator.h"
 #include "RandNum.h"
-#include "areas/GameRegion.h"
+#include "areas/ArdaRegion.h"
 #include "characters/Character.h"
 #include "culture/Culture.h"
 #include "flags/Flag.h"
 #include <string>
 #include <vector>
-namespace Scenario {
+namespace Arda {
 
 enum class Rank {
   GreatPower,
@@ -44,24 +44,24 @@ public:
   std::map<std::shared_ptr<Culture>, double> cultures;
   Gfx::Flag flag;
   Fwg::Gfx::Colour colour;
-  std::vector<Scenario::Character> characters;
+  std::vector<Arda::Character> characters;
   // constructors/destructors
   Country();
   Country(std::string tag, int ID, std::string name, std::string adjective,
           Gfx::Flag flag);
   virtual ~Country() = default;
   // containers
-  std::vector<std::shared_ptr<Region>> ownedRegions;
-  std::vector<std::shared_ptr<GameProvince>> ownedProvinces;
+  std::vector<std::shared_ptr<ArdaRegion>> ownedRegions;
+  std::vector<std::shared_ptr<Arda::ArdaProvince>> ownedProvinces;
 
   std::set<std::shared_ptr<Country>> neighbours;
   // member functions
   void assignRegions(int maxRegions,
-                     std::vector<std::shared_ptr<Region>> &gameRegions,
-                     std::shared_ptr<Region> startRegion,
-                     std::vector<std::shared_ptr<GameProvince>> &gameProvinces);
-  void addRegion(std::shared_ptr<Region> region);
-  void removeRegion(std::shared_ptr<Region> region);
+                     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+                     std::shared_ptr<ArdaRegion> startRegion,
+                     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces);
+  void addRegion(std::shared_ptr<ArdaRegion> region);
+  void removeRegion(std::shared_ptr<ArdaRegion> region);
   void selectCapital();
   // operators
   bool operator<(const Country &right) const { return ID < right.ID; };
@@ -74,4 +74,4 @@ public:
   void gatherCultureShares();
   virtual std::shared_ptr<Culture> getPrimaryCulture() const;
 };
-} // namespace Scenario
+} // namespace Arda

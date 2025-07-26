@@ -1,5 +1,5 @@
 #include "countries/Country.h"
-namespace Scenario {
+namespace Arda {
 Country::Country() : ID{-1} {}
 
 Country::Country(std::string tag, int ID, std::string name,
@@ -12,27 +12,27 @@ Country::Country(std::string tag, int ID, std::string name,
 }
 
 void Country::assignRegions(
-    int maxRegions, std::vector<std::shared_ptr<Region>> &gameRegions,
-    std::shared_ptr<Region> startRegion,
-    std::vector<std::shared_ptr<GameProvince>> &gameProvinces) {
+    int maxRegions, std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    std::shared_ptr<ArdaRegion> startRegion,
+    std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces) {
   addRegion(startRegion);
   auto breakCounter = 0;
   while (ownedRegions.size() < maxRegions && breakCounter++ < 100) {
-    for (const auto &gameRegion : ownedRegions) {
+    for (const auto &ardaRegion : ownedRegions) {
       if (ownedRegions.size() >= maxRegions)
         break;
-      if (gameRegion == nullptr)
+      if (ardaRegion == nullptr)
         continue;
-      if (gameRegion->neighbours.size() == 0)
+      if (ardaRegion->neighbours.size() == 0)
         continue;
-      if (gameRegion->neighbours.size()) {
-        auto &nextRegion = Fwg::Utils::selectRandom(gameRegion->neighbours);
-        if (nextRegion < gameRegions.size()) {
-          if (!gameRegions[nextRegion]->assigned &&
-              !gameRegions[nextRegion]->isSea() &&
-              !gameRegions[nextRegion]->isLake()) {
-            gameRegions[nextRegion]->assigned = true;
-            addRegion(gameRegions[nextRegion]);
+      if (ardaRegion->neighbours.size()) {
+        auto &nextRegion = Fwg::Utils::selectRandom(ardaRegion->neighbours);
+        if (nextRegion < ardaRegions.size()) {
+          if (!ardaRegions[nextRegion]->assigned &&
+              !ardaRegions[nextRegion]->isSea() &&
+              !ardaRegions[nextRegion]->isLake()) {
+            ardaRegions[nextRegion]->assigned = true;
+            addRegion(ardaRegions[nextRegion]);
           }
         }
       }
@@ -40,17 +40,17 @@ void Country::assignRegions(
   }
 }
 
-void Country::addRegion(std::shared_ptr<Region> region) {
+void Country::addRegion(std::shared_ptr<ArdaRegion> region) {
   region->assigned = true;
-  for (auto &gameProvince : region->gameProvinces)
-    gameProvince->owner = this->tag;
+  for (auto &ardaProvince : region->ardaProvinces)
+    ardaProvince->owner = this->tag;
   ownedRegions.push_back(region);
 }
-void Country::removeRegion(std::shared_ptr<Region> region) {
+void Country::removeRegion(std::shared_ptr<ArdaRegion> region) {
   region->assigned = false;
   // region->owner = "";
-  for (auto &gameProvince : region->gameProvinces)
-    gameProvince->owner = "";
+  for (auto &ardaProvince : region->ardaProvinces)
+    ardaProvince->owner = "";
   if (this != nullptr && ownedRegions.size()) {
     ownedRegions.erase(
         std::remove(ownedRegions.begin(), ownedRegions.end(), region),
@@ -60,7 +60,7 @@ void Country::removeRegion(std::shared_ptr<Region> region) {
 void Country::selectCapital() {
   // select the region with the highest population
   double max = 0;
-  std::shared_ptr<Region> capitalRegion;
+  std::shared_ptr<ArdaRegion> capitalRegion;
   if (ownedRegions.empty()) {
     Fwg::Utils::Logging::logLine("No regions found for country " + name);
     return;
@@ -90,15 +90,15 @@ void Country::selectCapital() {
 void Country::evaluateProvinces() {
   ownedProvinces.clear();
   for (const auto &region : ownedRegions) {
-    for (const auto &gameProvince : region->gameProvinces) {
-      ownedProvinces.push_back(gameProvince);
+    for (const auto &ardaProvince : region->ardaProvinces) {
+      ownedProvinces.push_back(ardaProvince);
     }
   }
   // sort the provinces by ID
   std::sort(
       ownedProvinces.begin(), ownedProvinces.end(),
-      [](const std::shared_ptr<GameProvince> &a,
-         const std::shared_ptr<GameProvince> &b) { return a->ID < b->ID; });
+      [](const std::shared_ptr<Arda::ArdaProvince> &a,
+         const std::shared_ptr<Arda::ArdaProvince> &b) { return a->ID < b->ID; });
 }
 void Country::evaluatePopulations(const double worldPopulationFactor) {
   // gather all population factors of the regions
@@ -149,8 +149,8 @@ void Country::gatherCultureShares() {
   }
 }
 
-std::shared_ptr<Culture> Scenario::Country::getPrimaryCulture() const {
-  // return the largest culture in the country, by evaluating all gameregions
+std::shared_ptr<Culture> Arda::Country::getPrimaryCulture() const {
+  // return the largest culture in the country, by evaluating all ardaRegions
   // according to their population multiplied with the share of the culture in
   // the region
   double max = -1.0;
@@ -163,4 +163,4 @@ std::shared_ptr<Culture> Scenario::Country::getPrimaryCulture() const {
   }
   return primaryCulture;
 }
-} // namespace Scenario
+} // namespace Arda

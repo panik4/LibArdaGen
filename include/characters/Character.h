@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-namespace Scenario {
+namespace Arda {
 enum class Gender { Male, Female };
 
 enum class Ideology {
@@ -34,8 +34,8 @@ public:
   std::string surname;
   Gender gender;
 
-  Ideology ideology;
+  Arda::Ideology ideology;
   Type type;
   std::vector<std::string> traits;
 };
-} // namespace Scenario
+} // namespace Arda

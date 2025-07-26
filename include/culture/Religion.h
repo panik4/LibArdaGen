@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include "entities/Colour.h"
-namespace Scenario {
+namespace Arda {
 class Religion {
 
 public:
@@ -9,7 +9,7 @@ public:
   // ID of the province that is the center
   int centerOfReligion;
   Fwg::Gfx::Colour colour;
- //std::vector<Scenario::GameProvince> centersOfReligion;
+ //std::vector<Arda::Arda::ArdaProvince> centersOfReligion;
 };
 
-} // namespace Scenario
+} // namespace Arda

@@ -1,16 +1,16 @@
 #include "areas/SuperRegion.h"
-namespace Scenario {
+namespace Arda {
 SuperRegion::SuperRegion() {}
-void SuperRegion::addRegion(std::shared_ptr<Region> region) {
-  this->gameRegions.push_back(region);
+void SuperRegion::addRegion(std::shared_ptr<ArdaRegion> region) {
+  this->ardaRegions.push_back(region);
   region->superRegionID = this->ID;
 }
-void SuperRegion::removeRegion(std::shared_ptr<Region> region) {
-  for (auto &reg : gameRegions) {
+void SuperRegion::removeRegion(std::shared_ptr<ArdaRegion> region) {
+  for (auto &reg : ardaRegions) {
     if (reg->ID == region->ID) {
-      gameRegions.erase(
-          std::remove(gameRegions.begin(), gameRegions.end(), reg),
-          gameRegions.end());
+      ardaRegions.erase(
+          std::remove(ardaRegions.begin(), ardaRegions.end(), reg),
+          ardaRegions.end());
       break;
     }
   }
@@ -19,7 +19,7 @@ void SuperRegion::setType() {
   bool foundLand = false;
   bool foundSea = false;
   std::vector<int> pixels;
-  for (auto &reg : gameRegions) {
+  for (auto &reg : ardaRegions) {
     for (auto &prov : reg->provinces) {
       if (prov->isSea()) {
         foundSea = true;
@@ -40,11 +40,11 @@ void SuperRegion::setType() {
 }
 // gathers all pixels from all regions in the super region, calculates the
 // weighted position
-void Scenario::SuperRegion::checkPosition(
+void Arda::SuperRegion::checkPosition(
     const std::vector<SuperRegion> &superRegions) {
   if (Fwg::Cfg::Values().debugLevel > 5) {
     std::vector<int> pixels;
-    for (auto &reg : gameRegions) {
+    for (auto &reg : ardaRegions) {
       for (auto &prov : reg->provinces) {
         for (auto &pix : prov->pixels) {
           pixels.push_back(pix);
@@ -63,7 +63,7 @@ void Scenario::SuperRegion::checkPosition(
       // now we check the type of the super region our center is actually in
       for (auto &superReg : superRegions) {
         std::unordered_set<int> othersPixels;
-        for (auto &reg : superReg.gameRegions) {
+        for (auto &reg : superReg.ardaRegions) {
           for (auto &prov : reg->provinces) {
             for (auto &pix : prov->pixels) {
               othersPixels.insert(pix);
@@ -80,17 +80,17 @@ void Scenario::SuperRegion::checkPosition(
     }
   }
 }
-std::vector<Cluster> Scenario::SuperRegion::getClusters(
-    std::vector<std::shared_ptr<Region>> &regions) {
+std::vector<Cluster> Arda::SuperRegion::getClusters(
+    std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   std::vector<Cluster> clusters;
 
   // Mark all regions in this superregion as unvisited
   std::unordered_set<int> visited;
-  auto allOwnRegions = this->gameRegions; // all regions in this superregion
+  auto allOwnRegions = this->ardaRegions; // all regions in this superregion
 
   // Helper lambda for DFS
-  auto dfs = [&](auto &&self, std::shared_ptr<Region> current,
-                 std::vector<std::shared_ptr<Region>> &cluster) -> void {
+  auto dfs = [&](auto &&self, std::shared_ptr<ArdaRegion> current,
+                 std::vector<std::shared_ptr<ArdaRegion>> &cluster) -> void {
     visited.insert(current->ID);
     cluster.push_back(current);
 
@@ -112,7 +112,7 @@ std::vector<Cluster> Scenario::SuperRegion::getClusters(
   // Main loop: start DFS for each unvisited region
   for (auto &region : allOwnRegions) {
     if (visited.find(region->ID) == visited.end()) {
-      std::vector<std::shared_ptr<Region>> cluster;
+      std::vector<std::shared_ptr<ArdaRegion>> cluster;
       dfs(dfs, region, cluster);
       // Create a Cluster object and add it to the result
       Cluster clusterObj;
@@ -129,4 +129,4 @@ std::vector<Cluster> Scenario::SuperRegion::getClusters(
 
   return clusters;
 }
-} // namespace Scenario
+} // namespace Arda

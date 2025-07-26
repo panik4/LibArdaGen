@@ -2,7 +2,7 @@
 #include "FastWorldGenerator.h"
 #include <string>
 #include <vector>
-namespace Scenario::Utils {
+namespace Arda::Utils {
 
 struct NoiseConfig {
   double fractalFrequency;
@@ -69,5 +69,5 @@ static Coordinate strToPos(const std::vector<std::string> &tokens,
   return p;
 }
 
-}; // namespace Scenario::Utils
+}; // namespace Arda::Utils
 

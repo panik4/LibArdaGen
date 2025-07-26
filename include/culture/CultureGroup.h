@@ -1,18 +1,18 @@
 #pragma once
-#include "areas/GameRegion.h"
+#include "areas/ArdaRegion.h"
 #include "culture/Culture.h"
 #include "entities/Colour.h"
 #include "language/LanguageGroup.h"
 #include <string>
-namespace Scenario {
+namespace Arda {
 
 class CultureGroup {
   std::string name;
   std::vector<std::shared_ptr<Culture>> cultures;
   Fwg::Gfx::Colour colour;
-  std::shared_ptr<Scenario::LanguageGroup> languageGroup;
-  std::shared_ptr<Region> center;
-  std::vector<std::shared_ptr<Region>> regions;
+  std::shared_ptr<Arda::LanguageGroup> languageGroup;
+  std::shared_ptr<ArdaRegion> center;
+  std::vector<std::shared_ptr<ArdaRegion>> regions;
   VisualType visualType;
 
 public:
@@ -32,25 +32,25 @@ public:
                    cultures.end());
   }
 
-  void addRegion(const std::shared_ptr<Region> &region) {
+  void addRegion(const std::shared_ptr<ArdaRegion> &region) {
     regions.push_back(region);
   }
 
-  void removeRegion(const std::shared_ptr<Region> &region) {
+  void removeRegion(const std::shared_ptr<ArdaRegion> &region) {
     regions.erase(std::remove(regions.begin(), regions.end(), region),
                   regions.end());
   }
 
-  void setCenter(const std::shared_ptr<Region> &region) { center = region; }
-  void setLanguageGroup(const std::shared_ptr<Scenario::LanguageGroup> &group) {
+  void setCenter(const std::shared_ptr<ArdaRegion> &region) { center = region; }
+  void setLanguageGroup(const std::shared_ptr<Arda::LanguageGroup> &group) {
     languageGroup = group;
   }
-  std::shared_ptr<Region> getCenter() { return center; }
-  std::vector<std::shared_ptr<Region>> getRegions() { return regions; }
+  std::shared_ptr<ArdaRegion> getCenter() { return center; }
+  std::vector<std::shared_ptr<ArdaRegion>> getRegions() { return regions; }
   std::vector<std::shared_ptr<Culture>> getCultures() { return cultures; }
   std::string getName() { return name; }
   Fwg::Gfx::Colour getColour() { return colour; }
-  std::shared_ptr<Scenario::LanguageGroup> getLanguageGroup() {
+  std::shared_ptr<Arda::LanguageGroup> getLanguageGroup() {
     return languageGroup;
   }
 
@@ -61,4 +61,4 @@ public:
   VisualType getVisualType() { return visualType; }
 };
 
-} // namespace Scenario
+} // namespace Arda

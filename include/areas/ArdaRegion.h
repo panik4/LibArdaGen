@@ -1,14 +1,14 @@
 #pragma once
-#include "areas/GameProvince.h"
+#include "areas/ArdaProvince.h"
 #include "areas/Region.h"
 #include "culture/Culture.h"
 #include "culture/Religion.h"
 #include "utils/ArdaUtils.h"
 #include <map>
-namespace Scenario {
+namespace Arda {
 class Country;
 enum class LocatorType { NONE, CITY, FARM, MINE, PORT, WOOD };
-class Region : public Fwg::Areas::Region {
+class ArdaRegion : public Fwg::Areas::Region {
   std::vector<std::string> cores;
 
 public:
@@ -28,25 +28,25 @@ public:
   // development into account
   double economicActivity;
   double worldEconomicActivityShare;
-  std::map<std::string, Scenario::Utils::Resource> resources;
+  std::map<std::string, Arda::Utils::Resource> resources;
 
   // other
   bool assigned;
   double snowChance, lightRainChance, heavyRainChance, blizzardChance,
       mudChance, sandStormChance;
   // containers
-  std::vector<std::shared_ptr<GameProvince>> gameProvinces;
+  std::vector<std::shared_ptr<Arda::ArdaProvince>> ardaProvinces;
   std::vector<double> temperatureRange;
   std::vector<double> dateRange;
-  std::map<std::shared_ptr<Scenario::Religion>, double> religions;
+  std::map<std::shared_ptr<Arda::Religion>, double> religions;
   // the sum here should ALWAYS be 1
-  std::map<std::shared_ptr<Scenario::Culture>, double> cultureShares;
+  std::map<std::shared_ptr<Arda::Culture>, double> cultureShares;
   std::vector<std::shared_ptr<Fwg::Civilization::Location>>
       significantLocations;
 
-  Region();
-  Region(const Fwg::Areas::Region &baseRegion);
-  virtual ~Region();
+  ArdaRegion();
+  ArdaRegion(const Fwg::Areas::Region &baseRegion);
+  virtual ~ArdaRegion();
 
   // member functions
   // average given culture and religion shares of all provinces
@@ -66,6 +66,6 @@ public:
 
   std::shared_ptr<Fwg::Civilization::Location>
   getLocation(Fwg::Civilization::LocationType type);
-  std::shared_ptr<Scenario::Culture> getPrimaryCulture();
+  std::shared_ptr<Arda::Culture> getPrimaryCulture();
 };
-} // namespace Scenario
+} // namespace Arda

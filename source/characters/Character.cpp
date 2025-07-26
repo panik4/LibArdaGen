@@ -1,5 +1,5 @@
 #include "characters/Character.h"
-namespace Scenario {
+namespace Arda {
 Character::Character() {}
 Character::~Character() {}
-} // namespace Scenario
+} // namespace Arda

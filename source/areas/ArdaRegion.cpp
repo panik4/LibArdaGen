@@ -1,13 +1,13 @@
-#include "areas/GameRegion.h"
-namespace Scenario {
-Region::Region() {}
+#include "areas/ArdaRegion.h"
+namespace Arda {
+ArdaRegion::ArdaRegion() {}
 
-Region::Region(const Fwg::Areas::Region &baseRegion)
+ArdaRegion::ArdaRegion(const Fwg::Areas::Region &baseRegion)
     : Fwg::Areas::Region(baseRegion), assigned(false), totalPopulation{-1} {}
 
-Region::~Region() {}
-void Region::sumPopulations() {}
-void Region::findLocator(Fwg::Civilization::LocationType locationType,
+ArdaRegion::~ArdaRegion() {}
+void ArdaRegion::sumPopulations() {}
+void ArdaRegion::findLocator(Fwg::Civilization::LocationType locationType,
                          int maxAmount) {
   std::shared_ptr<Fwg::Civilization::Location> addLocation;
   int maxPixels = 0;
@@ -27,32 +27,32 @@ void Region::findLocator(Fwg::Civilization::LocationType locationType,
   }
 }
 
-void Region::findPortLocator(int maxAmount) {
+void ArdaRegion::findPortLocator(int maxAmount) {
   findLocator(Fwg::Civilization::LocationType::Port, maxAmount);
 }
 
-void Region::findCityLocator(int maxAmount) {
+void ArdaRegion::findCityLocator(int maxAmount) {
   findLocator(Fwg::Civilization::LocationType::City, maxAmount);
 }
-void Region::findMineLocator(int maxAmount) {
+void ArdaRegion::findMineLocator(int maxAmount) {
   findLocator(Fwg::Civilization::LocationType::Mine, maxAmount);
 }
 
-void Region::findFarmLocator(int maxAmount) {
+void ArdaRegion::findFarmLocator(int maxAmount) {
   findLocator(Fwg::Civilization::LocationType::Farm, maxAmount);
 }
 
-void Region::findWoodLocator(int maxAmount) {
+void ArdaRegion::findWoodLocator(int maxAmount) {
   findLocator(Fwg::Civilization::LocationType::Forest, maxAmount);
 }
-void Region::findWaterLocator(int maxAmount) {
+void ArdaRegion::findWaterLocator(int maxAmount) {
   findLocator(Fwg::Civilization::LocationType::WaterNode, maxAmount);
 }
-void Region::findWaterPortLocator(int maxAmount) {
+void ArdaRegion::findWaterPortLocator(int maxAmount) {
   findLocator(Fwg::Civilization::LocationType::WaterPort, maxAmount);
 }
 std::shared_ptr<Fwg::Civilization::Location>
-Region::getLocation(Fwg::Civilization::LocationType type) {
+ArdaRegion::getLocation(Fwg::Civilization::LocationType type) {
   for (auto &location : locations) {
     if (location->type == type) {
       return location;
@@ -60,7 +60,7 @@ Region::getLocation(Fwg::Civilization::LocationType type) {
   }
   return nullptr;
 }
-std::shared_ptr<Scenario::Culture> Scenario::Region::getPrimaryCulture() {
+std::shared_ptr<Arda::Culture> Arda::ArdaRegion::getPrimaryCulture() {
   if (cultureShares.empty()) {
     return nullptr;
   }
@@ -71,4 +71,4 @@ std::shared_ptr<Scenario::Culture> Scenario::Region::getPrimaryCulture() {
 
   return primaryCulture->first;
 }
-} // namespace Scenario
+} // namespace Arda

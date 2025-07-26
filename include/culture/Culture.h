@@ -2,7 +2,7 @@
 #include "language/Language.h"
 #include "entities/Colour.h"
 #include <string>
-namespace Scenario {
+namespace Arda {
 class CultureGroup;
 
 enum VisualType { ASIAN, AFRICAN, ARABIC, CAUCASIAN, SOUTH_AMERICAN };
@@ -15,9 +15,9 @@ public:
   // ID of the province that is the center
   int centerOfCulture;
   Fwg::Gfx::Colour colour;
-  std::shared_ptr<Scenario::Language> language;
+  std::shared_ptr<Arda::Language> language;
   std::shared_ptr<CultureGroup> cultureGroup;
   VisualType visualType;
 };
 
-} // namespace Scenario
+} // namespace Arda

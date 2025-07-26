@@ -1,7 +1,7 @@
 #pragma once
 #include "areas/Province.h"
 #include "generic/VictoryPoint.h"
-namespace Scenario {
+namespace Arda {
 enum class PositionType {
   Standstill,
   StandstillRG,
@@ -20,7 +20,7 @@ struct ScenarioPosition {
   PositionType type;
   int typeIndex;
 };
-class GameProvince {
+class ArdaProvince {
 public:
   int ID;
   std::string name;
@@ -32,17 +32,17 @@ public:
   std::shared_ptr<Fwg::Areas::Province> baseProvince;
   std::shared_ptr<VictoryPoint> victoryPoint;
   // containers
-  std::vector<GameProvince> neighbours;
+  std::vector<Arda::ArdaProvince> neighbours;
   // these positions are used for victory points, units, etc
   std::vector<ScenarioPosition> positions;
 
   // constructors/destructor
-  GameProvince(std::shared_ptr<Fwg::Areas::Province> province);
-  GameProvince();
-  ~GameProvince();
+  ArdaProvince(std::shared_ptr<Fwg::Areas::Province> province);
+  ArdaProvince();
+  ~ArdaProvince();
   // operators
-  bool operator==(const GameProvince &right) const { return ID == right.ID; };
-  bool operator<(const GameProvince &right) const { return ID < right.ID; };
+  bool operator==(const Arda::ArdaProvince &right) const { return ID == right.ID; };
+  bool operator<(const Arda::ArdaProvince &right) const { return ID < right.ID; };
   std::string toHexString();
 };
-} // namespace Scenario
+} // namespace Arda

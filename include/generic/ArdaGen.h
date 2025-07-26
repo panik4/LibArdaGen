@@ -1,18 +1,18 @@
 #pragma once
-#include "CivilizationGeneration.h"
-#include "countries/Country.h"
 #include "FastWorldGenerator.h"
-#include "flags/Flag.h"
-#include "areas/GameProvince.h"
-#include "areas/GameRegion.h"
 #include "RandNum.h"
-#include "areas/ScenarioContinent.h"
-#include "utils/ArdaUtils.h"
+#include "areas/ArdaProvince.h"
+#include "areas/ArdaRegion.h"
+#include "areas/ArdaContinent.h"
 #include "areas/SuperRegion.h"
+#include "countries/Country.h"
+#include "flags/Flag.h"
+#include "generic/CivilizationGeneration.h"
+#include "utils/ArdaUtils.h"
 #include <map>
-namespace Scenario {
+namespace Arda {
 
-class Generator : public Fwg::FastWorldGenerator {
+class ArdaGen : public Fwg::FastWorldGenerator {
 
 protected:
   Fwg::Gfx::Bitmap typeMap;
@@ -30,9 +30,9 @@ public:
   double resourceFactor = 1.0;
   float strategicRegionFactor = 1.0;
   // containers - used for every game
-  std::vector<ScenarioContinent> scenContinents;
-  std::vector<std::shared_ptr<Region>> gameRegions;
-  std::vector<std::shared_ptr<GameProvince>> gameProvinces;
+  std::vector<ArdaContinent> scenContinents;
+  std::vector<std::shared_ptr<ArdaRegion>> ardaRegions;
+  std::vector<std::shared_ptr<Arda::ArdaProvince>> ardaProvinces;
   std::set<std::string> tags;
   Fwg::Utils::ColourTMap<std::string> countryColourMap;
   std::map<std::string, std::shared_ptr<Country>> countries;
@@ -42,10 +42,10 @@ public:
   std::map<int, std::vector<std::shared_ptr<Country>>> countryImportanceScores;
   Civilization::CivilizationData civData;
   // constructors/destructors
-  Generator();
-  Generator(const std::string &configSubFolder);
-  Generator(Fwg::FastWorldGenerator &fwg);
-  ~Generator();
+  ArdaGen();
+  ArdaGen(const std::string &configSubFolder);
+  ArdaGen(Fwg::FastWorldGenerator &fwg);
+  ~ArdaGen();
   /* member functions*/
   // print a map showing all countries for debug purposes
   Fwg::Gfx::Bitmap visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
@@ -71,15 +71,14 @@ public:
   // mapping terrain types of FastWorldGen to module compatible terrains, only
   // implemented for some modules
   virtual Fwg::Gfx::Bitmap mapTerrain();
-  // GameRegions are used for every single game,
-  std::shared_ptr<Region> &findStartRegion();
-
+  // ardaRegions are used for every single game,
+  std::shared_ptr<ArdaRegion> &findStartRegion();
 
   // and countries are always created the same way
   template <typename T> void generateCountries() {
     countries.clear();
     countryMap.clear();
-    for (auto &region : gameRegions) {
+    for (auto &region : ardaRegions) {
       region->assigned = false;
       region->owner = nullptr;
     }
@@ -101,7 +100,7 @@ public:
   virtual void generateCountrySpecifics();
   void totalResourceVal(const std::vector<float> &resPrev,
                         float resourceModifier,
-                        const Scenario::Utils::ResConfig &resourceConfig);
+                        const Arda::Utils::ResConfig &resourceConfig);
   // calculate how strong each country is
   virtual void evaluateCountries();
   virtual void printStatistics();
@@ -110,5 +109,5 @@ public:
   virtual void writeLocalisation();
   virtual void writeImages();
 
-}; // namespace Scenario
-} // namespace Scenario
+}; // namespace Arda
+} // namespace Arda

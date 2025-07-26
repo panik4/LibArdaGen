@@ -1,7 +1,7 @@
 #pragma once
 #include "FastWorldGenerator.h"
-#include "generic/ScenarioGenerator.h"
-#include "areas/GameRegion.h"
+#include "areas/ArdaRegion.h"
+#include "generic/ArdaGen.h"
 #include "io/Parsing.h"
 #include <filesystem>
 #include <string>
@@ -20,4 +20,4 @@ template <typename T> void dumpRegions(const std::vector<T> &regions) {
   }
   Fwg::Parsing::writeFile(config.mapsPath + "states.txt", content);
 }
-}; // namespace Scenario
+}; // namespace Arda::Parsing

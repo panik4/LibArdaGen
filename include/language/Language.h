@@ -7,7 +7,7 @@
 #include <set>
 #include <string>
 #include <vector>
-namespace Scenario {
+namespace Arda {
 // Function to get a random letter based on weights
 static std::string
 getRandomLetter(const std::vector<std::string> &letters,
@@ -149,4 +149,4 @@ public:
   std::string getAdjectiveForm(const std::string &word);
   std::string generateAreaName(const std::string &trait);
 };
-} // namespace Scenario
+} // namespace Arda

@@ -2,7 +2,7 @@
 
 #define HRESULT_E_NOT_SUPPORTED static_cast<HRESULT>(0x80070032L)
 using namespace DirectX;
-namespace Scenario::Gfx::Textures {
+namespace Arda::Gfx::Textures {
 void writeDDS(const int width, const int height,
               std::vector<uint8_t> &pixelData, const DXGI_FORMAT format,
               const std::string &path) {
@@ -87,4 +87,4 @@ std::vector<uint8_t> readDDS(const std::string &path) {
   }
   return pixelData;
 }
-} // namespace Scenario::Gfx::Textures
+} // namespace Arda::Gfx::Textures

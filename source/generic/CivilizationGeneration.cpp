@@ -1,15 +1,15 @@
 #include "generic/CivilizationGeneration.h"
 
-namespace Scenario::Civilization {
+namespace Arda::Civilization {
 
 void generateWorldCivilizations(
-    std::vector<std::shared_ptr<Region>> &regions,
-    std::vector<std::shared_ptr<GameProvince>> &gameProvinces,
-    CivilizationData &civData, std::vector<ScenarioContinent> &continents) {
+    std::vector<std::shared_ptr<ArdaRegion>> &regions,
+    std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
+    CivilizationData &civData, std::vector<ArdaContinent> &continents) {
   generatePopulationFactors(civData, regions);
   generateDevelopment(regions);
   generateEconomicActivity(civData, regions);
-  generateReligions(civData, gameProvinces);
+  generateReligions(civData, ardaProvinces);
   generateCultures(civData, regions);
   distributeLanguages(civData);
   for (auto &region : regions) {
@@ -22,7 +22,7 @@ void generateWorldCivilizations(
 
 void generateReligions(
     CivilizationData &civData,
-    std::vector<std::shared_ptr<GameProvince>> &gameProvinces) {
+    std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces) {
   auto &config = Fwg::Cfg::Values();
   civData.religions.clear();
   Fwg::Gfx::Bitmap religionMap(config.width, config.height, 24);
@@ -32,30 +32,30 @@ void generateReligions(
     std::transform(r.name.begin(), r.name.end(), r.name.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     do {
-      r.centerOfReligion = Fwg::Utils::selectRandom(gameProvinces)->ID;
-    } while (!gameProvinces[r.centerOfReligion]->baseProvince->isLand());
+      r.centerOfReligion = Fwg::Utils::selectRandom(ardaProvinces)->ID;
+    } while (!ardaProvinces[r.centerOfReligion]->baseProvince->isLand());
     r.colour.randomize();
     civData.religions.push_back(std::make_shared<Religion>(r));
   }
 
-  for (auto &gameProvince : gameProvinces) {
-    if (!gameProvince->baseProvince->isLand())
+  for (auto &ardaProvince : ardaProvinces) {
+    if (!ardaProvince->baseProvince->isLand())
       continue;
     auto closestReligion = 0;
     auto distance = 100000000.0;
     for (auto x = 0; x < civData.religions.size(); x++) {
       auto &religion = civData.religions[x];
-      auto religionCenter = gameProvinces[religion->centerOfReligion];
+      auto religionCenter = ardaProvinces[religion->centerOfReligion];
       auto nDistance = Fwg::getPositionDistance(
           religionCenter->baseProvince->position,
-          gameProvince->baseProvince->position, config.width);
+          ardaProvince->baseProvince->position, config.width);
       if (Fwg::Utils::switchIfComparator(nDistance, distance, std::less())) {
         closestReligion = x;
       }
     }
     //// add only the main religion at this time
-    // gameProvince->religions[civData.religions[closestReligion]] = 1.0;
-    // for (auto pix : gameProvince->baseProvince->pixels) {
+    // ardaProvince->religions[civData.religions[closestReligion]] = 1.0;
+    // for (auto pix : ardaProvince->baseProvince->pixels) {
     //   religionMap.setColourAtIndex(pix,
     //                                civData.religions[closestReligion]->colour);
     // }
@@ -64,7 +64,7 @@ void generateReligions(
 }
 
 void generateCultures(CivilizationData &civData,
-                      std::vector<std::shared_ptr<Region>> &gameRegions) {
+                      std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   civData.cultures.clear();
   auto &config = Fwg::Cfg::Values();
   Fwg::Gfx::Bitmap cultureMap(config.width, config.height, 24);
@@ -73,7 +73,7 @@ void generateCultures(CivilizationData &civData,
   int z = 15;
 
   // gather all regions which have no culture group assigned
-  std::vector<std::shared_ptr<Region>> unassignedRegions;
+  std::vector<std::shared_ptr<ArdaRegion>> unassignedRegions;
 
   // Generate x culture groups
   for (int i = 0; i < x; i++) {
@@ -83,7 +83,7 @@ void generateCultures(CivilizationData &civData,
     CultureGroup cultureGroup{"", colour};
 
     // randomly select a reguion to be the center of the culture group
-    cultureGroup.setCenter(Fwg::Utils::selectRandom(gameRegions));
+    cultureGroup.setCenter(Fwg::Utils::selectRandom(ardaRegions));
     // add the region to the culture group
     cultureGroup.addRegion(cultureGroup.getCenter());
 
@@ -97,7 +97,7 @@ void generateCultures(CivilizationData &civData,
                      [](unsigned char c) { return std::tolower(c); });
 
       culture.colour.randomize();
-      culture.language = std::make_shared<Scenario::Language>();
+      culture.language = std::make_shared<Arda::Language>();
       culture.cultureGroup = std::make_shared<CultureGroup>(cultureGroup);
       cultureGroup.addCulture(std::make_shared<Culture>(culture));
     }
@@ -107,8 +107,8 @@ void generateCultures(CivilizationData &civData,
   }
 
   // now distribute these culturegroups to the regions
-  for (auto &gameRegion : gameRegions) {
-    if (gameRegion->isSea() || gameRegion->isLake())
+  for (auto &ardaRegion : ardaRegions) {
+    if (ardaRegion->isSea() || ardaRegion->isLake())
       continue;
     auto closestCultureGroup = 0;
     auto distance = 100000000.0;
@@ -116,14 +116,14 @@ void generateCultures(CivilizationData &civData,
       auto &cultureGroup = civData.cultureGroups[x];
       auto cultureCenter = cultureGroup->getCenter();
       auto nDistance = Fwg::getPositionDistance(
-          cultureCenter->position, gameRegion->position, config.width);
+          cultureCenter->position, ardaRegion->position, config.width);
       if (Fwg::Utils::switchIfComparator(nDistance, distance, std::less())) {
         closestCultureGroup = x;
       }
     }
-    civData.cultureGroups[closestCultureGroup]->addRegion(gameRegion);
+    civData.cultureGroups[closestCultureGroup]->addRegion(ardaRegion);
     // add only the main culture at this time
-    for (auto &province : gameRegion->gameProvinces) {
+    for (auto &province : ardaRegion->ardaProvinces) {
       for (auto pix : province->baseProvince->pixels) {
         cultureMap.setColourAtIndex(
             pix, civData.cultureGroups[closestCultureGroup]->getColour());
@@ -149,7 +149,7 @@ void generateCultures(CivilizationData &civData,
       auto distance = 100000000.0;
       for (auto x = 0; x < cultureGroup->getCultures().size(); x++) {
         auto culture = cultureGroup->getCultures()[x];
-        auto cultureCenter = gameRegions[culture->centerOfCulture];
+        auto cultureCenter = ardaRegions[culture->centerOfCulture];
         auto nDistance = Fwg::getPositionDistance(
             cultureCenter->position, region->position, config.width);
         if (Fwg::Utils::switchIfComparator(nDistance, distance, std::less())) {
@@ -170,11 +170,11 @@ void generateCultures(CivilizationData &civData,
   }
 
   // now write the cultures to the culture map
-  for (auto &gameRegion : gameRegions) {
-    if (gameRegion->isSea() || gameRegion->isLake())
+  for (auto &ardaRegion : ardaRegions) {
+    if (ardaRegion->isSea() || ardaRegion->isLake())
       continue;
-    for (auto &culture : gameRegion->cultureShares) {
-      for (auto &province : gameRegion->gameProvinces) {
+    for (auto &culture : ardaRegion->cultureShares) {
+      for (auto &province : ardaRegion->ardaProvinces) {
         for (auto pix : province->baseProvince->pixels) {
           cultureMap.setColourAtIndex(pix, culture.first->colour);
         }
@@ -189,7 +189,7 @@ void generateCultures(CivilizationData &civData,
 void distributeLanguages(CivilizationData &civData) {
   // assign a language group to each culture group
   for (auto &cultureGroup : civData.cultureGroups) {
-    auto languageGroup = std::make_shared<Scenario::LanguageGroup>();
+    auto languageGroup = std::make_shared<Arda::LanguageGroup>();
     civData.languageGroups.push_back(languageGroup);
     cultureGroup->setLanguageGroup(languageGroup);
     // now generate at least as many languages as we have cultures
@@ -205,12 +205,12 @@ void distributeLanguages(CivilizationData &civData) {
 }
 
 void generatePopulationFactors(CivilizationData &civData,
-                               std::vector<std::shared_ptr<Region>> &regions) {
+                               std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   Fwg::Utils::Logging::logLine("Generating Population");
   double worldPopulationFactorSum = 0.0;
   for (auto &gR : regions) {
     gR->populationFactor = 0.0;
-    for (auto &gProv : gR->gameProvinces) {
+    for (auto &gProv : gR->ardaProvinces) {
       // calculate the population factor. We use both the size of the province
       // and the population density
       gProv->popFactor = gProv->baseProvince->populationDensity *
@@ -229,7 +229,7 @@ void generatePopulationFactors(CivilizationData &civData,
   }
   civData.worldPopulationFactorSum = worldPopulationFactorSum;
 }
-void generateDevelopment(std::vector<std::shared_ptr<Region>> &regions) {
+void generateDevelopment(std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   Fwg::Utils::Logging::logLine("Generating State Development");
   auto &config = Fwg::Cfg::Values();
   Fwg::Gfx::Bitmap developmentFactor(config.width, config.height, 24);
@@ -241,7 +241,7 @@ void generateDevelopment(std::vector<std::shared_ptr<Region>> &regions) {
     // we want to calculate the average development of the region, by taking the
     // average of the development of the provinces weighted by the popFactor
     // share of the totalPop
-    for (auto &province : region->gameProvinces) {
+    for (auto &province : region->ardaProvinces) {
       auto popFactor = province->popFactor;
       region->developmentFactor +=
           province->baseProvince->developmentFactor * popFactor / totalPop;
@@ -252,7 +252,7 @@ void generateDevelopment(std::vector<std::shared_ptr<Region>> &regions) {
  * to implement their own, more complex calculations
  */
 void generateEconomicActivity(CivilizationData &civData,
-                              std::vector<std::shared_ptr<Region>> &regions) {
+                              std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   double worldEconomicActivitySum = 0.0;
   for (auto &region : regions) {
     region->economicActivity =
@@ -265,7 +265,7 @@ void generateEconomicActivity(CivilizationData &civData,
   }
   civData.worldEconomicActivitySum = worldEconomicActivitySum;
 }
-void generateImportance(std::vector<std::shared_ptr<Region>> &regions) {
+void generateImportance(std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   double worldImportanceSum = 0.0;
   for (auto &region : regions) {
     region->importanceScore =
@@ -277,7 +277,7 @@ void generateImportance(std::vector<std::shared_ptr<Region>> &regions) {
   }
 }
 
-void nameRegions(std::vector<std::shared_ptr<Region>> &regions) {
+void nameRegions(std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   // take all regions and name them by taking their dominant cultures language
   // and generating a name
   for (auto &region : regions) {
@@ -291,14 +291,14 @@ void nameRegions(std::vector<std::shared_ptr<Region>> &regions) {
     std::transform(region->name.begin(), region->name.end(),
                    region->name.begin(),
                    [](unsigned char c) { return std::toupper(c); });
-    for (auto &province : region->gameProvinces) {
+    for (auto &province : region->ardaProvinces) {
       province->name = language->generateAreaName("");
     }
   }
 }
 
-void nameContinents(std::vector<ScenarioContinent> &continents,
-                    std::vector<std::shared_ptr<Region>> &regions) {
+void nameContinents(std::vector<ArdaContinent> &continents,
+                    std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   // take all continents and name them by taking their dominant cultures
   // language and generating a name
   for (auto &continent : continents) {
@@ -320,4 +320,4 @@ void nameContinents(std::vector<ScenarioContinent> &continents,
 
 bool sanityChecks(const CivilizationData &civData) { return true; }
 
-} // namespace Scenario::Civilization
+} // namespace Arda::Civilization

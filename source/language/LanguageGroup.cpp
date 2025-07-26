@@ -1,6 +1,6 @@
 
 #include "language/LanguageGroup.h"
-namespace Scenario {
+namespace Arda {
 // std::string
 // generateHardToken(const std::vector<std::string> &consonants,
 //                                  const std::map<std::string, float>
@@ -155,4 +155,4 @@ void LanguageGroup::generate(int languageAmount) {
     languages.push_back(std::make_shared<Language>(language));
   }
 }
-} // namespace Scenario
+} // namespace Arda

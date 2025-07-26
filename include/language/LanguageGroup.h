@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <iostream>
 #include <map>
-namespace Scenario {
+namespace Arda {
 class LanguageGroup {
   std::string name;
   // between 0.2 and 0.6
@@ -54,4 +54,4 @@ public:
   void generateTokenSets();
   void generate(int languageAmount);
 };
-} // namespace Scenario
+} // namespace Arda

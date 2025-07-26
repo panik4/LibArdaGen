@@ -1,10 +1,10 @@
-#include "generic/ScenarioGenerator.h"
+#include "generic/ArdaGen.h"
 namespace Logging = Fwg::Utils::Logging;
-namespace Scenario {
+namespace Arda {
 using namespace Fwg::Gfx;
-Generator::Generator() {}
+ArdaGen::ArdaGen() {}
 
-Generator::Generator(const std::string &configSubFolder)
+ArdaGen::ArdaGen(const std::string &configSubFolder)
     : FastWorldGenerator(configSubFolder) {
   Gfx::Flag::readColourGroups();
   Gfx::Flag::readFlagTypes();
@@ -13,24 +13,24 @@ Generator::Generator(const std::string &configSubFolder)
   stratRegionMap = Bitmap(0, 0, 24);
 }
 
-Generator::Generator(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {}
+ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {}
 
-Generator::~Generator() {}
+ArdaGen::~ArdaGen() {}
 
-void Generator::loadRequiredResources(const std::string &gamePath) {}
+void ArdaGen::loadRequiredResources(const std::string &gamePath) {}
 
-void Generator::mapContinents() {
+void ArdaGen::mapContinents() {
   Logging::logLine("Mapping Continents");
   scenContinents.clear();
   for (const auto &continent : this->areaData.continents) {
     // we copy the fwg continents by choice, to leave them untouched
-    scenContinents.push_back(ScenarioContinent(continent));
+    scenContinents.push_back(ArdaContinent(continent));
   }
 }
 
-void Generator::mapRegions() {
+void ArdaGen::mapRegions() {
   Logging::logLine("Mapping Regions");
-  gameRegions.clear();
+  ardaRegions.clear();
 
   for (auto &region : this->areaData.regions) {
     std::sort(region.provinces.begin(), region.provinces.end(),
@@ -38,31 +38,31 @@ void Generator::mapRegions() {
                  const std::shared_ptr<Fwg::Areas::Province> b) {
                 return (*a < *b);
               });
-    auto gameRegion = std::make_shared<Region>(region);
+    auto ardaRegion = std::make_shared<ArdaRegion>(region);
 
-    for (auto &province : gameRegion->provinces) {
-      gameRegion->gameProvinces.push_back(gameProvinces[province->ID]);
+    for (auto &province : ardaRegion->provinces) {
+      ardaRegion->ardaProvinces.push_back(ardaProvinces[province->ID]);
     }
     // save game region
-    gameRegions.push_back(gameRegion);
+    ardaRegions.push_back(ardaRegion);
   }
-  // sort by gameprovince ID
-  std::sort(gameRegions.begin(), gameRegions.end(),
+  // sort by Arda::ArdaProvince ID
+  std::sort(ardaRegions.begin(), ardaRegions.end(),
             [](auto l, auto r) { return *l < *r; });
-  // check if we have the same amount of gameProvinces as FastWorldGen provinces
-  if (gameProvinces.size() != this->areaData.provinces.size())
+  // check if we have the same amount of ardaProvinces as FastWorldGen provinces
+  if (ardaProvinces.size() != this->areaData.provinces.size())
     throw(std::exception("Fatal: Lost provinces, terminating"));
-  if (gameRegions.size() != this->areaData.regions.size())
+  if (ardaRegions.size() != this->areaData.regions.size())
     throw(std::exception("Fatal: Lost regions, terminating"));
-  for (const auto &gameRegion : gameRegions) {
-    if (gameRegion->ID > gameRegions.size()) {
+  for (const auto &ardaRegion : ardaRegions) {
+    if (ardaRegion->ID > ardaRegions.size()) {
       throw(std::exception("Fatal: Invalid region IDs, terminating"));
     }
   }
   applyRegionInput();
 }
 
-void Generator::applyRegionInput() {
+void ArdaGen::applyRegionInput() {
   Fwg::Utils::ColourTMap<std::vector<std::string>> regionInputMap;
   if (regionMappingPath.size() && std::filesystem::exists(regionMappingPath)) {
     auto mappingFileLines = Fwg::Parsing::getLines(regionMappingPath);
@@ -73,25 +73,25 @@ void Generator::applyRegionInput() {
       regionInputMap.setValue(colour, tokens);
     }
   }
-  for (auto &gameRegion : this->gameRegions) {
-    if (regionInputMap.find(gameRegion->colour)) {
-      if (regionInputMap[gameRegion->colour].size() > 3 &&
-          regionInputMap[gameRegion->colour][3].size()) {
+  for (auto &ardaRegion : this->ardaRegions) {
+    if (regionInputMap.find(ardaRegion->colour)) {
+      if (regionInputMap[ardaRegion->colour].size() > 3 &&
+          regionInputMap[ardaRegion->colour][3].size()) {
         // get the predefined name
-        gameRegion->name = regionInputMap[gameRegion->colour][3];
+        ardaRegion->name = regionInputMap[ardaRegion->colour][3];
       }
-      if (regionInputMap[gameRegion->colour].size() > 4 &&
-          regionInputMap[gameRegion->colour][4].size()) {
+      if (regionInputMap[ardaRegion->colour].size() > 4 &&
+          regionInputMap[ardaRegion->colour][4].size()) {
         try {
 
           // get the predefined population
-          gameRegion->totalPopulation =
-              stoi(regionInputMap[gameRegion->colour][4]);
+          ardaRegion->totalPopulation =
+              stoi(regionInputMap[ardaRegion->colour][4]);
         } catch (std::exception e) {
           Fwg::Utils::Logging::logLine(
               "ERROR: Some of the tokens can't be turned into a population "
               "number. The faulty token is ",
-              regionInputMap[gameRegion->colour][4]);
+              regionInputMap[ardaRegion->colour][4]);
         }
       }
     }
@@ -99,17 +99,17 @@ void Generator::applyRegionInput() {
   // debug visualisation of all regions, if coastal they are yellow, if sea they
   // are blue, if non-coastal they are green
   Bitmap regionMap(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
-  for (auto &gameRegion : this->gameRegions) {
-    for (auto &gameProv : gameRegion->gameProvinces) {
+  for (auto &ardaRegion : this->ardaRegions) {
+    for (auto &gameProv : ardaRegion->ardaProvinces) {
       for (auto &pix : gameProv->baseProvince->pixels) {
-        if (gameRegion->isSea()) {
+        if (ardaRegion->isSea()) {
           regionMap.setColourAtIndex(pix, Fwg::Cfg::Values().colours.at("sea"));
 
-        } else if (gameRegion->coastal && !gameRegion->isSea()) {
+        } else if (ardaRegion->coastal && !ardaRegion->isSea()) {
           regionMap.setColourAtIndex(pix,
                                      Fwg::Cfg::Values().colours.at("ores"));
 
-        } else if (gameRegion->isLake()) {
+        } else if (ardaRegion->isLake()) {
           regionMap.setColourAtIndex(pix,
                                      Fwg::Cfg::Values().colours.at("lake"));
         }
@@ -129,13 +129,13 @@ void Generator::applyRegionInput() {
             false);
 }
 
-void Generator::applyCountryInput() {
+void ArdaGen::applyCountryInput() {
 
 }
 
 
-void Generator::mapProvinces() {
-  gameProvinces.clear();
+void ArdaGen::mapProvinces() {
+  ardaProvinces.clear();
   for (auto &prov : this->areaData.provinces) {
     // edit coastal status: lakes are not coasts!
     if (prov->coastal && prov->isLake())
@@ -152,54 +152,54 @@ void Generator::mapProvinces() {
       prov->coastal = foundTrueCoast;
     }
 
-    // now create gameprovinces from FastWorldGen provinces
-    auto gP = std::make_shared<GameProvince>(prov);
+    // now create ardaProvinces from FastWorldGen provinces
+    auto gP = std::make_shared<Arda::ArdaProvince>(prov);
     // also copy neighbours
     for (auto &baseProvinceNeighbour : gP->baseProvince->neighbours)
       gP->neighbours.push_back(baseProvinceNeighbour);
-    gameProvinces.push_back(gP);
+    ardaProvinces.push_back(gP);
   }
 
-  // sort by gameprovince ID
-  std::sort(gameProvinces.begin(), gameProvinces.end(),
+  // sort by Arda::ArdaProvince ID
+  std::sort(ardaProvinces.begin(), ardaProvinces.end(),
             [](auto l, auto r) { return *l < *r; });
 }
 
-void Generator::cutFromFiles(const std::string &gamePath) {
+void ArdaGen::cutFromFiles(const std::string &gamePath) {
   Fwg::Utils::Logging::logLine("Unimplemented cutting");
 }
 // initialize states
-void Generator::initializeStates() {}
+void ArdaGen::initializeStates() {}
 // initialize states
-void Generator::mapCountries() {}
+void ArdaGen::mapCountries() {}
 
-Fwg::Gfx::Bitmap Generator::mapTerrain() {
+Fwg::Gfx::Bitmap ArdaGen::mapTerrain() {
   Bitmap typeMap(climateMap.width(), climateMap.height(), 24);
   auto &colours = Fwg::Cfg::Values().colours;
   typeMap.fill(colours.at("sea"));
   Logging::logLine("Mapping Terrain");
-  for (auto &gameRegion : gameRegions) {
-    for (auto &gameProv : gameRegion->gameProvinces) {
+  for (auto &ardaRegion : ardaRegions) {
+    for (auto &gameProv : ardaRegion->ardaProvinces) {
     }
   }
   Png::save(typeMap, Fwg::Cfg::Values().mapsPath + "/typeMap.png");
   return typeMap;
 }
 
-std::shared_ptr<Region> &Generator::findStartRegion() {
-  std::vector<std::shared_ptr<Region>> freeRegions;
-  for (const auto &gameRegion : gameRegions)
-    if (!gameRegion->assigned && !gameRegion->isSea() && !gameRegion->isLake())
-      freeRegions.push_back(gameRegion);
+std::shared_ptr<ArdaRegion> &ArdaGen::findStartRegion() {
+  std::vector<std::shared_ptr<ArdaRegion>> freeRegions;
+  for (const auto &ardaRegion : ardaRegions)
+    if (!ardaRegion->assigned && !ardaRegion->isSea() && !ardaRegion->isLake())
+      freeRegions.push_back(ardaRegion);
 
   if (freeRegions.size() == 0)
-    return gameRegions[0];
+    return ardaRegions[0];
 
   const auto &startRegion = Fwg::Utils::selectRandom(freeRegions);
-  return gameRegions[startRegion->ID];
+  return ardaRegions[startRegion->ID];
 }
 
-Bitmap Generator::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
+Bitmap ArdaGen::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
                                      const int ID) {
   Logging::logLine("Drawing borders");
   auto &config = Fwg::Cfg::Values();
@@ -207,9 +207,9 @@ Bitmap Generator::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
     countryBmp = Bitmap(config.width, config.height, 24);
   }
   if (ID > -1) {
-    for (const auto &prov : gameRegions[ID]->provinces) {
+    for (const auto &prov : ardaRegions[ID]->provinces) {
       auto countryColour = Fwg::Gfx::Colour(0, 0, 0);
-      const auto &region = gameRegions[ID];
+      const auto &region = ardaRegions[ID];
 
       if (region->owner) {
         countryColour = region->owner->colour;
@@ -224,7 +224,7 @@ Bitmap Generator::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
     }
   } else {
     Fwg::Gfx::Bitmap noBorderCountries(config.width, config.height, 24);
-    for (const auto &region : gameRegions) {
+    for (const auto &region : ardaRegions) {
       auto countryColour = Fwg::Gfx::Colour(0, 0, 0);
       // if this tag is assigned, use the colour
       if (region->owner) {
@@ -248,7 +248,7 @@ Bitmap Generator::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
   return countryBmp;
 }
 
-void Generator::distributeCountries() {
+void ArdaGen::distributeCountries() {
 
   auto &config = Fwg::Cfg::Values();
 
@@ -259,7 +259,7 @@ void Generator::distributeCountries() {
     auto startRegion(findStartRegion());
     if (startRegion->assigned || startRegion->isSea() || startRegion->isLake())
       continue;
-    country->assignRegions(6, gameRegions, startRegion, gameProvinces);
+    country->assignRegions(6, ardaRegions, startRegion, ardaProvinces);
     if (!country->ownedRegions.size())
       continue;
     // get the dominant culture in the country by iterating over all regions
@@ -277,13 +277,13 @@ void Generator::distributeCountries() {
   Fwg::Utils::Logging::logLine("Distributing Countries::Assigning Regions");
 
   if (countries.size()) {
-    for (auto &gameRegion : gameRegions) {
-      if (!gameRegion->isSea() && !gameRegion->assigned &&
-          !gameRegion->isLake()) {
+    for (auto &ardaRegion : ardaRegions) {
+      if (!ardaRegion->isSea() && !ardaRegion->assigned &&
+          !ardaRegion->isLake()) {
         auto gR = Fwg::Utils::getNearestAssignedLand(
-            gameRegions, gameRegion, config.width, config.height);
-        gR->owner->addRegion(gameRegion);
-        gameRegion->owner = gR->owner;
+            ardaRegions, ardaRegion, config.width, config.height);
+        gR->owner->addRegion(ardaRegion);
+        ardaRegion->owner = gR->owner;
       }
     }
   }
@@ -299,7 +299,7 @@ void Generator::distributeCountries() {
                       Fwg::Cfg::Values().mapsPath + "countries.png");
 }
 
-void Generator::evaluateCountryNeighbours() {
+void ArdaGen::evaluateCountryNeighbours() {
   Logging::logLine("Evaluating Country Neighbours");
   Fwg::Areas::Regions::evaluateRegionNeighbours(areaData.regions);
 
@@ -315,25 +315,25 @@ void Generator::evaluateCountryNeighbours() {
 
       for (const auto &neighbourRegion : gR->neighbours) {
         // TO DO: Investigate rare crash issue with index being out of range
-        if (gameRegions[neighbourRegion]->owner == nullptr)
+        if (ardaRegions[neighbourRegion]->owner == nullptr)
           continue;
-        if (neighbourRegion < gameRegions.size() &&
-            gameRegions[neighbourRegion]->owner->tag != c.second->tag) {
-          c.second->neighbours.insert(gameRegions[neighbourRegion]->owner);
+        if (neighbourRegion < ardaRegions.size() &&
+            ardaRegions[neighbourRegion]->owner->tag != c.second->tag) {
+          c.second->neighbours.insert(ardaRegions[neighbourRegion]->owner);
         }
       }
     }
   }
 }
-void Generator::totalResourceVal(
+void ArdaGen::totalResourceVal(
     const std::vector<float> &resPrev, float resourceModifier,
-    const Scenario::Utils::ResConfig &resourceConfig) {
+    const Arda::Utils::ResConfig &resourceConfig) {
   const auto baseResourceAmount = resourceModifier;
   auto totalRes = 0.0;
   for (auto &val : resPrev) {
     totalRes += val;
   }
-  for (auto &reg : gameRegions) {
+  for (auto &reg : ardaRegions) {
     auto resShare = 0.0;
     for (const auto &prov : reg->provinces) {
       for (const auto &pix : prov->pixels) {
@@ -350,9 +350,9 @@ void Generator::totalResourceVal(
          {resourceConfig.name, resourceConfig.capped, stateRes}});
   }
 }
-void Generator::evaluateCountries() {}
-void Generator::generateCountrySpecifics() {};
-void Generator::printStatistics() {
+void ArdaGen::evaluateCountries() {}
+void ArdaGen::generateCountrySpecifics() {};
+void ArdaGen::printStatistics() {
   Logging::logLine("Printing Statistics");
   std::map<std::string, int> countryPop;
   for (auto &c : countries) {
@@ -366,7 +366,7 @@ void Generator::printStatistics() {
                      " Population: ", countryPop[c.first]);
   }
 }
-void Generator::writeTextFiles() {}
-void Generator::writeLocalisation() {}
-void Generator::writeImages() {}
-} // namespace Scenario
+void ArdaGen::writeTextFiles() {}
+void ArdaGen::writeLocalisation() {}
+void ArdaGen::writeImages() {}
+} // namespace Arda

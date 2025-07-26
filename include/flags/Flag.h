@@ -3,7 +3,7 @@
 #include "parsing/ArdaParserUtils.h"
 #include "io/Textures.h"
 
-namespace Scenario::Gfx {
+namespace Arda::Gfx {
 struct FlagInfo {
   std::vector<std::string> flagColourGroups;
   std::vector<std::string> symbolColourGroups;
@@ -56,4 +56,4 @@ public:
   static void readSymbolTemplates();
   
 };
-} // namespace Scenario::Gfx
+} // namespace Arda::Gfx

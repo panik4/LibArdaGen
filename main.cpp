@@ -8,6 +8,6 @@
 #include <filesystem>
 
 int main() {
-  Scenario::Generator scenarioGen;
+  Arda::ArdaGen scenarioGen;
   scenarioGen.genHeight();
 }

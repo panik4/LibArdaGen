@@ -1,8 +1,8 @@
 #pragma once
-namespace Scenario {
+namespace Arda {
 struct VictoryPoint {
   int amount;
   Fwg::Position position;
   std::string name;
 };
-} // namespace Scenario
+} // namespace Arda

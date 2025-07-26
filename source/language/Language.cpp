@@ -1,5 +1,5 @@
 #include "language/Language.h"
-namespace Scenario {
+namespace Arda {
 void Language::vary() {
   for (auto &letter : alphabet) {
     letter.second = RandNum::getRandom(alphabet.at(letter.first) * 0.8,
@@ -212,10 +212,10 @@ std::string Language::generateGenericCapitalizedWord() {
   word[0] = toupper(word[0]);
   return word;
 }
-std::string Scenario::Language::getAdjectiveForm(const std::string &word) {
+std::string Arda::Language::getAdjectiveForm(const std::string &word) {
   return word + Fwg::Utils::selectRandom(adjectiveEndings);
 }
-std::string Scenario::Language::generateAreaName(const std::string &trait) {
+std::string Arda::Language::generateAreaName(const std::string &trait) {
   return generateGenericCapitalizedWord();
 }
-} // namespace Scenario
+} // namespace Arda
