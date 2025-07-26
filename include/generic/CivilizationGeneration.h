@@ -1,15 +1,13 @@
 #pragma once
-#include "CultureGroup.h"
 #include "FastWorldGenerator.h"
-#include "NameGenerator.h"
-#include "Religion.h"
-#include "generic/GameRegion.h"
-#include "generic/ScenarioContinent.h"
+#include "areas/GameRegion.h"
+#include "areas/ScenarioContinent.h"
+#include "culture/CultureGroup.h"
+#include "culture/Religion.h"
 
 namespace Scenario::Civilization {
 
 struct CivilizationData {
-  NameGeneration::NameData nData;
   std::vector<std::shared_ptr<Religion>> religions;
   std::vector<std::shared_ptr<Culture>> cultures;
   std::vector<std::shared_ptr<CultureGroup>> cultureGroups;

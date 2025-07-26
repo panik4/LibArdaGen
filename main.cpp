@@ -7,7 +7,7 @@
 #include "generic/ScenarioGenerator.h"
 #include <filesystem>
 
-int main() { Scenario::Generator scenarioGen; 
-scenarioGen.genHeight();
-
+int main() {
+  Scenario::Generator scenarioGen;
+  scenarioGen.genHeight();
 }
