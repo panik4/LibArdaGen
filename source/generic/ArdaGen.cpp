@@ -10,14 +10,12 @@ ArdaGen::ArdaGen(const std::string &configSubFolder)
   Gfx::Flag::readFlagTypes();
   Gfx::Flag::readFlagTemplates();
   Gfx::Flag::readSymbolTemplates();
-  stratRegionMap = Bitmap(0, 0, 24);
+  superRegionMap = Bitmap(0, 0, 24);
 }
 
 ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {}
 
 ArdaGen::~ArdaGen() {}
-
-void ArdaGen::loadRequiredResources(const std::string &gamePath) {}
 
 void ArdaGen::mapContinents() {
   Logging::logLine("Mapping Continents");
@@ -163,27 +161,6 @@ void ArdaGen::mapProvinces() {
   // sort by Arda::ArdaProvince ID
   std::sort(ardaProvinces.begin(), ardaProvinces.end(),
             [](auto l, auto r) { return *l < *r; });
-}
-
-void ArdaGen::cutFromFiles(const std::string &gamePath) {
-  Fwg::Utils::Logging::logLine("Unimplemented cutting");
-}
-// initialize states
-void ArdaGen::initializeStates() {}
-// initialize states
-void ArdaGen::mapCountries() {}
-
-Fwg::Gfx::Bitmap ArdaGen::mapTerrain() {
-  Bitmap typeMap(climateMap.width(), climateMap.height(), 24);
-  auto &colours = Fwg::Cfg::Values().colours;
-  typeMap.fill(colours.at("sea"));
-  Logging::logLine("Mapping Terrain");
-  for (auto &ardaRegion : ardaRegions) {
-    for (auto &gameProv : ardaRegion->ardaProvinces) {
-    }
-  }
-  Png::save(typeMap, Fwg::Cfg::Values().mapsPath + "/typeMap.png");
-  return typeMap;
 }
 
 std::shared_ptr<ArdaRegion> &ArdaGen::findStartRegion() {

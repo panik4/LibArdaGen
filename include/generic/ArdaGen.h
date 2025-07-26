@@ -1,9 +1,9 @@
 #pragma once
 #include "FastWorldGenerator.h"
 #include "RandNum.h"
+#include "areas/ArdaContinent.h"
 #include "areas/ArdaProvince.h"
 #include "areas/ArdaRegion.h"
-#include "areas/ArdaContinent.h"
 #include "areas/SuperRegion.h"
 #include "countries/Country.h"
 #include "flags/Flag.h"
@@ -28,19 +28,21 @@ public:
   double worldPopulationFactor = 1.0;
   double worldIndustryFactor = 1.0;
   double resourceFactor = 1.0;
-  float strategicRegionFactor = 1.0;
+  float superRegionFactor = 1.0;
   // containers - used for every game
   std::vector<ArdaContinent> scenContinents;
   std::vector<std::shared_ptr<ArdaRegion>> ardaRegions;
   std::vector<std::shared_ptr<Arda::ArdaProvince>> ardaProvinces;
+  // countries
   std::set<std::string> tags;
   Fwg::Utils::ColourTMap<std::string> countryColourMap;
   std::map<std::string, std::shared_ptr<Country>> countries;
   std::map<Rank, std::vector<std::shared_ptr<Country>>> countriesByRank;
-  Fwg::Gfx::Bitmap countryMap;
-  Fwg::Gfx::Bitmap stratRegionMap;
   std::map<int, std::vector<std::shared_ptr<Country>>> countryImportanceScores;
   Civilization::CivilizationData civData;
+  // images
+  Fwg::Gfx::Bitmap countryMap;
+  Fwg::Gfx::Bitmap superRegionMap;
   // constructors/destructors
   ArdaGen();
   ArdaGen(const std::string &configSubFolder);
@@ -50,8 +52,6 @@ public:
   // print a map showing all countries for debug purposes
   Fwg::Gfx::Bitmap visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
                                       const int ID = -1);
-  // specific preparations. Used by each game, BUT to create game scenario
-  void loadRequiredResources(const std::string &gamePath);
 
   // map base continents to generic paradox compatible game continents
   void mapContinents();
@@ -63,14 +63,6 @@ public:
   // map base provinces to generic game regions
   void mapProvinces();
 
-  virtual void cutFromFiles(const std::string &gamePath);
-  // initialize states
-  virtual void initializeStates();
-  // initialize countries
-  virtual void mapCountries();
-  // mapping terrain types of FastWorldGen to module compatible terrains, only
-  // implemented for some modules
-  virtual Fwg::Gfx::Bitmap mapTerrain();
   // ardaRegions are used for every single game,
   std::shared_ptr<ArdaRegion> &findStartRegion();
 

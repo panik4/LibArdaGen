@@ -56,10 +56,10 @@ public:
 
   std::set<std::shared_ptr<Country>> neighbours;
   // member functions
-  void assignRegions(int maxRegions,
-                     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
-                     std::shared_ptr<ArdaRegion> startRegion,
-                     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces);
+  void assignRegions(
+      int maxRegions, std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+      std::shared_ptr<ArdaRegion> startRegion,
+      std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces);
   void addRegion(std::shared_ptr<ArdaRegion> region);
   void removeRegion(std::shared_ptr<ArdaRegion> region);
   void selectCapital();
