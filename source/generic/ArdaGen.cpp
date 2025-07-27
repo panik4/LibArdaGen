@@ -246,7 +246,7 @@ void ArdaGen::distributeCountries() {
     auto language = culture->language;
     country->name = language->generateGenericCapitalizedWord();
     country->adjective = language->getAdjectiveForm(country->name);
-    //country->tag = NameGeneration::generateTag(country->name, nData);
+    country->tag = Arda::Names::generateTag(country->name, nData.disallowedTokens);
     for (auto &region : country->ownedRegions) {
       region->owner = country;
     }

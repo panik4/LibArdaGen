@@ -1,4 +1,4 @@
-#include "generic/CivilizationGeneration.h"
+#include "civilisation/CivilizationGeneration.h"
 
 namespace Arda::Civilization {
 
@@ -11,6 +11,8 @@ void generateWorldCivilizations(
   generateEconomicActivity(civData, regions);
   generateReligions(civData, ardaProvinces);
   generateCultures(civData, regions);
+  Arda::Gfx::displayCultureGroups(civData);
+  Arda::Gfx::displayCultures(regions);
   distributeLanguages(civData);
   for (auto &region : regions) {
     region->sumPopulations();
@@ -67,7 +69,6 @@ void generateCultures(CivilizationData &civData,
                       std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   civData.cultures.clear();
   auto &config = Fwg::Cfg::Values();
-  Fwg::Gfx::Bitmap cultureMap(config.width, config.height, 24);
   int x = 20;
   int y = 5;
   int z = 15;
@@ -122,16 +123,7 @@ void generateCultures(CivilizationData &civData,
       }
     }
     civData.cultureGroups[closestCultureGroup]->addRegion(ardaRegion);
-    // add only the main culture at this time
-    for (auto &province : ardaRegion->ardaProvinces) {
-      for (auto pix : province->baseProvince->pixels) {
-        cultureMap.setColourAtIndex(
-            pix, civData.cultureGroups[closestCultureGroup]->getColour());
-      }
-    }
   }
-  Fwg::Gfx::Png::save(cultureMap,
-                      Fwg::Cfg::Values().mapsPath + "/world/cultureGroups.png");
 
   // randomly distribute culture centers inside the culturegroup
   for (auto &cultureGroup : civData.cultureGroups) {
@@ -168,22 +160,6 @@ void generateCultures(CivilizationData &civData,
       culture->visualType = cultureGroup->getVisualType();
     }
   }
-
-  // now write the cultures to the culture map
-  for (auto &ardaRegion : ardaRegions) {
-    if (ardaRegion->isSea() || ardaRegion->isLake())
-      continue;
-    for (auto &culture : ardaRegion->cultureShares) {
-      for (auto &province : ardaRegion->ardaProvinces) {
-        for (auto pix : province->baseProvince->pixels) {
-          cultureMap.setColourAtIndex(pix, culture.first->colour);
-        }
-      }
-    }
-  }
-
-  Fwg::Gfx::Png::save(cultureMap,
-                      Fwg::Cfg::Values().mapsPath + "/world/cultures.png");
 }
 
 void distributeLanguages(CivilizationData &civData) {

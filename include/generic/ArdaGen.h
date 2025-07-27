@@ -7,7 +7,8 @@
 #include "areas/SuperRegion.h"
 #include "countries/Country.h"
 #include "flags/Flag.h"
-#include "generic/CivilizationGeneration.h"
+#include "civilisation/CivilizationGeneration.h"
+#include "culture/NameUtils.h"
 #include "utils/ArdaUtils.h"
 #include <map>
 namespace Arda {
@@ -29,7 +30,8 @@ public:
   double worldIndustryFactor = 1.0;
   double resourceFactor = 1.0;
   float superRegionFactor = 1.0;
-  // containers - used for every game
+  // containers
+  Arda::Names::NameData nData;
   std::vector<ArdaContinent> scenContinents;
   std::vector<std::shared_ptr<ArdaRegion>> ardaRegions;
   std::vector<std::shared_ptr<Arda::ArdaProvince>> ardaProvinces;
