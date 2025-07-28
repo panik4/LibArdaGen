@@ -312,6 +312,7 @@ void ArdaGen::totalResourceVal(
   }
   for (auto &reg : ardaRegions) {
     auto resShare = 0.0;
+    reg->resources.clear();
     for (const auto &prov : reg->provinces) {
       for (const auto &pix : prov->pixels) {
         resShare += resPrev[pix];

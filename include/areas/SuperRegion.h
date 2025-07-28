@@ -24,7 +24,8 @@ public:
   void addRegion(std::shared_ptr<ArdaRegion> region);
   void removeRegion(std::shared_ptr<ArdaRegion> region);
   void setType();
-  void checkPosition(const std::vector<SuperRegion> &superRegions);
+  virtual void
+  checkPosition(const std::vector<std::shared_ptr<SuperRegion>> &superRegions);
   std::vector<Cluster>
   getClusters(std::vector<std::shared_ptr<ArdaRegion>> &regions);
 };

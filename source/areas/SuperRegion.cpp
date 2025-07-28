@@ -41,7 +41,7 @@ void SuperRegion::setType() {
 // gathers all pixels from all regions in the super region, calculates the
 // weighted position
 void Arda::SuperRegion::checkPosition(
-    const std::vector<SuperRegion> &superRegions) {
+    const std::vector<std::shared_ptr<Arda::SuperRegion>> &superRegions) {
   if (Fwg::Cfg::Values().debugLevel > 5) {
     std::vector<int> pixels;
     for (auto &reg : ardaRegions) {
@@ -63,7 +63,7 @@ void Arda::SuperRegion::checkPosition(
       // now we check the type of the super region our center is actually in
       for (auto &superReg : superRegions) {
         std::unordered_set<int> othersPixels;
-        for (auto &reg : superReg.ardaRegions) {
+        for (auto &reg : superReg->ardaRegions) {
           for (auto &prov : reg->provinces) {
             for (auto &pix : prov->pixels) {
               othersPixels.insert(pix);
@@ -73,8 +73,8 @@ void Arda::SuperRegion::checkPosition(
         if (othersPixels.find(this->position.weightedCenter) !=
             othersPixels.end()) {
           Fwg::Utils::Logging::logLine(
-              "The center is in super region with ID: ", superReg.ID,
-              " type is: ", (int)superReg.areaType);
+              "The center is in super region with ID: ", superReg->ID,
+              " type is: ", (int)superReg->areaType);
         }
       }
     }
