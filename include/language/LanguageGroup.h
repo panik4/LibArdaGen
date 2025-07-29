@@ -1,5 +1,7 @@
 #pragma once
 #include "RandNum.h"
+#include "LanguageGenerator.h"
+#include "utils/Cfg.h"
 #include "language/Language.h"
 #include "utils/Utils.h"
 #include <algorithm>
@@ -7,6 +9,7 @@
 #include <map>
 namespace Arda {
 class LanguageGroup {
+  Dataset mergedDataset;
   std::string name;
   // between 0.2 and 0.6
   double vowelShare;

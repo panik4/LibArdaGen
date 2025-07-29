@@ -96,6 +96,28 @@ void LanguageGroup::generateTokenSets() {
   }
 }
 void LanguageGroup::generate(int languageAmount) {
+  LanguageGenerator languageGenerator;
+  auto baseDir = Fwg::Cfg::Values().resourcePath + "//names//languageGroups//";
+  languageGenerator.loadDatasets({baseDir + "germanic.txt ", baseDir + "slavic.txt",
+       baseDir + "latin.txt",
+                                  baseDir + "turkic.txt"});
+  mergedDataset = languageGenerator.getRandomMergedDataset();
+  if (mergedDataset.vocabulary.empty()) {
+    std::cerr << "No vocabulary loaded, cannot generate languages."
+              << std::endl;
+    return;
+  }
+  for (int i = 0; i < languageAmount; i++) {
+    Language language;
+    language.reducedDataset = mergedDataset;
+    language.train();
+    language.generateVocabulary();
+
+    // languageGenerator.reduceDataset(        {mergedDataset});
+    languages.push_back(std::make_shared<Language>(language));
+  }
+
+  return;
   vowelShare = RandNum::getRandom(0.2, 0.6);
 
   for (auto &letter : alphabet) {

@@ -1,5 +1,6 @@
 #pragma once
 #include "RandNum.h"
+#include "language/LanguageGenerator.h"
 #include "utils/Utils.h"
 #include <algorithm>
 #include <cctype>
@@ -29,67 +30,12 @@ getRandomLetter(const std::vector<std::string> &letters,
 
 class Language {
 public:
-  std::vector<float> cumulativeVowelWeights;
-  std::vector<float> cumulativeConsonantWeights;
-  std::uniform_real_distribution<> vowelDis;
-  std::uniform_real_distribution<> consonantDis;
-  void initDistribution(const std::vector<std::string> &letters,
-                        std::vector<float> &cumulativeWeights,
-                        std::uniform_real_distribution<> &distribution) {
-    float currentSum = 0.0f;
-    for (const auto &letter : letters) {
-      currentSum += alphabet.at(letter);
-      cumulativeWeights.push_back(currentSum);
-    }
+  Dataset reducedDataset;
+  std::map<std::string, MarkovNameGenerator> markovGeneratorsByVocabulary;
+  std::unordered_map<std::string, std::vector<std::string>> vocabulary;
+  void train();
 
-    // Generate a random number in the range [0, total weight)
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    distribution = std::uniform_real_distribution<>(
-        0.0, cumulativeWeights.empty() ? 0.0f : cumulativeWeights.back());
-  }
-
-  std::string generateHardToken(const std::vector<std::string> &letters,
-                                std::map<std::string, float> alphabet,
-                                std::set<std::string> &existingTokens) {
-    std::string token;
-    do {
-      token.clear();
-      int tokenLength = RandNum::getRandom(2, 3);
-      for (int i = 0; i < tokenLength; i++) {
-        token += getRandomLetter(consonants, cumulativeConsonantWeights,
-                                 consonantDis);
-      }
-    } while (existingTokens.find(token) != existingTokens.end());
-    existingTokens.insert(token);
-    return token;
-  }
-
-  std::string generateSoftToken(const std::vector<std::string> &letters,
-                                std::map<std::string, float> alphabet,
-                                std::set<std::string> &existingTokens) {
-    std::string token;
-    do {
-      token.clear();
-      int tokenLength = 2;
-      for (int i = 0; i < tokenLength; i++) {
-        std::string letter =
-            getRandomLetter(vowels, cumulativeVowelWeights, vowelDis);
-        // Ensure that only very rarely may the same letter be used twice in a
-        // soft token if it has a length of 2
-        if (i == 1 && token[0] == letter[0] && RandNum::getRandom(0, 100) > 5) {
-          // If the same letter is chosen and the random number is greater than
-          // 5, choose a different letter
-          do {
-            letter = getRandomLetter(vowels, cumulativeVowelWeights, vowelDis);
-          } while (token[0] == letter[0]);
-        }
-        token += letter;
-      }
-    } while (existingTokens.find(token) != existingTokens.end());
-    existingTokens.insert(token);
-    return token;
-  }
+  void generateVocabulary();
 
   std::string name;
   std::vector<std::string> articles;         // like the, la, le, der, die, das
@@ -142,7 +88,9 @@ public:
 
   // method to generate a word, but using only a random tokenset of specified
   // length
-  std::string generateWord(int tokenSetLength);
+  
+  std::string getRandomWordFromVocabulary(const std::string&category);
+  std::string generateWord();
 
   std::string generateGenericWord();
   std::string generateGenericCapitalizedWord();
