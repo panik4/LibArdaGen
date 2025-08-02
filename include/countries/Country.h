@@ -21,7 +21,7 @@ class Country {
 
 public:
   // member variables
-  const int ID;
+  int ID;
   std::string tag;
   std::string name;
   std::string adjective;

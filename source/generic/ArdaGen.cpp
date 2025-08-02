@@ -17,6 +17,24 @@ ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {}
 
 ArdaGen::~ArdaGen() {}
 
+void ArdaGen::generateCountries(
+    std::function<std::shared_ptr<Country>()> factory) {
+  // generate country data
+  Arda::Countries::generateCountries(factory, numCountries, ardaRegions,
+                                     countries, ardaProvinces, civData, nData);
+  //  first gather generic neighbours, they will be mapped to hoi4 countries
+  //  in mapCountries
+  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
+                                             countries);
+  evaluateCountries();
+  Fwg::Utils::Logging::logLine("Visualising Countries");
+  visualiseCountries(countryMap);
+  Fwg::Gfx::Png::save(countryMap,
+                      Fwg::Cfg::Values().mapsPath + "countries.png");
+  mapCountries();
+  evaluateCountries();
+}
+
 void ArdaGen::mapContinents() {
   Logging::logLine("Mapping Continents");
   scenContinents.clear();
@@ -59,6 +77,8 @@ void ArdaGen::mapRegions() {
   }
   applyRegionInput();
 }
+
+void ArdaGen::mapCountries() {}
 
 void ArdaGen::applyRegionInput() {
   Fwg::Utils::ColourTMap<std::vector<std::string>> regionInputMap;
@@ -127,10 +147,7 @@ void ArdaGen::applyRegionInput() {
             false);
 }
 
-void ArdaGen::applyCountryInput() {
-
-}
-
+void ArdaGen::applyCountryInput() {}
 
 void ArdaGen::mapProvinces() {
   ardaProvinces.clear();
@@ -163,21 +180,9 @@ void ArdaGen::mapProvinces() {
             [](auto l, auto r) { return *l < *r; });
 }
 
-std::shared_ptr<ArdaRegion> &ArdaGen::findStartRegion() {
-  std::vector<std::shared_ptr<ArdaRegion>> freeRegions;
-  for (const auto &ardaRegion : ardaRegions)
-    if (!ardaRegion->assigned && !ardaRegion->isSea() && !ardaRegion->isLake())
-      freeRegions.push_back(ardaRegion);
+void ArdaGen::evaluateCountries() {}
 
-  if (freeRegions.size() == 0)
-    return ardaRegions[0];
-
-  const auto &startRegion = Fwg::Utils::selectRandom(freeRegions);
-  return ardaRegions[startRegion->ID];
-}
-
-Bitmap ArdaGen::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
-                                     const int ID) {
+Bitmap ArdaGen::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp, const int ID) {
   Logging::logLine("Drawing borders");
   auto &config = Fwg::Cfg::Values();
   if (!countryBmp.initialised()) {
@@ -225,86 +230,9 @@ Bitmap ArdaGen::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
   return countryBmp;
 }
 
-void ArdaGen::distributeCountries() {
-
-  auto &config = Fwg::Cfg::Values();
-
-  Fwg::Utils::Logging::logLine("Distributing Countries");
-  for (auto &countryEntry : countries) {
-    auto &country = countryEntry.second;
-    country->ownedRegions.clear();
-    auto startRegion(findStartRegion());
-    if (startRegion->assigned || startRegion->isSea() || startRegion->isLake())
-      continue;
-    country->assignRegions(6, ardaRegions, startRegion, ardaProvinces);
-    if (!country->ownedRegions.size())
-      continue;
-    // get the dominant culture in the country by iterating over all regions
-    // and counting the number of provinces with the same culture
-    country->gatherCultureShares();
-    auto culture = country->getPrimaryCulture();
-    auto language = culture->language;
-    country->name = language->generateGenericCapitalizedWord();
-    country->adjective = language->getAdjectiveForm(country->name);
-    country->tag = Arda::Names::generateTag(country->name, nData.disallowedTokens);
-    for (auto &region : country->ownedRegions) {
-      region->owner = country;
-    }
-  }
-  Fwg::Utils::Logging::logLine("Distributing Countries::Assigning Regions");
-
-  if (countries.size()) {
-    for (auto &ardaRegion : ardaRegions) {
-      if (!ardaRegion->isSea() && !ardaRegion->assigned &&
-          !ardaRegion->isLake()) {
-        auto gR = Fwg::Utils::getNearestAssignedLand(
-            ardaRegions, ardaRegion, config.width, config.height);
-        gR->owner->addRegion(ardaRegion);
-        ardaRegion->owner = gR->owner;
-      }
-    }
-  }
-  Fwg::Utils::Logging::logLine(
-      "Distributing Countries::Evaluating Populations");
-  for (auto &country : countries) {
-    country.second->evaluatePopulations(civData.worldPopulationFactorSum);
-    country.second->gatherCultureShares();
-  }
-  Fwg::Utils::Logging::logLine("Distributing Countries::Visualising Countries");
-  visualiseCountries(countryMap);
-  Fwg::Gfx::Png::save(countryMap,
-                      Fwg::Cfg::Values().mapsPath + "countries.png");
-}
-
-void ArdaGen::evaluateCountryNeighbours() {
-  Logging::logLine("Evaluating Country Neighbours");
-  Fwg::Areas::Regions::evaluateRegionNeighbours(areaData.regions);
-
-  for (auto &c : countries) {
-    for (const auto &gR : c.second->ownedRegions) {
-      if (gR->neighbours.size() != areaData.regions[gR->ID].neighbours.size())
-        throw(std::exception("Fatal: Neighbour count mismatch, terminating"));
-      // now compare if all IDs in those neighbour vectors match
-      for (int i = 0; i < gR->neighbours.size(); i++) {
-        if (gR->neighbours[i] != areaData.regions[gR->ID].neighbours[i])
-          throw(std::exception("Fatal: Neighbour mismatch, terminating"));
-      }
-
-      for (const auto &neighbourRegion : gR->neighbours) {
-        // TO DO: Investigate rare crash issue with index being out of range
-        if (ardaRegions[neighbourRegion]->owner == nullptr)
-          continue;
-        if (neighbourRegion < ardaRegions.size() &&
-            ardaRegions[neighbourRegion]->owner->tag != c.second->tag) {
-          c.second->neighbours.insert(ardaRegions[neighbourRegion]->owner);
-        }
-      }
-    }
-  }
-}
-void ArdaGen::totalResourceVal(
-    const std::vector<float> &resPrev, float resourceModifier,
-    const Arda::Utils::ResConfig &resourceConfig) {
+void ArdaGen::totalResourceVal(const std::vector<float> &resPrev,
+                               float resourceModifier,
+                               const Arda::Utils::ResConfig &resourceConfig) {
   const auto baseResourceAmount = resourceModifier;
   auto totalRes = 0.0;
   for (auto &val : resPrev) {
@@ -327,8 +255,372 @@ void ArdaGen::totalResourceVal(
          {resourceConfig.name, resourceConfig.capped, stateRes}});
   }
 }
-void ArdaGen::evaluateCountries() {}
-void ArdaGen::generateCountrySpecifics() {};
+
+void ArdaGen::generateStrategicRegions(
+    std::function<std::shared_ptr<SuperRegion>()> factory) {
+  Fwg::Utils::Logging::logLine(
+      "Scenario: Dividing world into strategic regions");
+  superRegions.clear();
+  superRegionMap.clear();
+  const auto &config = Fwg::Cfg::Values();
+
+  std::vector<int> waterAreaPixels;
+  std::vector<int> landAreaPixels;
+  for (auto &region : this->ardaRegions) {
+    // as per types, group the regions. Land and lake together, while ocean
+    // and islands together. MixedLand is landArea sum up all the province
+    // pixels of the region in one vector
+    region->pixels = region->gatherPixels();
+    if (region->type == Arda::ArdaRegion::RegionType::Ocean ||
+        region->type == Arda::ArdaRegion::RegionType::OceanCoastal ||
+        region->type == Arda::ArdaRegion::RegionType::OceanIslandCoastal ||
+        region->type == Arda::ArdaRegion::RegionType::OceanMixedCoastal ||
+        region->type == Arda::ArdaRegion::RegionType::CoastalIsland ||
+        region->type == Arda::ArdaRegion::RegionType::Island ||
+        region->type == Arda::ArdaRegion::RegionType::IslandLake) {
+      for (auto &province : region->provinces) {
+        waterAreaPixels.insert(waterAreaPixels.end(), region->pixels.begin(),
+                               region->pixels.end());
+      }
+    } else {
+      for (auto &province : region->provinces) {
+        landAreaPixels.insert(landAreaPixels.end(), region->pixels.begin(),
+                              region->pixels.end());
+      }
+    }
+  }
+  auto landShare = static_cast<double>(landAreaPixels.size()) /
+                   (landAreaPixels.size() + waterAreaPixels.size());
+  Fwg::Utils::Logging::logLine("Land share: ", landShare);
+  auto waterShare = static_cast<double>(waterAreaPixels.size()) /
+                    (landAreaPixels.size() + waterAreaPixels.size());
+  Fwg::Utils::Logging::logLine("Water share: ", waterShare);
+  if (landShare + waterShare != 1.0) {
+    Fwg::Utils::Logging::logLine(
+        "Error: Land and water share do not add up to 1.0");
+  }
+  // calculate the amount of strategic regions we want to have
+  int landSuperRegions =
+      static_cast<int>(landShare * 110.0 * 2.0 * this->superRegionFactor);
+  int waterSuperRegions =
+      static_cast<int>(waterShare * 110.0 * 1.0 * this->superRegionFactor);
+
+  int landMinDist = Fwg::Utils::computePoissonMinDistFromArea(
+      landAreaPixels.size(), landSuperRegions, config.width, 8.0);
+  int waterMinDist = Fwg::Utils::computePoissonMinDistFromArea(
+      waterAreaPixels.size(), waterSuperRegions, config.width, 8.0);
+
+  // Launch parallel Poisson disk generation
+  auto waterFuture = std::async(std::launch::async, [&]() {
+    return Fwg::Utils::generatePoissonDiskPoints(
+        waterAreaPixels, config.width, waterSuperRegions, waterMinDist);
+  });
+
+  auto landFuture = std::async(std::launch::async, [&]() {
+    return Fwg::Utils::generatePoissonDiskPoints(landAreaPixels, config.width,
+                                                 landSuperRegions, landMinDist);
+  });
+
+  // Wait and retrieve the results
+  auto waterPoints = waterFuture.get();
+  auto landPoints = landFuture.get();
+
+  std::vector<int> validLandSeeds;
+  auto landVoronois = Fwg::Utils::growRegionsMultiSourceClusters(
+      landAreaPixels, landPoints, config.width, config.height,
+      /*wrapX=*/false,
+      /*fillIslands=*/true, &validLandSeeds);
+
+  std::vector<int> validWaterSeeds;
+  auto waterVoronois = Fwg::Utils::growRegionsMultiSourceClusters(
+      waterAreaPixels, waterPoints, config.width, config.height,
+      /*wrapX=*/false,
+      /*fillIslands=*/true, &validWaterSeeds);
+
+  if (config.debugLevel > 5) {
+    // debug visualise landVoronoi
+    Fwg::Gfx::Bitmap landVoronoiBmp(config.width, config.height, 24);
+    for (auto &landvor : landVoronois) {
+      Fwg::Gfx::Colour c;
+      c.randomize();
+      for (const auto &pix : landvor) {
+        landVoronoiBmp.setColourAtIndex(pix, c);
+      }
+    }
+    Fwg::Gfx::Png::save(landVoronoiBmp,
+                        config.mapsPath + "debug//landVoronoi.png", false);
+    //  debug visualise waterVoronoi
+    Fwg::Gfx::Bitmap waterVoronoiBmp(config.width, config.height, 24);
+    for (auto &watervor : waterVoronois) {
+      Fwg::Gfx::Colour c;
+      c.randomize();
+      for (const auto &pix : watervor) {
+        waterVoronoiBmp.setColourAtIndex(pix, c);
+      }
+    }
+    Fwg::Gfx::Png::save(waterVoronoiBmp,
+                        config.mapsPath + "debug//waterVoronoi.png", false);
+  }
+
+  std::vector<int> indexToVoronoiID(config.bitmapSize);
+  for (int i = 0; i < landVoronois.size(); ++i) {
+    for (const auto &pix : landVoronois[i]) {
+      indexToVoronoiID[pix] = i;
+    }
+  }
+  for (int i = 0; i < waterVoronois.size(); ++i) {
+    for (const auto &pix : waterVoronois[i]) {
+      indexToVoronoiID[pix] = i + landVoronois.size();
+    }
+  }
+  for (auto &landVor : landVoronois) {
+    auto superRegion = factory();
+    superRegion->ID = superRegions.size();
+    superRegion->areaType = Fwg::Areas::AreaType::Land;
+    superRegions.push_back(superRegion);
+  }
+  for (auto &waterVor : waterVoronois) {
+    auto superRegion = factory();
+    superRegion->ID = superRegions.size();
+    superRegion->areaType = Fwg::Areas::AreaType::Sea;
+    superRegions.push_back(superRegion);
+  }
+  // just add a map to track which region belongs to which type of voronoiArea
+  std::map<int, Fwg::Areas::AreaType> regionAreaTypeMap;
+  // now we match the regions to the voronoi areas, and create the strategic
+  // regions by a best fit
+  for (auto &region : this->ardaRegions) {
+    std::unordered_map<int, int> voronoiOverlap;
+    auto &regionPixels = region->pixels;
+    for (const auto &pix : regionPixels) {
+      auto voronoiID = indexToVoronoiID[pix];
+      if (voronoiOverlap.find(voronoiID) == voronoiOverlap.end()) {
+        voronoiOverlap[voronoiID] = 1;
+      } else {
+        voronoiOverlap[voronoiID]++;
+      }
+    }
+    // now find the voronoi area with the most overlap
+    int maxOverlap = 0;
+    int bestVoronoiID = -1;
+    for (const auto &voronoi : voronoiOverlap) {
+      if (voronoi.second > maxOverlap) {
+        maxOverlap = voronoi.second;
+        bestVoronoiID = voronoi.first;
+      }
+    }
+    superRegions[bestVoronoiID]->addRegion(region);
+    regionAreaTypeMap[region->ID] = superRegions[bestVoronoiID]->areaType;
+  }
+  // to track which regions should be reassigned later after evaluation of
+  // some metrics
+  std::queue<std::shared_ptr<Arda::ArdaRegion>> regionsToBeReassigned;
+
+  // postprocess stratregions
+  for (auto &superRegion : superRegions) {
+    superRegion->colour = Fwg::Gfx::generateUniqueColour(
+        superRegion->ID, superRegion->areaType == Fwg::Areas::AreaType::Sea);
+    // lets sum up all the pixels of the strategic region
+    for (auto &ardaRegion : superRegion->ardaRegions) {
+      superRegion->pixels.insert(superRegion->pixels.end(),
+                                 ardaRegion->pixels.begin(),
+                                 ardaRegion->pixels.end());
+    }
+    // let's find the weighted centre of the strat region
+    superRegion->position.calcWeightedCenter(superRegion->pixels);
+
+    // now get all clusters
+    superRegion->regionClusters = superRegion->getClusters(ardaRegions);
+    if (superRegion->regionClusters.size() > 1) {
+      Fwg::Utils::Logging::logLineLevel(
+          9, "Strategic region with ID: ", superRegion->ID,
+          " has multiple clusters: ", superRegion->regionClusters.size());
+    }
+
+    // now if the strategic region is of AreaType sea, free the smaller
+    // clusters, add their regions to the regionsToBeReassigned vector
+    if (superRegion->regionClusters.size() > 1 &&
+        superRegion->areaType == Fwg::Areas::AreaType::Sea) {
+      Fwg::Utils::Logging::logLineLevel(
+          9, "Strategic region with ID: ", superRegion->ID,
+          " has multiple clusters, trying to free smaller clusters");
+      // the biggest cluster by pixels size remains
+      auto biggestCluster =
+          std::max_element(superRegion->regionClusters.begin(),
+                           superRegion->regionClusters.end(),
+                           [](const Arda::Cluster &a, const Arda::Cluster &b) {
+                             return a.size() < b.size();
+                           });
+      // free the others
+      for (auto &cluster : superRegion->regionClusters) {
+        if (&cluster != &(*biggestCluster)) {
+          Fwg::Utils::Logging::logLine("Freeing cluster with size: ",
+                                       cluster.size());
+          // add the regions of the cluster to the regionsToBeReassigned
+          // vector
+          for (auto &region : cluster.regions) {
+            regionsToBeReassigned.push(region);
+            // remove the region from the superRegion ardaRegions vector
+            auto it = std::find(superRegion->ardaRegions.begin(),
+                                superRegion->ardaRegions.end(), region);
+            if (it != superRegion->ardaRegions.end()) {
+              Fwg::Utils::Logging::logLine(
+                  "Removing region with ID: ", region->ID,
+                  " from strategic region with ID: ", superRegion->ID);
+              superRegion->ardaRegions.erase(it);
+
+            } else {
+              Fwg::Utils::Logging::logLine("Warning: Region not found in "
+                                           "strategic region ardaRegions");
+            }
+          }
+          // clear the cluster regions
+          cluster.regions.clear();
+        }
+      }
+
+      // remove empty clusters
+      superRegion->regionClusters.erase(
+          std::remove_if(superRegion->regionClusters.begin(),
+                         superRegion->regionClusters.end(),
+                         [](const Arda::Cluster &cluster) {
+                           return cluster.regions.empty();
+                         }),
+          superRegion->regionClusters.end());
+    }
+  }
+
+  // create a buffer to map which region is assigned to which strategic region
+  std::map<int, int> assignedToIDs;
+  for (auto &superRegion : superRegions) {
+    // assign the regions to the strategic region
+    for (auto &region : superRegion->ardaRegions) {
+      // check for duplicate regions
+      if (assignedToIDs.count(region->ID)) {
+        Fwg::Utils::Logging::logLine(
+            "Warning: Region with ID: ", region->ID,
+            " is already assigned to strategic region with ID: ",
+            assignedToIDs[region->ID]);
+        continue; // skip this region, it is already assigned
+      }
+
+      assignedToIDs[region->ID] = superRegion->ID;
+    }
+  }
+
+  // now we reassign the regions to the strategic regions
+  // take from queue regionsToBeReassigned, and assign all of them until none
+  // are left. We assign by taking all neighbours of the same AreaType, and
+  // determining which one of those is closest to us using the position
+  while (!regionsToBeReassigned.empty()) {
+    auto region = regionsToBeReassigned.front();
+    regionsToBeReassigned.pop();
+    std::map<int, int> regionDistances;
+    for (auto &neighbourId : region->neighbours) {
+      auto &neighbourRegion = ardaRegions[neighbourId];
+      // if the neighbour region is of the same area type, we can consider
+      // that ones distance, and it must already be assigned
+      if (regionAreaTypeMap[neighbourRegion->ID] ==
+              regionAreaTypeMap[region->ID] &&
+          assignedToIDs.count(neighbourRegion->ID)) {
+        // calculate the distance between the two regions
+        auto distance = Fwg::Utils::getDistance(
+            region->position.weightedCenter,
+            neighbourRegion->position.weightedCenter, config.width);
+        regionDistances[neighbourId] = distance;
+      }
+    }
+    // now find the closest neighbour region
+    if (regionDistances.empty()) {
+      Fwg::Utils::Logging::logLine("Warning: No neighbours of the same area "
+                                   "type found for region with "
+                                   "ID: ",
+                                   region->ID);
+      continue; // no neighbours of the same area type, skip
+    }
+    auto closestNeighbourIt = std::min_element(
+        regionDistances.begin(), regionDistances.end(),
+        [](const std::pair<int, int> &a, const std::pair<int, int> &b) {
+          return a.second < b.second;
+        });
+    auto closestNeighbourID = closestNeighbourIt->first;
+    auto closestNeighbourRegion = ardaRegions[closestNeighbourID];
+    // check if the closest neighbour region is already assigned to a
+    // strategic region
+    if (assignedToIDs.find(closestNeighbourID) != assignedToIDs.end()) {
+      // if it is, assign the region to the same strategic region
+      auto superRegionID = assignedToIDs[closestNeighbourID];
+      Fwg::Utils::Logging::logLine(
+          "Reassigning region with ID: ", region->ID,
+          " to strategic region with ID: ", superRegionID);
+      superRegions[superRegionID]->addRegion(region);
+      assignedToIDs[region->ID] = superRegionID;
+    } else {
+      // if it is not, put it back on the queue to be reassigned
+      Fwg::Utils::Logging::logLine(
+          "No strategic region found for region with ID: ", region->ID,
+          " closest neighbour is: ", closestNeighbourID);
+      regionsToBeReassigned.push(region);
+    }
+  }
+
+  // safety check to see if all regions are assigned to some region
+  for (const auto &region : ardaRegions) {
+    if (assignedToIDs.find(region->ID) == assignedToIDs.end()) {
+      Fwg::Utils::Logging::logLine("Warning: Region with ID: ", region->ID,
+                                   " is not assigned to any strategic region");
+      // assign it to the first strategic region
+      if (!superRegions.empty()) {
+        superRegions[0]->addRegion(region);
+        assignedToIDs[region->ID] = superRegions[0]->ID;
+      } else {
+        Fwg::Utils::Logging::logLine("Error: No strategic regions available, "
+                                     "cannot assign region with "
+                                     "ID: ",
+                                     region->ID);
+      }
+    }
+  }
+  // delete all empty strategic regions
+  superRegions.erase(
+      std::remove_if(superRegions.begin(), superRegions.end(),
+                     [](const std::shared_ptr<Arda::SuperRegion> &superRegion) {
+                       return superRegion->ardaRegions.empty();
+                     }),
+      superRegions.end());
+  // fix IDs of strategic regions
+  for (size_t i = 0; i < superRegions.size(); ++i) {
+    superRegions[i]->ID = i;
+    for (auto &region : superRegions[i]->ardaRegions) {
+      // set the super region ID for the region
+      region->superRegionID = i;
+    }
+    // also set the name of the strategic region
+    superRegions[i]->name = std::to_string(i + 1);
+  }
+
+  Fwg::Utils::Logging::logLine(
+      "Scenario: Done Dividing world into strategic regions");
+  for (auto &superRegion : superRegions) {
+    superRegion->checkPosition(superRegions);
+    superRegion->name = std::to_string(superRegion->ID + 1);
+  }
+  ////  build a vector of superregions from all the strategic regions
+  // for (auto &superRegion : superRegions) {
+  //   StrategicRegion stratRegion;
+  //   stratRegion->ID = superRegion->ID;
+  //   stratRegion->ardaRegions = superRegion->ardaRegions;
+  //   stratRegion->setType();
+  //   strategicRegions.push_back(stratRegion);
+  // }
+  // visualiseStrategicRegions();
+  // Fwg::Utils::Logging::logLine(
+  //     "Scenario: Done visualising and checking positions of strategic
+  //     regions");
+
+  return;
+}
+
 void ArdaGen::printStatistics() {
   Logging::logLine("Printing Statistics");
   std::map<std::string, int> countryPop;
