@@ -1,6 +1,10 @@
 #include "countries/Country.h"
 namespace Arda {
-Country::Country() : ID{-1} {}
+Country::Country() : ID{-1} {
+  colour = {static_cast<unsigned char>(RandNum::getRandom(0, 255)),
+            static_cast<unsigned char>(RandNum::getRandom(0, 255)),
+            static_cast<unsigned char>(RandNum::getRandom(0, 255))};
+}
 
 Country::Country(std::string tag, int ID, std::string name,
                  std::string adjective, Gfx::Flag flag)
@@ -95,10 +99,11 @@ void Country::evaluateProvinces() {
     }
   }
   // sort the provinces by ID
-  std::sort(
-      ownedProvinces.begin(), ownedProvinces.end(),
-      [](const std::shared_ptr<Arda::ArdaProvince> &a,
-         const std::shared_ptr<Arda::ArdaProvince> &b) { return a->ID < b->ID; });
+  std::sort(ownedProvinces.begin(), ownedProvinces.end(),
+            [](const std::shared_ptr<Arda::ArdaProvince> &a,
+               const std::shared_ptr<Arda::ArdaProvince> &b) {
+              return a->ID < b->ID;
+            });
 }
 void Country::evaluatePopulations(const double worldPopulationFactor) {
   // gather all population factors of the regions

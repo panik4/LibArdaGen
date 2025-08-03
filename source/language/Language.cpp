@@ -39,14 +39,14 @@ void Language::generateVocabulary() {
     vocabulary[key] =
         std::vector<std::string>(uniqueWords.begin(), uniqueWords.end());
   }
-  // now print the vocabulary by key
-  for (const auto &[key, words] : vocabulary) {
-    std::cout << "Vocabulary for " << key << ":\n";
-    for (const auto &word : words) {
-      std::cout << word << "\n";
-    }
-    std::cout << "\n";
-  }
+  //// now print the vocabulary by key
+  //for (const auto &[key, words] : vocabulary) {
+  //  std::cout << "Vocabulary for " << key << ":\n";
+  //  for (const auto &word : words) {
+  //    std::cout << word << "\n";
+  //  }
+  //  std::cout << "\n";
+  //}
 }
 
 void Language::fillAllLists() {
@@ -61,50 +61,6 @@ void Language::fillAllLists() {
   names.clear();
   shipNames.clear();
   airplaneNames.clear();
-
-  // for (int i = 0; i < 3; i++) {
-  //   std::string article;
-  //   bool hasVowel = false;
-  //   int reqSize = 2 + rand() % 2;
-  //   for (int j = 0; j < reqSize; j++) {
-  //     std::string letter = "";
-  //     if ((!hasVowel && j == reqSize - 1) || rand() % reqSize == 0) {
-  //       letter = getRandomLetter(vowels, cumulativeVowelWeights, vowelDis);
-  //       hasVowel = true;
-  //     } else {
-  //       letter = getRandomLetter(consonants, cumulativeConsonantWeights,
-  //                                consonantDis);
-  //     }
-  //     article += letter;
-  //   }
-  //   if (!hasVowel) {
-  //     article[rand() % article.size()] =
-  //         getRandomLetter(vowels, cumulativeVowelWeights, vowelDis)[0];
-  //   }
-  //   articles.push_back(article);
-  // }
-  //// generate adjective endings
-  // for (int i = 0; i < 3; i++) {
-  //   std::string adjectiveEnding;
-  //   bool hasConsonant = false;
-  //   int reqSize = 1 + rand() % 3;
-  //   for (int j = 0; j < reqSize; j++) {
-  //     std::string letter = "";
-  //     if ((!hasConsonant && j == reqSize - 1) || rand() % reqSize == 0) {
-  //       letter = getRandomLetter(consonants, cumulativeConsonantWeights,
-  //                                consonantDis);
-  //       hasConsonant = true;
-  //     } else {
-  //       letter = getRandomLetter(vowels, cumulativeVowelWeights, vowelDis);
-  //     }
-  //     adjectiveEnding += letter;
-  //   }
-  //   if (!hasConsonant) {
-  //     adjectiveEnding[rand() % adjectiveEnding.size()] =
-  //         getRandomLetter(vowels, cumulativeVowelWeights, vowelDis)[0];
-  //   }
-  //   adjectiveEndings.push_back(adjectiveEnding);
-  // }
 
   for (int i = 0; i < 2; i++) {
     citySuffixes.push_back(getRandomWordFromVocabulary("CitySuffix"));
@@ -153,7 +109,7 @@ void Language::fillAllLists() {
     cityNames.push_back(cityName);
   }
 
-  std::set<std::string> usedMaleNames;
+  std::unordered_set<std::string> usedMaleNames;
   for (int i = 0; i < 100; i++) {
     std::string firstName = getRandomWordFromVocabulary("MaleNames");
     if (usedMaleNames.find(firstName) == usedMaleNames.end()) {
@@ -161,7 +117,7 @@ void Language::fillAllLists() {
       usedMaleNames.insert(firstName);
     }
   }
-  std::set<std::string> usedFemaleNames;
+  std::unordered_set<std::string> usedFemaleNames;
   for (int i = 0; i < 100; i++) {
     std::string firstName = getRandomWordFromVocabulary("FemaleNames");
     if (usedFemaleNames.find(firstName) == usedFemaleNames.end() &&
@@ -170,7 +126,7 @@ void Language::fillAllLists() {
       usedFemaleNames.insert(firstName);
     }
   }
-  std::set<std::string> usedLastNames;
+  std::unordered_set<std::string> usedLastNames;
   for (int i = 0; i < 100; i++) {
     std::string lastName = generateGenericCapitalizedWord();
     if (usedLastNames.find(lastName) == usedLastNames.end() &&
@@ -180,7 +136,7 @@ void Language::fillAllLists() {
       usedLastNames.insert(lastName);
     }
   }
-  std::set<std::string> usedNames;
+  std::unordered_set<std::string> usedNames;
   for (int i = 0; i < 100; i++) {
     std::string shipName = generateGenericCapitalizedWord();
     if (usedNames.find(shipName) == usedNames.end()) {

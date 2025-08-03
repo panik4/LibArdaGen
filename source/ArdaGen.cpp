@@ -1,4 +1,4 @@
-#include "generic/ArdaGen.h"
+#include "ArdaGen.h"
 namespace Logging = Fwg::Utils::Logging;
 namespace Arda {
 using namespace Fwg::Gfx;

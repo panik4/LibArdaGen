@@ -1,7 +1,6 @@
 #pragma once
 #include "language/Dataset.h"
 #include "language/MarkovNameGenerator.h"
-#include <algorithm>
 #include <iostream>
 #include <map>
 namespace Arda {

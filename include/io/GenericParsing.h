@@ -1,7 +1,7 @@
 #pragma once
 #include "FastWorldGenerator.h"
 #include "areas/ArdaRegion.h"
-#include "generic/ArdaGen.h"
+#include "ArdaGen.h"
 #include "io/Parsing.h"
 #include <filesystem>
 #include <string>

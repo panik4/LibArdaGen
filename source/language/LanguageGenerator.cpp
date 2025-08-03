@@ -1,4 +1,3 @@
-
 #include "language/LanguageGenerator.h"
 namespace Arda {
 void LanguageGenerator::loadDatasets(

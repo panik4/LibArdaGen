@@ -169,7 +169,9 @@ void distributeLanguages(CivilizationData &civData) {
     civData.languageGroups.push_back(languageGroup);
     cultureGroup->setLanguageGroup(languageGroup);
     // now generate at least as many languages as we have cultures
-    languageGroup->generate(cultureGroup->getCultures().size());
+    languageGroup->generate(cultureGroup->getCultures().size(),
+                            Fwg::Cfg::Values().resourcePath +
+                                "//names//languageGroups//");
     // languageGroup->generate(cultureGroup->getCultures().size());
     //  now assign each culture a language
     for (auto i = 0; i < cultureGroup->getCultures().size(); i++) {
