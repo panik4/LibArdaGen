@@ -6,6 +6,14 @@
 #include <vector>
 namespace Arda {
 
+enum class AreaNameType {
+  Ocean,
+  Sea,
+  Lake,
+  Plains,
+  Valley,
+};
+
 class Language {
 public:
   Dataset reducedDataset;
@@ -14,7 +22,9 @@ public:
   void train();
 
   void generateVocabulary();
-
+  static std::string capitaliseName(const std::string &word);
+  static std::string capitalisedWord(const std::string &word);
+  static std::string lowercaseWord(const std::string &word);
   std::string name;
   std::vector<std::string> articles;         // like the, la, le, der, die, das
   std::vector<std::string> adjectiveEndings; // like -ian, -ese, -ish, -ese,
@@ -41,11 +51,15 @@ public:
 
   void fillAllLists();
 
+  std::string
+  getRandomCapitalisedWordFromVocabulary(const std::string &category);
+
+  std::string getRandomLowercaseWordFromVocabulary(const std::string &category);
+
   std::string generateWord(const std::vector<std::string> &tokenSet);
   std::string getRandomWordFromVocabulary(const std::string &category);
-  std::string generateWord();
-
   std::string generateGenericWord();
+  std::string generateGenericLowercaseWord();
   std::string generateGenericCapitalizedWord();
   std::string getAdjectiveForm(const std::string &word);
   std::string generateAreaName(const std::string &trait);

@@ -39,14 +39,45 @@ void Language::generateVocabulary() {
     vocabulary[key] =
         std::vector<std::string>(uniqueWords.begin(), uniqueWords.end());
   }
-  //// now print the vocabulary by key
-  //for (const auto &[key, words] : vocabulary) {
-  //  std::cout << "Vocabulary for " << key << ":\n";
-  //  for (const auto &word : words) {
-  //    std::cout << word << "\n";
-  //  }
-  //  std::cout << "\n";
-  //}
+}
+
+std::string Language::capitaliseName(const std::string &word) {
+  // simple rule: First letter capitalised, anything after a dash or space
+  // capitalised, rest lowercase
+  if (word.empty())
+    return word;
+  std::string capitalised = word;
+  capitalised[0] = toupper(capitalised[0]);
+  for (size_t i = 1; i < capitalised.size(); ++i) {
+    if (capitalised[i - 1] == '-' || capitalised[i - 1] == ' ') {
+      capitalised[i] = toupper(capitalised[i]);
+    } else {
+      capitalised[i] = tolower(capitalised[i]);
+    }
+  }
+
+  return capitalised;
+}
+
+std::string Language::capitalisedWord(const std::string &word) {
+  if (word.empty())
+    return word;
+  std::string capitalised = word;
+  capitalised[0] = toupper(capitalised[0]);
+  for (size_t i = 1; i < capitalised.size(); ++i) {
+    capitalised[i] = tolower(capitalised[i]);
+  }
+  return capitalised;
+}
+
+std::string Language::lowercaseWord(const std::string &word) {
+  if (word.empty())
+    return word;
+  std::string lowercased = word;
+  for (size_t i = 0; i < lowercased.size(); ++i) {
+    lowercased[i] = tolower(lowercased[i]);
+  }
+  return lowercased;
 }
 
 void Language::fillAllLists() {
@@ -63,15 +94,16 @@ void Language::fillAllLists() {
   airplaneNames.clear();
 
   for (int i = 0; i < 2; i++) {
-    citySuffixes.push_back(getRandomWordFromVocabulary("CitySuffix"));
+    citySuffixes.push_back(getRandomLowercaseWordFromVocabulary("CitySuffix"));
   }
   for (int i = 0; i < 2; i++) {
-    cityPrefixes.push_back(getRandomWordFromVocabulary("CityPrefix"));
+    cityPrefixes.push_back(
+        getRandomCapitalisedWordFromVocabulary("CityPrefix"));
   }
   bool articlesUsed = false;
-  //if (rand() % 3 == 0) {
-  //  articlesUsed = true;
-  //}
+  // if (rand() % 3 == 0) {
+  //   articlesUsed = true;
+  // }
   std::string prefixSeparator = " ";
   if (rand() % 3 == 0) {
     prefixSeparator = "-";
@@ -82,9 +114,10 @@ void Language::fillAllLists() {
   for (auto &article : articles) {
     article[0] = toupper(article[0]);
   }
-  port = generateWord();
+  port = generateGenericCapitalizedWord();
 
-  for (int i = 0; i < 100; i++) {
+  std::unordered_set<std::string> usedCoreNames;
+  for (int i = 0; i < 4000; i++) {
     std::string cityName;
     if (rand() % 3 == 0) {
       if (articlesUsed && rand() % 2 == 0) {
@@ -95,8 +128,10 @@ void Language::fillAllLists() {
         cityName += prefixSeparator;
       }
     }
-    auto coreName = generateGenericWord();
-    coreName[0] = toupper(coreName[0]);
+    auto coreName = generateGenericLowercaseWord();
+    while (usedCoreNames.find(coreName) != usedCoreNames.end()) {
+      coreName = generateGenericLowercaseWord();
+    }
     cityName += coreName;
     if (rand() % 3 == 0) {
       auto suffix = Fwg::Utils::selectRandom(citySuffixes);
@@ -106,20 +141,22 @@ void Language::fillAllLists() {
       }
       cityName += suffix;
     }
+    cityName = capitaliseName(cityName);
     cityNames.push_back(cityName);
   }
 
   std::unordered_set<std::string> usedMaleNames;
-  for (int i = 0; i < 100; i++) {
-    std::string firstName = getRandomWordFromVocabulary("MaleNames");
+  for (int i = 0; i < 1000; i++) {
+    std::string firstName = getRandomCapitalisedWordFromVocabulary("MaleNames");
     if (usedMaleNames.find(firstName) == usedMaleNames.end()) {
       maleNames.push_back(firstName);
       usedMaleNames.insert(firstName);
     }
   }
   std::unordered_set<std::string> usedFemaleNames;
-  for (int i = 0; i < 100; i++) {
-    std::string firstName = getRandomWordFromVocabulary("FemaleNames");
+  for (int i = 0; i < 1000; i++) {
+    std::string firstName =
+        getRandomCapitalisedWordFromVocabulary("FemaleNames");
     if (usedFemaleNames.find(firstName) == usedFemaleNames.end() &&
         usedMaleNames.find(firstName) == usedMaleNames.end()) {
       femaleNames.push_back(firstName);
@@ -127,7 +164,7 @@ void Language::fillAllLists() {
     }
   }
   std::unordered_set<std::string> usedLastNames;
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < 1000; i++) {
     std::string lastName = generateGenericCapitalizedWord();
     if (usedLastNames.find(lastName) == usedLastNames.end() &&
         usedMaleNames.find(lastName) == usedMaleNames.end() &&
@@ -137,7 +174,7 @@ void Language::fillAllLists() {
     }
   }
   std::unordered_set<std::string> usedNames;
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < 1000; i++) {
     std::string shipName = generateGenericCapitalizedWord();
     if (usedNames.find(shipName) == usedNames.end()) {
       shipNames.push_back(shipName);
@@ -151,31 +188,41 @@ void Language::fillAllLists() {
   }
 }
 
-std::string Language::getRandomWordFromVocabulary(const std::string &category) {
-  return vocabulary.at(category)[rand() % vocabulary.at(category).size()];
+std::string
+Language::getRandomCapitalisedWordFromVocabulary(const std::string &category) {
+  return capitalisedWord(
+      vocabulary.at(category)[rand() % vocabulary.at(category).size()]);
 }
 
-std::string Language::generateWord() {
-  return getRandomWordFromVocabulary("GenericWords");
+std::string
+Language::getRandomLowercaseWordFromVocabulary(const std::string &category) {
+  return capitalisedWord(
+      vocabulary.at(category)[rand() % vocabulary.at(category).size()]);
+}
+
+std::string Language::getRandomWordFromVocabulary(const std::string &category) {
+  return vocabulary.at(category)[rand() % vocabulary.at(category).size()];
 }
 
 std::string Language::generateGenericWord() {
   return getRandomWordFromVocabulary("GenericWords");
 }
-
+std::string Language::generateGenericLowercaseWord() {
+  auto word = getRandomWordFromVocabulary("GenericWords");
+  return lowercaseWord(word);
+}
 std::string Language::generateGenericCapitalizedWord() {
   auto word = getRandomWordFromVocabulary("GenericWords");
-  word[0] = toupper(word[0]);
-  // tolower for the rest
-  for (size_t i = 1; i < word.size(); ++i) {
-    word[i] = tolower(word[i]);
-  }
-  return word;
+  return capitalisedWord(word);
 }
 std::string Arda::Language::getAdjectiveForm(const std::string &word) {
-  return word/* + Fwg::Utils::selectRandom(adjectiveEndings)*/;
+  return word /* + Fwg::Utils::selectRandom(adjectiveEndings)*/;
 }
 std::string Arda::Language::generateAreaName(const std::string &trait) {
-  return generateGenericCapitalizedWord();
+  auto name = generateGenericCapitalizedWord();
+  if (trait == "sea") {
+    name += " Sea";
+  }
+  return name;
 }
 } // namespace Arda

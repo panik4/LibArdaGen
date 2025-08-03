@@ -14,7 +14,8 @@ namespace Arda::Civilization {
 void generateWorldCivilizations(
     std::vector<std::shared_ptr<ArdaRegion>> &regions,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
-    CivilizationData &civData, std::vector<ArdaContinent> &continents);
+    CivilizationData &civData, std::vector<ArdaContinent> &continents,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions);
 void generateReligions(
     CivilizationData &civData,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces);
@@ -33,7 +34,10 @@ void generateEconomicActivity(CivilizationData &civData,
 void generateImportance(std::vector<std::shared_ptr<ArdaRegion>> &regions);
 // after having generated cultures, generate names for the regions
 void nameRegions(std::vector<std::shared_ptr<ArdaRegion>> &regions);
-// after having generated cultures, generate names for the continents
+void nameSuperRegions(
+    std::vector<std::shared_ptr<SuperRegion>> &superRegion,
+    std::vector<std::shared_ptr<Arda::ArdaRegion>> &ardaRegions);
+    // after having generated cultures, generate names for the continents
 void nameContinents(std::vector<ArdaContinent> &continents,
                     std::vector<std::shared_ptr<ArdaRegion>> &regions);
 

@@ -3,9 +3,10 @@
 namespace Arda::Civilization {
 
 void generateWorldCivilizations(
-    std::vector<std::shared_ptr<ArdaRegion>> &regions,
+    std::vector<std::shared_ptr<Arda::ArdaRegion>> &regions,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
-    CivilizationData &civData, std::vector<ArdaContinent> &continents) {
+    CivilizationData &civData, std::vector<ArdaContinent> &continents,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions) {
   generatePopulationFactors(civData, regions);
   generateDevelopment(regions);
   generateEconomicActivity(civData, regions);
@@ -182,8 +183,9 @@ void distributeLanguages(CivilizationData &civData) {
   }
 }
 
-void generatePopulationFactors(CivilizationData &civData,
-                               std::vector<std::shared_ptr<ArdaRegion>> &regions) {
+void generatePopulationFactors(
+    CivilizationData &civData,
+    std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   Fwg::Utils::Logging::logLine("Generating Population");
   double worldPopulationFactorSum = 0.0;
   for (auto &gR : regions) {
@@ -229,8 +231,9 @@ void generateDevelopment(std::vector<std::shared_ptr<ArdaRegion>> &regions) {
 /* Very simple calculation of economic activity. The modules can override this
  * to implement their own, more complex calculations
  */
-void generateEconomicActivity(CivilizationData &civData,
-                              std::vector<std::shared_ptr<ArdaRegion>> &regions) {
+void generateEconomicActivity(
+    CivilizationData &civData,
+    std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   double worldEconomicActivitySum = 0.0;
   for (auto &region : regions) {
     region->economicActivity =
@@ -271,6 +274,51 @@ void nameRegions(std::vector<std::shared_ptr<ArdaRegion>> &regions) {
                    [](unsigned char c) { return std::toupper(c); });
     for (auto &province : region->ardaProvinces) {
       province->name = language->generateAreaName("");
+    }
+  }
+}
+void nameSuperRegions(
+    std::vector<std::shared_ptr<SuperRegion>> &superRegion,
+    std::vector<std::shared_ptr<Arda::ArdaRegion>> &ardaRegions) {
+  // take all regions and name them by taking their dominant cultures language
+  // and generating a name
+  for (auto &superRegion : superRegion) {
+    // first find a reference region: check if any of our owned region has a
+    // primary culture
+    std::shared_ptr<Arda::ArdaRegion> namegivingRegion;
+    for (auto &region : superRegion->ardaRegions) {
+      auto culture = region->getPrimaryCulture();
+      if (culture != nullptr) {
+        namegivingRegion = region;
+      }
+    }
+    if (namegivingRegion == nullptr) {
+      float distance = 100000000.0;
+      // search all regions, check the closest with a culture that is not null
+      for (auto &region : ardaRegions) {
+        auto culture = region->getPrimaryCulture();
+        if (culture != nullptr) {
+          auto nDistance =
+              Fwg::getPositionDistance(region->position, superRegion->position,
+                                       Fwg::Cfg::Values().width);
+          if (nDistance < distance) {
+            namegivingRegion = region;
+            distance = nDistance;
+          }
+        }
+      }
+    }
+    if (namegivingRegion == nullptr) {
+      superRegion->name = "SuperRegion " + std::to_string(superRegion->ID);
+      continue;
+    } else {
+      auto culture = namegivingRegion->getPrimaryCulture();
+      if (culture == nullptr) {
+        superRegion->name = "SuperRegion " + std::to_string(superRegion->ID);
+        continue;
+      }
+      auto language = culture->language;
+      superRegion->name = language->generateAreaName("sea");
     }
   }
 }

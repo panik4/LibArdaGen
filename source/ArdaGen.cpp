@@ -605,6 +605,7 @@ void ArdaGen::generateStrategicRegions(
     superRegion->checkPosition(superRegions);
     superRegion->name = std::to_string(superRegion->ID + 1);
   }
+  Civilization::nameSuperRegions(superRegions, ardaRegions);
   ////  build a vector of superregions from all the strategic regions
   // for (auto &superRegion : superRegions) {
   //   StrategicRegion stratRegion;
