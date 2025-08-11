@@ -39,9 +39,23 @@ void writeMipMapDDS(const int width, const int height,
                   wPath.c_str());
   }
 }
+void flipVertically(std::vector<uint8_t> &pixels, int width, int height) {
+  const int rowSize = width * 4;
+  std::vector<uint8_t> tempRow(rowSize);
 
+  for (int y = 0; y < height / 2; ++y) {
+    uint8_t *rowTop = pixels.data() + y * rowSize;
+    uint8_t *rowBottom = pixels.data() + (height - 1 - y) * rowSize;
+
+    std::memcpy(tempRow.data(), rowTop, rowSize);
+    std::memcpy(rowTop, rowBottom, rowSize);
+    std::memcpy(rowBottom, tempRow.data(), rowSize);
+  }
+}
 void writeTGA(const int width, const int height, std::vector<uint8_t> pixelData,
               const std::string &path) {
+  flipVertically(pixelData, width, height);
+
   auto wPath{std::wstring(path.begin(), path.end())};
   Image image(width, height, DXGI_FORMAT_B8G8R8A8_UNORM,
               sizeof(uint8_t) * width * 4, sizeof(uint8_t) * width * height,

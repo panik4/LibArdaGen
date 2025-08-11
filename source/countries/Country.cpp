@@ -168,4 +168,13 @@ std::shared_ptr<Culture> Arda::Country::getPrimaryCulture() const {
   }
   return primaryCulture;
 }
+std::string Country::exportLine() const {
+  std::string line = "";
+  line += colour.toString() + ";";
+  line += tag + ";";
+  line += name + ";";
+  line += adjective + ";";
+
+  return line;
+}
 } // namespace Arda

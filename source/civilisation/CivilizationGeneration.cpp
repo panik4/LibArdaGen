@@ -21,6 +21,9 @@ void generateWorldCivilizations(
   nameRegions(regions);
   generateImportance(regions);
   nameContinents(continents, regions);
+  Arda::Areas::saveRegions(regions,
+                           Fwg::Cfg::Values().mapsPath + "//areas//",
+                           Arda::Gfx::visualiseRegions(regions));
 }
 
 void generateReligions(
@@ -193,8 +196,8 @@ void generatePopulationFactors(
     for (auto &gProv : gR->ardaProvinces) {
       // calculate the population factor. We use both the size of the province
       // and the population density
-      gProv->popFactor = gProv->baseProvince->populationDensity *
-                         gProv->baseProvince->pixels.size();
+      gProv->popFactor =
+          gProv->baseProvince->populationDensity * gProv->baseProvince->size();
       // the game region has its population increased by the population factor
       // of the province, therefore a product of the size of all provinces and
       // their respective population densities
@@ -268,10 +271,6 @@ void nameRegions(std::vector<std::shared_ptr<ArdaRegion>> &regions) {
     }
     auto language = culture->language;
     region->name = language->generateAreaName("");
-    // capitalise the region name
-    std::transform(region->name.begin(), region->name.end(),
-                   region->name.begin(),
-                   [](unsigned char c) { return std::toupper(c); });
     for (auto &province : region->ardaProvinces) {
       province->name = language->generateAreaName("");
     }
@@ -318,7 +317,8 @@ void nameSuperRegions(
         continue;
       }
       auto language = culture->language;
-      superRegion->name = language->generateAreaName("sea");
+      superRegion->name =
+          language->generateAreaName(superRegion->isSea() ? "sea" : "");
     }
   }
 }

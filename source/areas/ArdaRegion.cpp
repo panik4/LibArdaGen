@@ -8,7 +8,7 @@ ArdaRegion::ArdaRegion(const Fwg::Areas::Region &baseRegion)
 ArdaRegion::~ArdaRegion() {}
 void ArdaRegion::sumPopulations() {}
 void ArdaRegion::findLocator(Fwg::Civilization::LocationType locationType,
-                         int maxAmount) {
+                             int maxAmount) {
   std::shared_ptr<Fwg::Civilization::Location> addLocation;
   int maxPixels = 0;
   for (auto &location : locations) {
@@ -70,5 +70,12 @@ std::shared_ptr<Arda::Culture> Arda::ArdaRegion::getPrimaryCulture() {
       [](const auto &a, const auto &b) { return a.second < b.second; });
 
   return primaryCulture->first;
+}
+std::string ArdaRegion::exportLine() const {
+  std::string retLine = "";
+  retLine += colour.toString() + ";";
+  retLine += this->name + ";";
+  retLine += std::to_string(this->totalPopulation) + ";";
+  return retLine;
 }
 } // namespace Arda

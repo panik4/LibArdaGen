@@ -46,7 +46,7 @@ void Arda::SuperRegion::checkPosition(
     std::vector<int> pixels;
     for (auto &reg : ardaRegions) {
       for (auto &prov : reg->provinces) {
-        for (auto &pix : prov->pixels) {
+        for (const auto pix : prov->getNonOwningPixelView()) {
           pixels.push_back(pix);
         }
       }
@@ -65,7 +65,7 @@ void Arda::SuperRegion::checkPosition(
         std::unordered_set<int> othersPixels;
         for (auto &reg : superReg->ardaRegions) {
           for (auto &prov : reg->provinces) {
-            for (auto &pix : prov->pixels) {
+            for (const auto pix : prov->getNonOwningPixelView()) {
               othersPixels.insert(pix);
             }
           }
@@ -119,8 +119,10 @@ std::vector<Cluster> Arda::SuperRegion::getClusters(
       clusterObj.regions = std::move(cluster);
       // gather all pixels from the cluster
       for (const auto &reg : clusterObj.regions) {
-        clusterObj.pixels.insert(clusterObj.pixels.end(),
-                                 region->pixels.begin(), region->pixels.end());
+        clusterObj.getPixelsForManipulation().insert(
+            clusterObj.getPixelsForManipulation().end(),
+                                 region->getNonOwningPixelView().begin(),
+                                 region->getNonOwningPixelView().end());
       }
 
       clusters.push_back(std::move(clusterObj));

@@ -1,5 +1,6 @@
 #pragma once
 #include "areas/SuperRegion.h"
+#include "countries/Country.h"
 #include "civilisation/ArdaCivilisations.h"
 #include "rendering/Visualization.h"
 
@@ -12,5 +13,12 @@ Fwg::Gfx::Bitmap visualiseStrategicRegions(
     Fwg::Gfx::Bitmap &superRegionMap,
     const std::vector<std::shared_ptr<Arda::SuperRegion>> &superRegions,
     const int ID = -1);
+
+Fwg::Gfx::Bitmap
+visualiseRegions(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
+
+
+Fwg::Gfx::Bitmap visualiseCountries(
+    const std::map<std::string, std::shared_ptr<Country>> &countries);
 
 } // namespace Arda::Gfx

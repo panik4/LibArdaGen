@@ -36,6 +36,18 @@ void evaluateCountryNeighbours(
     std::vector<Fwg::Areas::Region> &baseRegions,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     std::map<std::string, std::shared_ptr<Country>> &countries);
+
+// load countries from an image and map them to regions
+void loadCountries(std::function<std::shared_ptr<Country>()> factory,
+                   std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+                   std::map<std::string, std::shared_ptr<Country>> &countries,
+                   Civilization::CivilizationData &civData,
+                   Arda::Names::NameData &nData,
+                   const Fwg::Gfx::Bitmap &inputImage,
+                   const std::string &mappingPath);
+void saveCountries(std::map<std::string, std::shared_ptr<Country>> &countries,
+                   const std::string &mappingPath,
+                   const Fwg::Gfx::Bitmap &countryImage);
 // virtual void generateCountrySpecifics();
 
 }; // namespace Arda::Countries

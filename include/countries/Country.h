@@ -73,5 +73,7 @@ public:
 
   void gatherCultureShares();
   virtual std::shared_ptr<Culture> getPrimaryCulture() const;
+
+  virtual std::string exportLine() const;
 };
 } // namespace Arda

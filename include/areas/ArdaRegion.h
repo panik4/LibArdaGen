@@ -23,7 +23,7 @@ public:
   double importanceScore;
   double relativeImportance;
   // calculate this in every module
-  int totalPopulation;
+  int totalPopulation = 0;
   // this calculated in every module, usually by taking both population and
   // development into account
   double economicActivity;
@@ -67,5 +67,6 @@ public:
   std::shared_ptr<Fwg::Civilization::Location>
   getLocation(Fwg::Civilization::LocationType type);
   std::shared_ptr<Arda::Culture> getPrimaryCulture();
+  std::string exportLine() const;
 };
 } // namespace Arda

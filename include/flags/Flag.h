@@ -7,6 +7,7 @@ namespace Arda::Gfx {
 struct FlagInfo {
   std::vector<std::string> flagColourGroups;
   std::vector<std::string> symbolColourGroups;
+  bool applySymbol;
   double symbolWidthOffset;
   double symbolHeightOffset;
   double reductionFactor;
@@ -47,7 +48,7 @@ public:
   void flip();
   static std::vector<unsigned char>
   resize(const int width, const int height,
-         const std::vector<unsigned char> tImage, const int inWidth,
+         const std::vector<unsigned char> &tImage, const int inWidth,
          const int inHeight);
   // methods - read in configs
   static void readColourGroups();

@@ -4,6 +4,7 @@
 #include "areas/ArdaContinent.h"
 #include "areas/ArdaProvince.h"
 #include "areas/ArdaRegion.h"
+#include "areas/AreaGen.h"
 #include "areas/SuperRegion.h"
 #include "civilisation/CivilizationGeneration.h"
 #include "countries/Country.h"
@@ -53,7 +54,15 @@ public:
   ArdaGen(Fwg::FastWorldGenerator &fwg);
   ~ArdaGen();
   /* member functions*/
+  void generateStrategicRegions(
+      std::function<std::shared_ptr<SuperRegion>()> factory);
+  void
+  loadStrategicRegions(std::function<std::shared_ptr<SuperRegion>()> factory,
+                       const Fwg::Gfx::Bitmap &inputImage);
+  virtual void generateStateSpecifics();
   void generateCountries(std::function<std::shared_ptr<Country>()> factory);
+  void loadCountries(std::function<std::shared_ptr<Country>()> factory,
+                     const Fwg::Gfx::Bitmap &inputImage);
   // print a map showing all countries for debug purposes
   Fwg::Gfx::Bitmap visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
                                       const int ID = -1);
@@ -68,9 +77,6 @@ public:
   void applyCountryInput();
   // map base provinces to generic game regions
   void mapProvinces();
-
-  void generateStrategicRegions(
-      std::function<std::shared_ptr<SuperRegion>()> factory);
   void totalResourceVal(const std::vector<float> &resPrev,
                         float resourceModifier,
                         const Arda::Utils::ResConfig &resourceConfig);

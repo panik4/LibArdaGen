@@ -10,7 +10,7 @@ displayCultureGroups(const Arda::Civilization::CivilizationData &civData) {
     for (auto &ardaRegion : cultureGroup->getRegions())
       // add only the main culture at this time
       for (auto &province : ardaRegion->ardaProvinces) {
-        for (auto pix : province->baseProvince->pixels) {
+        for (const auto pix : province->baseProvince->getNonOwningPixelView()) {
           cultureMap.setColourAtIndex(pix, cultureGroup->getColour());
         }
       }
@@ -31,7 +31,7 @@ displayCultures(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
       continue;
     for (auto &culture : ardaRegion->cultureShares) {
       for (auto &province : ardaRegion->ardaProvinces) {
-        for (auto pix : province->baseProvince->pixels) {
+        for (const auto pix : province->baseProvince->getNonOwningPixelView()) {
           cultureMap.setColourAtIndex(pix, culture.first->colour);
         }
       }
@@ -93,6 +93,40 @@ Fwg::Gfx::Bitmap visualiseStrategicRegions(
                         Fwg::Cfg::Values().mapsPath + "superRegions.png");
   }
   return superRegionMap;
+}
+
+Fwg::Gfx::Bitmap
+visualiseRegions(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
+  auto regionMap =
+      Fwg::Gfx::Bitmap(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
+
+  for (const auto &region : ardaRegions) {
+    for (const auto pix : region->getNonOwningPixelView()) {
+      regionMap.setColourAtIndex(pix, region->colour);
+    }
+  }
+  return regionMap;
+}
+
+Fwg::Gfx::Bitmap visualiseCountries(
+    const std::map<std::string, std::shared_ptr<Country>> &countries) {
+  Fwg::Utils::Logging::logLine("Drawing borders");
+  auto &config = Fwg::Cfg::Values();
+  auto countryBmp = Fwg::Gfx::Bitmap(config.width, config.height, 24);
+
+  for (auto &country : countries) {
+    for (auto &region : country.second->ownedRegions) {
+      auto countryColour = country.second->colour;
+      // Fill provinces
+      for (const auto &prov : region->ardaProvinces) {
+        for (const auto pix : prov->baseProvince->getNonOwningPixelView()) {
+          countryBmp.setColourAtIndex(pix, countryColour);
+        }
+      }
+    }
+  }
+
+  return countryBmp;
 }
 
 } // namespace Arda::Gfx

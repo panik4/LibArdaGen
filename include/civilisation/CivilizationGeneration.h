@@ -6,6 +6,7 @@
 #include "rendering/ArdaVisualisation.h"
 #include "culture/CultureGroup.h"
 #include "culture/Religion.h"
+#include "areas/AreaGen.h"
 
 namespace Arda::Civilization {
 // generic preparations. However, if desired, there are necessary preparations
