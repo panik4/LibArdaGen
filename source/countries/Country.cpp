@@ -115,6 +115,7 @@ void Country::evaluatePopulations(const double worldPopulationFactor) {
 }
 
 void Country::evaluateDevelopment() {
+  averageDevelopment = 0.0;
   for (auto &state : this->ownedRegions) {
     // development should be weighed by the pop in the state
     averageDevelopment +=
