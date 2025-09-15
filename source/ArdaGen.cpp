@@ -21,9 +21,9 @@ void ArdaGen::generateCountries(
     std::function<std::shared_ptr<Country>()> factory) {
   // generate country data
   if (factory != nullptr) {
-    Arda::Countries::generateCountries(factory, numCountries, ardaRegions,
-                                       countries, ardaProvinces, civData,
-                                       nData);
+    Arda::Countries::generateCountries(factory, ardaConfig.numCountries,
+                                       ardaRegions, countries, ardaProvinces,
+                                       civData, nData);
   }
   //  first gather generic neighbours, they will be mapped to hoi4 countries
   //  in mapCountries
@@ -35,8 +35,9 @@ void ArdaGen::generateCountries(
                       Fwg::Cfg::Values().mapsPath + "countries.png");
   mapCountries();
   evaluateCountries();
-  Arda::Countries::saveCountries(
-      countries, Fwg::Cfg::Values().mapsPath + "//areas//", Arda::Gfx::visualiseCountries(countries));
+  Arda::Countries::saveCountries(countries,
+                                 Fwg::Cfg::Values().mapsPath + "//areas//",
+                                 Arda::Gfx::visualiseCountries(countries));
 }
 
 void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
@@ -54,10 +55,10 @@ void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
 
 void ArdaGen::mapContinents() {
   Logging::logLine("Mapping Continents");
-  scenContinents.clear();
+  ardaContinents.clear();
   for (const auto &continent : this->areaData.continents) {
     // we copy the fwg continents by choice, to leave them untouched
-    scenContinents.push_back(ArdaContinent(continent));
+    ardaContinents.push_back(ArdaContinent(continent));
   }
 }
 
@@ -200,7 +201,7 @@ void ArdaGen::mapProvinces() {
 void ArdaGen::generateStrategicRegions(
     std::function<std::shared_ptr<SuperRegion>()> factory) {
   Arda::Areas::generateStrategicRegions(factory, superRegions, ardaRegions,
-                                        superRegionFactor);
+                                        ardaConfig.superRegionFactor);
   Civilization::nameSuperRegions(superRegions, ardaRegions);
 }
 
@@ -305,8 +306,23 @@ void ArdaGen::totalResourceVal(const std::vector<float> &resPrev,
   }
 }
 
+void ArdaGen::gatherStatistics() {
+  // first gather all resources
+  ardaStats.totalResources.clear();
+  for (const auto &reg : ardaRegions) {
+    for (const auto &res : reg->resources) {
+      if (ardaStats.totalResources.find(res.first) ==
+          ardaStats.totalResources.end()) {
+        ardaStats.totalResources[res.first] = 0;
+      }
+      ardaStats.totalResources[res.first] += res.second.amount;
+    }
+  }
+}
+
 void ArdaGen::printStatistics() {
   Logging::logLine("Printing Statistics");
+  gatherStatistics();
   std::map<std::string, int> countryPop;
   for (auto &c : countries) {
     countryPop[c.first] = 0;

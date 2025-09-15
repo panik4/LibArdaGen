@@ -15,32 +15,58 @@
 #include <map>
 namespace Arda {
 
+enum GenerationAge { Medieval, Renaissance, Victorian, WorldWar };
+
+struct ArdaConfig {
+  // vars - config options
+  GenerationAge generationAge = Renaissance;
+  int numCountries = 100;
+  double worldPopulationFactor = 1.0;
+  double worldIndustryFactor = 1.0;
+  double resourceFactor = 1.0;
+  float superRegionFactor = 1.0;
+};
+
+struct ArdaStats {
+  int totalWorldPopulation = 0;
+  int totalCountries = 0;
+  int totalColonialCountries = 0;
+  int totalRegions = 0;
+  int totalProvinces = 0;
+  int totalLandProvinces = 0;
+  int totalCoastalProvinces = 0;
+  int totalOceanProvinces = 0;
+  int totalColonialRegions = 0;
+  std::map<std::string, int> totalResources;
+};
+
+struct ArdaData {
+  // vars - track civil statistics
+  long long worldPop = 0;
+  double worldEconomicActivity = 0;
+};
+
 class ArdaGen : public Fwg::FastWorldGenerator {
 
 protected:
   Fwg::Gfx::Bitmap typeMap;
 
 public:
-  int numCountries;
+  // to allow text inputs as addition to country image input
   std::string countryMappingPath = "";
+  // to allow text inputs as addition to region image input
   std::string regionMappingPath = "";
-  // vars - track civil statistics
-  long long worldPop = 0;
-  double worldEconomicActivity = 0;
-  // vars - config options
-  double worldPopulationFactor = 1.0;
-  double worldIndustryFactor = 1.0;
-  double resourceFactor = 1.0;
-  float superRegionFactor = 1.0;
+  ArdaConfig ardaConfig;
+  ArdaStats ardaStats;
+  ArdaData ardaData;
+
   // containers
   Arda::Names::NameData nData;
-  std::vector<ArdaContinent> scenContinents;
+  std::vector<ArdaContinent> ardaContinents;
   std::vector<std::shared_ptr<ArdaRegion>> ardaRegions;
   std::vector<std::shared_ptr<Arda::ArdaProvince>> ardaProvinces;
   std::vector<std::shared_ptr<SuperRegion>> superRegions;
   // countries
-  std::set<std::string> tags;
-  Fwg::Utils::ColourTMap<std::string> countryColourMap;
   std::map<std::string, std::shared_ptr<Country>> countries;
   std::map<Rank, std::vector<std::shared_ptr<Country>>> countriesByRank;
   std::map<int, std::vector<std::shared_ptr<Country>>> countryImportanceScores;
@@ -80,6 +106,7 @@ public:
   void totalResourceVal(const std::vector<float> &resPrev,
                         float resourceModifier,
                         const Arda::Utils::ResConfig &resourceConfig);
+  virtual void gatherStatistics();
   // calculate how strong each country is
   virtual void evaluateCountries();
   virtual void printStatistics();
