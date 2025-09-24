@@ -16,6 +16,7 @@ findStartRegion(std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
 }
 
 void generateCountries(
+    const Arda::Utils::GenerationAge &generationAge,
     std::function<std::shared_ptr<Country>()> factory, int numCountries,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     std::map<std::string, std::shared_ptr<Country>> &countries,
@@ -26,7 +27,6 @@ void generateCountries(
     region->assigned = false;
     region->owner = nullptr;
   }
-  auto &config = Fwg::Cfg::Values();
   Fwg::Utils::Logging::logLine("Generating Countries");
 
   for (auto i = 0; i < numCountries; i++) {
@@ -39,18 +39,16 @@ void generateCountries(
 
     countries.emplace(country->tag, country);
   }
-  distributeCountries(ardaRegions, countries, ardaProvinces, civData, nData);
+  distributeCountries(generationAge, ardaRegions, countries, ardaProvinces,
+                      civData, nData);
   // remove all countries without regions
-  for (auto it = countries.begin(); it != countries.end();) {
-    if (it->second->ownedRegions.empty()) {
-      it = countries.erase(it);
-    } else {
-      ++it;
-    }
-  }
+  std::erase_if(countries, [](const auto &entry) {
+    return entry.second->ownedRegions.empty();
+  });
 }
 
 void distributeCountries(
+    const Arda::Utils::GenerationAge &generationAge,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     std::map<std::string, std::shared_ptr<Country>> &countries,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
@@ -99,6 +97,7 @@ void distributeCountries(
     country.second->evaluatePopulations(civData.worldPopulationFactorSum);
     country.second->gatherCultureShares();
   }
+  generateCountrySpecifics(generationAge, countries);
 }
 
 void evaluateCountryNeighbours(
@@ -131,7 +130,8 @@ void evaluateCountryNeighbours(
   }
 }
 
-void loadCountries(std::function<std::shared_ptr<Country>()> factory,
+void loadCountries(const Arda::Utils::GenerationAge &generationAge,
+                   std::function<std::shared_ptr<Country>()> factory,
                    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
                    std::map<std::string, std::shared_ptr<Country>> &countries,
                    Civilization::CivilizationData &civData,
@@ -155,7 +155,6 @@ void loadCountries(std::function<std::shared_ptr<Country>()> factory,
         "Exception while parsing country input, ", e.what(),
         " continuing with randomly generated countries");
   }
-  auto countryMap = inputImage;
   Fwg::Utils::ColourTMap<std::vector<std::shared_ptr<Arda::ArdaRegion>>>
       mapOfRegions;
   for (auto &region : ardaRegions) {
@@ -168,7 +167,7 @@ void loadCountries(std::function<std::shared_ptr<Country>()> factory,
     for (auto province : region->ardaProvinces) {
       if (!province->baseProvince->isSea()) {
         //  we have the colour already
-        auto colour = countryMap[province->baseProvince->pixels[0]];
+        auto colour = inputImage[province->baseProvince->pixels[0]];
 
         if (likeliestOwner.find(colour)) {
           likeliestOwner[colour] += province->baseProvince->pixels.size();
@@ -242,7 +241,7 @@ void loadCountries(std::function<std::shared_ptr<Country>()> factory,
       region->owner = country.second;
     }
     country.second->evaluatePopulations(civData.worldPopulationFactorSum);
-    country.second->gatherCultureShares();
+    generateCountrySpecifics(generationAge, countries);
   }
 }
 
@@ -258,6 +257,33 @@ void saveCountries(std::map<std::string, std::shared_ptr<Country>> &countries,
   Fwg::Gfx::Png::save(countryImage, mappingPath + "//countries.png");
 }
 
-void evaluateCountries() {}
-void generateCountrySpecifics() {};
+void generateCountrySpecifics(
+    const Arda::Utils::GenerationAge &generationAge,
+    std::map<std::string, std::shared_ptr<Country>> &countries) {
+  // military: navalFocus, airFocus, landFocus
+  for (auto &countryEntry : countries) {
+    auto &country = countryEntry.second;
+    // military focus: first gather info about position of the country, taking
+    // coastline into account
+    auto coastalRegions = 0.0;
+    for (auto &region : country->ownedRegions) {
+      if (region->coastal) {
+        coastalRegions++;
+      }
+    }
+    // naval focus goes from 0-50%. If we have a lot of coastal regions, we
+    // focus on naval
+    country->navalFocus = std::clamp(
+        (coastalRegions / country->ownedRegions.size() * 100.0), 0.0, 50.0);
+    // only allow air focus in world war age
+    if (generationAge == Arda::Utils::GenerationAge::WorldWar) {
+      // TODO: Increase if our position is very remote?
+      // now let's get the air focus, which primarily depends on randomness,
+      // should be between 5 and 35%
+      country->airFocus = RandNum::getRandom(5.0, 35.0);
+    }
+    // land focus is the rest
+    country->landFocus = 100.0 - country->navalFocus - country->airFocus;
+  }
+}
 } // namespace Arda::Countries

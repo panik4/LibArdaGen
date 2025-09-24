@@ -20,6 +20,7 @@ findStartRegion(std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
 // and countries are always created the same way
 
 void generateCountries(
+    const Arda::Utils::GenerationAge &generationAge,
     std::function<std::shared_ptr<Country>()> factory, int numCountries,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     std::map<std::string, std::shared_ptr<Country>> &countries,
@@ -27,6 +28,7 @@ void generateCountries(
     Civilization::CivilizationData &civData, Arda::Names::NameData &nData);
 
 void distributeCountries(
+    const Arda::Utils::GenerationAge &generationAge,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     std::map<std::string, std::shared_ptr<Country>> &countries,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
@@ -38,7 +40,8 @@ void evaluateCountryNeighbours(
     std::map<std::string, std::shared_ptr<Country>> &countries);
 
 // load countries from an image and map them to regions
-void loadCountries(std::function<std::shared_ptr<Country>()> factory,
+void loadCountries(const Arda::Utils::GenerationAge &generationAge,
+                   std::function<std::shared_ptr<Country>()> factory,
                    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
                    std::map<std::string, std::shared_ptr<Country>> &countries,
                    Civilization::CivilizationData &civData,
@@ -48,6 +51,8 @@ void loadCountries(std::function<std::shared_ptr<Country>()> factory,
 void saveCountries(std::map<std::string, std::shared_ptr<Country>> &countries,
                    const std::string &mappingPath,
                    const Fwg::Gfx::Bitmap &countryImage);
-// virtual void generateCountrySpecifics();
+void generateCountrySpecifics(
+    const Arda::Utils::GenerationAge &generationAge,
+    std::map<std::string, std::shared_ptr<Country>> &countries);
 
 }; // namespace Arda::Countries

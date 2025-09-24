@@ -21,9 +21,9 @@ void ArdaGen::generateCountries(
     std::function<std::shared_ptr<Country>()> factory) {
   // generate country data
   if (factory != nullptr) {
-    Arda::Countries::generateCountries(factory, ardaConfig.numCountries,
-                                       ardaRegions, countries, ardaProvinces,
-                                       civData, nData);
+    Arda::Countries::generateCountries(
+        ardaConfig.generationAge, factory, ardaConfig.numCountries, ardaRegions,
+        countries, ardaProvinces, civData, nData);
   }
   //  first gather generic neighbours, they will be mapped to hoi4 countries
   //  in mapCountries
@@ -44,8 +44,9 @@ void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
                             const Fwg::Gfx::Bitmap &inputImage) {
   // generate country data
   if (factory != nullptr) {
-    Arda::Countries::loadCountries(factory, ardaRegions, countries, civData,
-                                   nData, inputImage, countryMappingPath);
+    Arda::Countries::loadCountries(ardaConfig.generationAge, factory,
+                                   ardaRegions, countries, civData, nData,
+                                   inputImage, countryMappingPath);
   }
   Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
                                              countries);

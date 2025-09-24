@@ -45,6 +45,15 @@ public:
   Gfx::Flag flag;
   Fwg::Gfx::Colour colour;
   std::vector<Arda::Character> characters;
+
+  // military
+  double navalFocus;
+  double airFocus;
+  double landFocus;
+
+
+
+
   // constructors/destructors
   Country();
   Country(std::string tag, int ID, std::string name, std::string adjective,

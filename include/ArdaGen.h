@@ -15,11 +15,10 @@
 #include <map>
 namespace Arda {
 
-enum GenerationAge { Medieval, Renaissance, Victorian, WorldWar };
 
 struct ArdaConfig {
   // vars - config options
-  GenerationAge generationAge = Renaissance;
+  Utils::GenerationAge generationAge = Utils::GenerationAge::Renaissance;
   int numCountries = 100;
   double worldPopulationFactor = 1.0;
   double worldIndustryFactor = 1.0;
