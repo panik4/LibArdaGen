@@ -2,7 +2,12 @@
 namespace Logging = Fwg::Utils::Logging;
 namespace Arda {
 using namespace Fwg::Gfx;
-ArdaGen::ArdaGen() {}
+ArdaGen::ArdaGen() {
+
+  factories.continentFactory = [](const std::vector<int> &pixels) {
+    return std::make_shared<Arda::ArdaContinent>(pixels);
+  };
+}
 
 ArdaGen::ArdaGen(const std::string &configSubFolder)
     : FastWorldGenerator(configSubFolder) {
@@ -11,9 +16,16 @@ ArdaGen::ArdaGen(const std::string &configSubFolder)
   Gfx::Flag::readFlagTemplates();
   Gfx::Flag::readSymbolTemplates();
   superRegionMap = Bitmap(0, 0, 24);
+  factories.continentFactory = [](const std::vector<int> &pixels) {
+    return std::make_shared<Arda::ArdaContinent>(pixels);
+  };
 }
 
-ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {}
+ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {
+  factories.continentFactory = [](const std::vector<int> &pixels) {
+    return std::make_shared<Arda::ArdaContinent>(pixels);
+  };
+}
 
 ArdaGen::~ArdaGen() {}
 
@@ -58,8 +70,9 @@ void ArdaGen::mapContinents() {
   Logging::logLine("Mapping Continents");
   ardaContinents.clear();
   for (const auto &continent : this->areaData.continents) {
-    // we copy the fwg continents by choice, to leave them untouched
-    ardaContinents.push_back(ArdaContinent(continent));
+    // reinterpret FastWorldGen continent as ArdaContinent
+    auto ardaContinent = std::dynamic_pointer_cast<ArdaContinent>(continent);
+    ardaContinents.push_back(ardaContinent);
   }
 }
 

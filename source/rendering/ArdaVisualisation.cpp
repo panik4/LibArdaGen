@@ -43,6 +43,37 @@ displayCultures(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   return cultureMap;
 }
 
+Fwg::Gfx::Bitmap
+displayReligions(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
+  auto &config = Fwg::Cfg::Values();
+  Fwg::Gfx::Bitmap religionMap(config.width, config.height, 24);
+  // now write the cultures to the culture map
+  for (auto &ardaRegion : ardaRegions) {
+    if (ardaRegion->isSea() || ardaRegion->isLake())
+      continue;
+    for (auto &religion : ardaRegion->religions) {
+      for (auto &province : ardaRegion->ardaProvinces) {
+        for (const auto pix : province->baseProvince->getNonOwningPixelView()) {
+          religionMap.setColourAtIndex(pix, religion.first->colour);
+        }
+      }
+    }
+  }
+
+  Fwg::Gfx::Png::save(religionMap,
+                      Fwg::Cfg::Values().mapsPath + "/world/religions.png");
+  return religionMap;
+}
+
+Fwg::Gfx::Bitmap displayLanguageGroups(
+    const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
+  auto &config = Fwg::Cfg::Values();
+  Fwg::Gfx::Bitmap languageMap(config.width, config.height, 24);
+
+  return Fwg::Gfx::Bitmap();
+}
+
+
 Fwg::Gfx::Bitmap visualiseStrategicRegions(
     Fwg::Gfx::Bitmap &superRegionMap,
     const std::vector<std::shared_ptr<Arda::SuperRegion>> &superRegions,

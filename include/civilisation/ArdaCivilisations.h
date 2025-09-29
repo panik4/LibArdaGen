@@ -10,6 +10,7 @@ struct CivilizationData {
   std::vector<std::shared_ptr<Religion>> religions;
   std::vector<std::shared_ptr<Culture>> cultures;
   std::vector<std::shared_ptr<CultureGroup>> cultureGroups;
+
   std::vector<std::shared_ptr<Arda::LanguageGroup>> languageGroups;
   std::map<std::string, std::shared_ptr<Arda::Language>> languages;
   double worldPopulationFactorSum = 0.0;

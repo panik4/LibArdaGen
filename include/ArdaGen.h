@@ -61,7 +61,7 @@ public:
 
   // containers
   Arda::Names::NameData nData;
-  std::vector<ArdaContinent> ardaContinents;
+  std::vector<std::shared_ptr<ArdaContinent>> ardaContinents;
   std::vector<std::shared_ptr<ArdaRegion>> ardaRegions;
   std::vector<std::shared_ptr<Arda::ArdaProvince>> ardaProvinces;
   std::vector<std::shared_ptr<SuperRegion>> superRegions;

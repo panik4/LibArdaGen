@@ -7,7 +7,6 @@
 namespace Arda {
 
 class CultureGroup {
-  std::string name;
   std::vector<std::shared_ptr<Culture>> cultures;
   Fwg::Gfx::Colour colour;
   std::shared_ptr<Arda::LanguageGroup> languageGroup;
@@ -16,6 +15,7 @@ class CultureGroup {
   VisualType visualType;
 
 public:
+  std::string name;
   // Constructor
   CultureGroup(const std::string &name, const Fwg::Gfx::Colour &colour)
       : name(name), colour(colour) {}
@@ -44,6 +44,13 @@ public:
   void setCenter(const std::shared_ptr<ArdaRegion> &region) { center = region; }
   void setLanguageGroup(const std::shared_ptr<Arda::LanguageGroup> &group) {
     languageGroup = group;
+
+    this->name = languageGroup->name;
+    for (auto i = 0; i < cultures.size(); i++) {
+      cultures[i]->language = languageGroup->languages[i];
+      cultures[i]->name =
+          cultures[i]->language->generateGenericCapitalizedWord();
+    }
   }
   std::shared_ptr<ArdaRegion> getCenter() { return center; }
   std::vector<std::shared_ptr<ArdaRegion>> getRegions() { return regions; }

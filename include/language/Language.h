@@ -1,6 +1,7 @@
 #pragma once
-#include "language/LanguageGenerator.h"
 #include "utils/Utils.h"
+#include "language/Dataset.h"
+#include "language/MarkovNameGenerator.h"
 #include <string>
 #include <unordered_set>
 #include <vector>

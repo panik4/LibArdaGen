@@ -93,6 +93,8 @@ void Language::fillAllLists() {
   shipNames.clear();
   airplaneNames.clear();
 
+  name = generateGenericCapitalizedWord();
+
   for (int i = 0; i < 2; i++) {
     citySuffixes.push_back(getRandomLowercaseWordFromVocabulary("CitySuffix"));
   }

@@ -5,7 +5,8 @@ namespace Arda::Civilization {
 void generateWorldCivilizations(
     std::vector<std::shared_ptr<Arda::ArdaRegion>> &regions,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
-    CivilizationData &civData, std::vector<ArdaContinent> &continents,
+    CivilizationData &civData,
+    std::vector<std::shared_ptr<ArdaContinent>> &continents,
     std::vector<std::shared_ptr<SuperRegion>> &superRegions) {
   generatePopulationFactors(civData, regions);
   generateDevelopment(regions);
@@ -21,8 +22,7 @@ void generateWorldCivilizations(
   nameRegions(regions);
   generateImportance(regions);
   nameContinents(continents, regions);
-  Arda::Areas::saveRegions(regions,
-                           Fwg::Cfg::Values().mapsPath + "//areas//",
+  Arda::Areas::saveRegions(regions, Fwg::Cfg::Values().mapsPath + "//areas//",
                            Arda::Gfx::visualiseRegions(regions));
 }
 
@@ -72,13 +72,11 @@ void generateReligions(
 void generateCultures(CivilizationData &civData,
                       std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   civData.cultures.clear();
+  civData.cultureGroups.clear();
   auto &config = Fwg::Cfg::Values();
   int x = 20;
   int y = 5;
   int z = 15;
-
-  // gather all regions which have no culture group assigned
-  std::vector<std::shared_ptr<ArdaRegion>> unassignedRegions;
 
   // Generate x culture groups
   for (int i = 0; i < x; i++) {
@@ -91,7 +89,8 @@ void generateCultures(CivilizationData &civData,
     cultureGroup.setCenter(Fwg::Utils::selectRandom(ardaRegions));
     // add the region to the culture group
     cultureGroup.addRegion(cultureGroup.getCenter());
-
+    auto cgPtr = std::make_shared<CultureGroup>(cultureGroup);
+    civData.cultureGroups.push_back(cgPtr);
     // Generate y to z cultures per culture group
     int numCultures = RandNum::getRandom(y, z);
     for (int j = 0; j < numCultures; j++) {
@@ -103,12 +102,9 @@ void generateCultures(CivilizationData &civData,
 
       culture.colour.randomize();
       culture.language = std::make_shared<Arda::Language>();
-      culture.cultureGroup = std::make_shared<CultureGroup>(cultureGroup);
-      cultureGroup.addCulture(std::make_shared<Culture>(culture));
+      culture.cultureGroup = cgPtr;
+      cgPtr->addCulture(std::make_shared<Culture>(culture));
     }
-
-    civData.cultureGroups.push_back(
-        std::make_shared<CultureGroup>(cultureGroup));
   }
 
   // now distribute these culturegroups to the regions
@@ -118,7 +114,7 @@ void generateCultures(CivilizationData &civData,
     auto closestCultureGroup = 0;
     auto distance = 100000000.0;
     for (auto x = 0; x < civData.cultureGroups.size(); x++) {
-      auto &cultureGroup = civData.cultureGroups[x];
+      auto cultureGroup = civData.cultureGroups[x];
       auto cultureCenter = cultureGroup->getCenter();
       auto nDistance = Fwg::getPositionDistance(
           cultureCenter->position, ardaRegion->position, config.width);
@@ -141,6 +137,7 @@ void generateCultures(CivilizationData &civData,
   // now subdivide all culturegroups into cultures
   for (auto &cultureGroup : civData.cultureGroups) {
     for (auto &region : cultureGroup->getRegions()) {
+      region->cultureShares.clear();
       auto closestCulture = 0;
       auto distance = 100000000.0;
       for (auto x = 0; x < cultureGroup->getCultures().size(); x++) {
@@ -166,23 +163,29 @@ void generateCultures(CivilizationData &civData,
   }
 }
 
+void generateLanguageGroup(std::shared_ptr<CultureGroup> &cultureGroup) {
+
+  //// now generate at least as many languages as we have cultures
+  // cultureGroup->getLanguageGroup()->generate(cultureGroup->getCultures().size(),
+  //                                            Fwg::Cfg::Values().resourcePath
+  //                                            +
+  //                                                "//names//languageGroups//");
+  //  languageGroup->generate(cultureGroup->getCultures().size());
+}
+
 void distributeLanguages(CivilizationData &civData) {
+  LanguageGenerator languageGenerator(Fwg::Cfg::Values().resourcePath +
+                                      "//names//languageGroups//");
   // assign a language group to each culture group
   for (auto &cultureGroup : civData.cultureGroups) {
-    auto languageGroup = std::make_shared<Arda::LanguageGroup>();
+    auto languageGroup = std::make_shared<Arda::LanguageGroup>(
+        languageGenerator.generateLanguageGroup(
+            cultureGroup->getCultures().size(), {}));
     civData.languageGroups.push_back(languageGroup);
     cultureGroup->setLanguageGroup(languageGroup);
-    // now generate at least as many languages as we have cultures
-    languageGroup->generate(cultureGroup->getCultures().size(),
-                            Fwg::Cfg::Values().resourcePath +
-                                "//names//languageGroups//");
-    // languageGroup->generate(cultureGroup->getCultures().size());
+    // generateLanguageGroup(cultureGroup);
     //  now assign each culture a language
-    for (auto i = 0; i < cultureGroup->getCultures().size(); i++) {
-      cultureGroup->getCultures()[i]->language = languageGroup->languages[i];
-      // generate a variety of names for the language
-      languageGroup->languages[i]->fillAllLists();
-    }
+
   }
 }
 
@@ -323,23 +326,23 @@ void nameSuperRegions(
   }
 }
 
-void nameContinents(std::vector<ArdaContinent> &continents,
+void nameContinents(std::vector<std::shared_ptr<ArdaContinent>> &continents,
                     std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   // take all continents and name them by taking their dominant cultures
   // language and generating a name
   for (auto &continent : continents) {
-    if (continent.regions.size()) {
-      auto ID = continent.regions[0]->ID;
+    if (continent->regions.size()) {
+      auto ID = continent->regions[0]->ID;
       auto culture = regions[ID]->getPrimaryCulture();
       if (culture == nullptr) {
         continue;
       }
       auto language = culture->language;
-      continent.name = language->generateAreaName("");
-      continent.adjective = language->getAdjectiveForm(continent.name);
+      continent->name = language->generateAreaName("");
+      continent->adjective = language->getAdjectiveForm(continent->name);
     } else {
-      continent.name = std::to_string(continent.ID);
-      continent.adjective = std::to_string(continent.ID);
+      continent->name = std::to_string(continent->ID);
+      continent->adjective = std::to_string(continent->ID);
     }
   }
 }

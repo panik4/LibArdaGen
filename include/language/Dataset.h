@@ -7,6 +7,7 @@
 namespace Arda {
 
 struct Dataset {
+  std::vector<std::string> influences;
   std::unordered_map<std::string, std::vector<std::string>> vocabulary;
 
   bool loadFromFile(const std::string &filename) {
