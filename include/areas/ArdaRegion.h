@@ -14,24 +14,23 @@ class ArdaRegion : public Fwg::Areas::Region {
 public:
   // member variables
   std::shared_ptr<Country> owner;
-  std::string name;
-  int superRegionID;
+  int superRegionID = -1;
   // calculate this for the scenario in general
-  double populationFactor;
-  double worldPopulationShare;
-  double developmentFactor;
-  double importanceScore;
-  double relativeImportance;
+  double populationFactor = 0.0;
+  double worldPopulationShare = 0.0;
+  double developmentFactor = 0.0;
+  double importanceScore = 0.0;
+  double relativeImportance = 0.0;
   // calculate this in every module
   int totalPopulation = 0;
   // this calculated in every module, usually by taking both population and
   // development into account
-  double economicActivity;
-  double worldEconomicActivityShare;
+  double economicActivity = 0.0;
+  double worldEconomicActivityShare = 0.0;
   std::map<std::string, Arda::Utils::Resource> resources;
 
   // other
-  bool assigned;
+  bool assigned = false;
   double snowChance, lightRainChance, heavyRainChance, blizzardChance,
       mudChance, sandStormChance;
   // containers
@@ -45,7 +44,7 @@ public:
       significantLocations;
 
   ArdaRegion();
-  ArdaRegion(const Fwg::Areas::Region &baseRegion);
+  ArdaRegion(const std::shared_ptr<Fwg::Areas::Region> &baseRegion);
   virtual ~ArdaRegion();
 
   // member functions

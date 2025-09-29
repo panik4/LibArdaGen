@@ -35,7 +35,7 @@ void distributeCountries(
     Civilization::CivilizationData &civData, Arda::Names::NameData &nData);
 // see which country neighbours which
 void evaluateCountryNeighbours(
-    std::vector<Fwg::Areas::Region> &baseRegions,
+    std::vector<std::shared_ptr<Fwg::Areas::Region>> &baseRegions,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     std::map<std::string, std::shared_ptr<Country>> &countries);
 

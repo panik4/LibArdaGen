@@ -4,6 +4,9 @@ namespace Arda {
 using namespace Fwg::Gfx;
 ArdaGen::ArdaGen() {
 
+  factories.regionFactory = []() {
+    return std::make_shared<Arda::ArdaRegion>();
+  };
   factories.continentFactory = [](const std::vector<int> &pixels) {
     return std::make_shared<Arda::ArdaContinent>(pixels);
   };
@@ -16,12 +19,18 @@ ArdaGen::ArdaGen(const std::string &configSubFolder)
   Gfx::Flag::readFlagTemplates();
   Gfx::Flag::readSymbolTemplates();
   superRegionMap = Bitmap(0, 0, 24);
+  factories.regionFactory = []() {
+    return std::make_shared<Arda::ArdaRegion>();
+  };
   factories.continentFactory = [](const std::vector<int> &pixels) {
     return std::make_shared<Arda::ArdaContinent>(pixels);
   };
 }
 
 ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {
+  factories.regionFactory = []() {
+    return std::make_shared<Arda::ArdaRegion>();
+  };
   factories.continentFactory = [](const std::vector<int> &pixels) {
     return std::make_shared<Arda::ArdaContinent>(pixels);
   };
@@ -81,7 +90,7 @@ void ArdaGen::mapRegions() {
   ardaRegions.clear();
 
   for (auto &region : this->areaData.regions) {
-    std::sort(region.provinces.begin(), region.provinces.end(),
+    std::sort(region->provinces.begin(), region->provinces.end(),
               [](const std::shared_ptr<Fwg::Areas::Province> a,
                  const std::shared_ptr<Fwg::Areas::Province> b) {
                 return (*a < *b);
@@ -95,8 +104,8 @@ void ArdaGen::mapRegions() {
     ardaRegions.push_back(ardaRegion);
   }
   // sort by Arda::ArdaProvince ID
-  std::sort(ardaRegions.begin(), ardaRegions.end(),
-            [](auto l, auto r) { return *l < *r; });
+  //std::sort(ardaRegions.begin(), ardaRegions.end(),
+  //          [](auto l, auto r) { return *l < *r; });
   // check if we have the same amount of ardaProvinces as FastWorldGen provinces
   if (ardaProvinces.size() != this->areaData.provinces.size())
     throw(std::exception("Fatal: Lost provinces, terminating"));

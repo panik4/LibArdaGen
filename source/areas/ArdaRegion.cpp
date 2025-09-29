@@ -2,8 +2,8 @@
 namespace Arda {
 ArdaRegion::ArdaRegion() {}
 
-ArdaRegion::ArdaRegion(const Fwg::Areas::Region &baseRegion)
-    : Fwg::Areas::Region(baseRegion), assigned(false), totalPopulation{-1} {}
+ArdaRegion::ArdaRegion(const std::shared_ptr<Fwg::Areas::Region> &baseRegion)
+    : Fwg::Areas::Region(*baseRegion), assigned(false), totalPopulation{-1} {}
 
 ArdaRegion::~ArdaRegion() {}
 void ArdaRegion::sumPopulations() {}

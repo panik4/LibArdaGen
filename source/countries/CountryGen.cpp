@@ -101,7 +101,7 @@ void distributeCountries(
 }
 
 void evaluateCountryNeighbours(
-    std::vector<Fwg::Areas::Region> &baseRegions,
+    std::vector<std::shared_ptr<Fwg::Areas::Region>> &baseRegions,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     std::map<std::string, std::shared_ptr<Country>> &countries) {
   Fwg::Utils::Logging::logLine("Evaluating Country Neighbours");
@@ -109,11 +109,11 @@ void evaluateCountryNeighbours(
 
   for (auto &c : countries) {
     for (const auto &gR : c.second->ownedRegions) {
-      if (gR->neighbours.size() != baseRegions[gR->ID].neighbours.size())
+      if (gR->neighbours.size() != baseRegions[gR->ID]->neighbours.size())
         throw(std::exception("Fatal: Neighbour count mismatch, terminating"));
       // now compare if all IDs in those neighbour vectors match
       for (int i = 0; i < gR->neighbours.size(); i++) {
-        if (gR->neighbours[i] != baseRegions[gR->ID].neighbours[i])
+        if (gR->neighbours[i] != baseRegions[gR->ID]->neighbours[i])
           throw(std::exception("Fatal: Neighbour mismatch, terminating"));
       }
 
