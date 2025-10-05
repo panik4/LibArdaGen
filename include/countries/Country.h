@@ -27,9 +27,10 @@ public:
   std::string adjective;
   int capitalRegionID = 0;
   int capitalProvinceID;
-  double populationFactor;
+  double totalPopulation;
   double averageDevelopment;
   double worldPopulationShare;
+  double gdp;
   double worldEconomicActivityShare;
   bool landlocked = true;
 
@@ -40,7 +41,7 @@ public:
   double relativeScore;
   // the gamemodule calculates the total population
   int pop;
-  // the cultures and their populationFactor
+  // the cultures and their population
   std::map<std::shared_ptr<Culture>, double> cultures;
   Gfx::Flag flag;
   Fwg::Gfx::Colour colour;
@@ -75,7 +76,7 @@ public:
   // operators
   bool operator<(const Country &right) const { return ID < right.ID; };
   void evaluateProvinces();
-  void evaluatePopulations(const double worldPopulationFactor);
+  void evaluatePopulations(const double worldPopulation);
   void evaluateDevelopment();
   void evaluateEconomicActivity(const double worldEconomicActivity);
   void evaluateProperties();

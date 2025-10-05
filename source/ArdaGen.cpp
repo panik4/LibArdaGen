@@ -3,7 +3,9 @@ namespace Logging = Fwg::Utils::Logging;
 namespace Arda {
 using namespace Fwg::Gfx;
 ArdaGen::ArdaGen() {
-
+  factories.provinceFactory = []() {
+    return std::make_shared<Arda::ArdaProvince>();
+  };
   factories.regionFactory = []() {
     return std::make_shared<Arda::ArdaRegion>();
   };
@@ -19,6 +21,9 @@ ArdaGen::ArdaGen(const std::string &configSubFolder)
   Gfx::Flag::readFlagTemplates();
   Gfx::Flag::readSymbolTemplates();
   superRegionMap = Bitmap(0, 0, 24);
+  factories.provinceFactory = []() {
+    return std::make_shared<Arda::ArdaProvince>();
+  };
   factories.regionFactory = []() {
     return std::make_shared<Arda::ArdaRegion>();
   };
@@ -28,6 +33,9 @@ ArdaGen::ArdaGen(const std::string &configSubFolder)
 }
 
 ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {
+  factories.provinceFactory = []() {
+    return std::make_shared<Arda::ArdaProvince>();
+  };
   factories.regionFactory = []() {
     return std::make_shared<Arda::ArdaRegion>();
   };
@@ -104,7 +112,7 @@ void ArdaGen::mapRegions() {
     ardaRegions.push_back(ardaRegion);
   }
   // sort by Arda::ArdaProvince ID
-  //std::sort(ardaRegions.begin(), ardaRegions.end(),
+  // std::sort(ardaRegions.begin(), ardaRegions.end(),
   //          [](auto l, auto r) { return *l < *r; });
   // check if we have the same amount of ardaProvinces as FastWorldGen provinces
   if (ardaProvinces.size() != this->areaData.provinces.size())
@@ -160,7 +168,7 @@ void ArdaGen::applyRegionInput() {
   Bitmap regionMap(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
   for (auto &ardaRegion : this->ardaRegions) {
     for (auto &gameProv : ardaRegion->ardaProvinces) {
-      for (auto &pix : gameProv->baseProvince->pixels) {
+      for (auto &pix : gameProv->pixels) {
         if (ardaRegion->isSea()) {
           regionMap.setColourAtIndex(pix, Fwg::Cfg::Values().colours.at("sea"));
 
@@ -176,7 +184,7 @@ void ArdaGen::applyRegionInput() {
         else {
           regionMap.setColourAtIndex(pix,
                                      Fwg::Cfg::Values().colours.at("land"));
-          if (gameProv->baseProvince->coastal) {
+          if (gameProv->coastal) {
             regionMap.setColourAtIndex(
                 pix, Fwg::Cfg::Values().colours.at("autumnForest"));
           }
@@ -209,16 +217,98 @@ void ArdaGen::mapProvinces() {
     }
 
     // now create ardaProvinces from FastWorldGen provinces
-    auto gP = std::make_shared<Arda::ArdaProvince>(prov);
+    auto gP = std::dynamic_pointer_cast<Arda::ArdaProvince>(prov);
     // also copy neighbours
-    for (auto &baseProvinceNeighbour : gP->baseProvince->neighbours)
-      gP->neighbours.push_back(baseProvinceNeighbour);
+    // for (auto &baseProvinceNeighbour : gP->neighbours)
+    //  gP->neighbours.push_back(baseProvinceNeighbour);
     ardaProvinces.push_back(gP);
   }
 
-  // sort by Arda::ArdaProvince ID
-  std::sort(ardaProvinces.begin(), ardaProvinces.end(),
-            [](auto l, auto r) { return *l < *r; });
+  //// sort by Arda::ArdaProvince ID
+  // std::sort(ardaProvinces.begin(), ardaProvinces.end(),
+  //           [](auto l, auto r) { return *l < *r; });
+}
+
+bool ArdaGen::genDevelopment(Fwg::Cfg &config) {
+  Civilization::generateDevelopment(ardaProvinces, ardaRegions, ardaContinents);
+  gatherStatistics();
+  return true;
+}
+bool ArdaGen::loadDevelopment(Fwg::Cfg &config, const std::string &path) {
+  Civilization::loadDevelopment(Fwg::IO::Reader::readGenericImage(path, config),
+                                ardaProvinces, ardaRegions, ardaContinents);
+  gatherStatistics();
+  return true;
+}
+bool ArdaGen::loadPopulation(Fwg::Cfg &config,
+                             const Fwg::Gfx::Bitmap &inputPop) {
+  ardaConfig.calculateTargetWorldPopulation();
+  Civilization::loadPopulation(inputPop, ardaProvinces, ardaRegions,
+                               ardaContinents,
+                               ardaConfig.targetWorldPopulation);
+  gatherStatistics();
+
+  return true;
+}
+bool ArdaGen::genPopulation(Fwg::Cfg &config) {
+  ardaConfig.calculateTargetWorldPopulation();
+  Civilization::generatePopulation(civData, ardaProvinces, ardaRegions,
+                                   ardaContinents,
+                                   ardaConfig.targetWorldPopulation);
+  gatherStatistics();
+
+  return true;
+}
+void ArdaGen::genEconomyData() {
+  ardaConfig.calculateTargetWorldGdp();
+  Arda::Civilization::generateEconomyData(civData, ardaProvinces, ardaRegions,
+                                          ardaContinents,
+                                          ardaConfig.targetWorldGdp);
+  gatherStatistics();
+}
+
+void ArdaGen::genCultureData() {
+  Arda::Civilization::generateCultureData(civData, ardaProvinces, ardaRegions,
+                                          ardaContinents, superRegions);
+  gatherStatistics();
+}
+
+void ArdaGen::genCivilisationData() {
+  ardaConfig.calculateTargetWorldPopulation();
+  ardaConfig.calculateTargetWorldGdp();
+  Arda::Civilization::generateFullCivilisationData(
+      ardaRegions, ardaProvinces, civData, ardaContinents, superRegions,
+      ardaConfig.targetWorldPopulation, ardaConfig.targetWorldGdp);
+  genLocations();
+  gatherStatistics();
+}
+
+void ArdaGen::genLocations() {
+  locationMap.clear();
+  Fwg::Civilization::Locations::generateLocations(
+      areaData.regions, terrainData, climateData, provinceMap, areaData, ardaConfig.locationConfig);
+  locationMap = Fwg::Gfx::displayLocations(areaData.regions, worldMap);
+  Fwg::Gfx::Png::save(locationMap,
+                      Fwg::Cfg::Values().mapsPath + "//world//locations.png");
+
+}
+void ArdaGen::genNavmesh() {
+  Fwg::Civilization::Locations::generateConnections(
+      areaData.regions, terrainData,
+                                               climateData, worldMap);
+  // navmeshMap = Fwg::Gfx::displayConnections(areaData.regions, locationMap);
+}
+
+
+bool ArdaGen::genWastelands(Fwg::Cfg &config) {
+  Arda::Civilization::Wastelands::detectWastelands(terrainData, climateData,
+                                                   ardaData.civLayer, config);
+  auto worldOverlayMap = Arda::Gfx::displayWorldOverlayMap(
+      climateData, worldMap, ardaData.civLayer);
+  Fwg::Gfx::Png::save(worldOverlayMap, config.mapsPath + "worldOverlayMap.png",
+                      true);
+
+  return true;
 }
 
 void ArdaGen::generateStrategicRegions(
@@ -332,7 +422,11 @@ void ArdaGen::totalResourceVal(const std::vector<float> &resPrev,
 void ArdaGen::gatherStatistics() {
   // first gather all resources
   ardaStats.totalResources.clear();
+  ardaStats.totalWorldPopulation = 0;
+  ardaStats.totalWorldGdp = 0;
   for (const auto &reg : ardaRegions) {
+    ardaStats.totalWorldPopulation += reg->totalPopulation;
+    ardaStats.totalWorldGdp += reg->gdp;
     for (const auto &res : reg->resources) {
       if (ardaStats.totalResources.find(res.first) ==
           ardaStats.totalResources.end()) {

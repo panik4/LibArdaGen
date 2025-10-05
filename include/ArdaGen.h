@@ -7,14 +7,15 @@
 #include "areas/AreaGen.h"
 #include "areas/SuperRegion.h"
 #include "civilisation/CivilizationGeneration.h"
+#include "civilization/Location.h"
 #include "countries/Country.h"
 #include "countries/CountryGen.h"
 #include "culture/NameUtils.h"
 #include "flags/Flag.h"
+#include "resources/ResourceGeneration.h"
 #include "utils/ArdaUtils.h"
 #include <map>
 namespace Arda {
-
 
 struct ArdaConfig {
   // vars - config options
@@ -24,10 +25,23 @@ struct ArdaConfig {
   double worldIndustryFactor = 1.0;
   double resourceFactor = 1.0;
   float superRegionFactor = 1.0;
+  double targetWorldPopulation = 3'000'000'000;
+  double targetWorldGdp = 8'000'000'000'000;
+  Fwg::Civilization::LocationConfig locationConfig;
+  void calculateTargetWorldPopulation() {
+    targetWorldPopulation =
+        Arda::Utils::ageConfigs[generationAge].targetWorldPopulation *
+        worldPopulationFactor;
+  }
+  void calculateTargetWorldGdp() {
+    targetWorldGdp = Arda::Utils::ageConfigs[generationAge].targetWorldGdp *
+                     worldIndustryFactor;
+  }
 };
 
 struct ArdaStats {
-  int totalWorldPopulation = 0;
+  double totalWorldPopulation = 0;
+  double totalWorldGdp = 0;
   int totalCountries = 0;
   int totalColonialCountries = 0;
   int totalRegions = 0;
@@ -40,9 +54,8 @@ struct ArdaStats {
 };
 
 struct ArdaData {
-  // vars - track civil statistics
-  long long worldPop = 0;
   double worldEconomicActivity = 0;
+  Civilization::CivilizationLayer civLayer;
 };
 
 class ArdaGen : public Fwg::FastWorldGenerator {
@@ -79,6 +92,18 @@ public:
   ArdaGen(Fwg::FastWorldGenerator &fwg);
   ~ArdaGen();
   /* member functions*/
+
+  bool loadDevelopment(Fwg::Cfg &config, const std::string &path);
+  bool genDevelopment(Fwg::Cfg &config);
+  bool loadPopulation(Fwg::Cfg &config, const Fwg::Gfx::Bitmap &inputPop);
+  bool genPopulation(Fwg::Cfg &config);
+  void genEconomyData();
+  void genCultureData();
+  void genCivilisationData();
+  void genLocations();
+  void genNavmesh();
+
+  bool genWastelands(Fwg::Cfg &config);
   void generateStrategicRegions(
       std::function<std::shared_ptr<SuperRegion>()> factory);
   void

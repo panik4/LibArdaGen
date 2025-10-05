@@ -1,22 +1,30 @@
 #pragma once
 #include "areas/SuperRegion.h"
 #include "civilisation/ArdaCivilisations.h"
+#include "civilisation/CivilisationLayer.h"
 #include "countries/Country.h"
 #include "rendering/Visualization.h"
 
 namespace Arda::Gfx {
+Fwg::Gfx::Bitmap displayDevelopment(
+    const std::vector<std::shared_ptr<Arda::ArdaProvince>> provinces);
+Fwg::Gfx::Bitmap displayPopulation(
+    const std::vector<std::shared_ptr<Arda::ArdaProvince>> provinces);
 Fwg::Gfx::Bitmap
 displayCultureGroups(const Arda::Civilization::CivilizationData &civData);
 Fwg::Gfx::Bitmap
 displayCultures(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
 Fwg::Gfx::Bitmap
 displayReligions(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
-Fwg::Gfx::Bitmap
-displayLanguageGroups(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
+Fwg::Gfx::Bitmap displayLanguageGroups(
+    const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
 Fwg::Gfx::Bitmap
 displayLanguages(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
 
-
+Fwg::Gfx::Bitmap
+displayWorldOverlayMap(const Fwg::Climate::ClimateData &climateData,
+                       const Fwg::Gfx::Bitmap &worldMap,
+                       const Arda::Civilization::CivilizationLayer &civLayer);
 
 Fwg::Gfx::Bitmap visualiseStrategicRegions(
     Fwg::Gfx::Bitmap &superRegionMap,

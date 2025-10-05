@@ -20,16 +20,16 @@ struct ScenarioPosition {
   PositionType type;
   int typeIndex;
 };
-class ArdaProvince {
+class ArdaProvince : public Fwg::Areas::Province {
 public:
-  int ID;
-  std::string name;
   std::string owner;
   std::string terrainType;
-  double popFactor;
-  double devFactor;
-  double cityShare;
-  std::shared_ptr<Fwg::Areas::Province> baseProvince;
+  double populationDensity = 0.0;
+  double worldPopulationShare = 0.0;
+  double population = 0;
+  double worldGdpShare = 0.0;
+  double gdp = 0;
+
   std::shared_ptr<VictoryPoint> victoryPoint;
   // containers
   std::vector<Arda::ArdaProvince> neighbours;
@@ -41,8 +41,12 @@ public:
   ArdaProvince();
   ~ArdaProvince();
   // operators
-  bool operator==(const Arda::ArdaProvince &right) const { return ID == right.ID; };
-  bool operator<(const Arda::ArdaProvince &right) const { return ID < right.ID; };
+  bool operator==(const Arda::ArdaProvince &right) const {
+    return ID == right.ID;
+  };
+  bool operator<(const Arda::ArdaProvince &right) const {
+    return ID < right.ID;
+  };
   std::string toHexString();
 };
 } // namespace Arda

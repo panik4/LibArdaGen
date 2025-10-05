@@ -70,8 +70,8 @@ void Country::selectCapital() {
     return;
   }
   for (const auto &region : ownedRegions) {
-    if (region->populationFactor > max) {
-      max = region->populationFactor;
+    if (region->totalPopulation > max) {
+      max = region->totalPopulation;
       capitalRegionID = region->ID;
       capitalRegion = region;
     }
@@ -105,13 +105,13 @@ void Country::evaluateProvinces() {
               return a->ID < b->ID;
             });
 }
-void Country::evaluatePopulations(const double worldPopulationFactor) {
+void Country::evaluatePopulations(const double worldPopulation) {
   // gather all population factors of the regions
-  populationFactor = 0.0;
+  totalPopulation = 0.0;
   for (const auto &region : ownedRegions) {
-    populationFactor += region->populationFactor;
+    totalPopulation += region->totalPopulation;
   }
-  worldPopulationShare = populationFactor / worldPopulationFactor;
+  worldPopulationShare = totalPopulation / worldPopulation;
 }
 
 void Country::evaluateDevelopment() {
@@ -119,18 +119,17 @@ void Country::evaluateDevelopment() {
   for (auto &state : this->ownedRegions) {
     // development should be weighed by the pop in the state
     averageDevelopment +=
-        state->developmentFactor *
+        state->averageDevelopment *
         (state->worldPopulationShare / this->worldPopulationShare);
   }
-  this->averageDevelopment = averageDevelopment;
 }
 
 void Country::evaluateEconomicActivity(const double worldEconomicActivity) {
-  double economicActivity = 0.0;
+  gdp = 0.0;
   for (const auto &region : ownedRegions) {
-    economicActivity += region->economicActivity;
+    gdp += region->gdp;
   }
-  worldEconomicActivityShare = economicActivity / worldEconomicActivity;
+  worldEconomicActivityShare = gdp / worldEconomicActivity;
 }
 
 void Country::evaluateProperties() {
@@ -147,10 +146,11 @@ void Country::evaluateProperties() {
 void Country::gatherCultureShares() {
   cultures.clear();
   for (const auto &region : ownedRegions) {
-    for (const auto &culture : region->cultureShares) {
+    for (const auto &culture : region->cultures) {
       if (cultures.find(culture.first) == cultures.end())
         cultures[culture.first] = 0;
-      cultures[culture.first] += culture.second * region->populationFactor;
+      cultures[culture.first] +=
+          culture.second * static_cast<double>(region->totalPopulation);
     }
   }
 }

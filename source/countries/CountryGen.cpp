@@ -165,16 +165,16 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
     Fwg::Gfx::Colour selectedCol;
 
     for (auto province : region->ardaProvinces) {
-      if (!province->baseProvince->isSea()) {
+      if (!province->isSea()) {
         //  we have the colour already
-        auto colour = inputImage[province->baseProvince->pixels[0]];
+        auto colour = inputImage[province->pixels[0]];
 
         if (likeliestOwner.find(colour)) {
-          likeliestOwner[colour] += province->baseProvince->pixels.size();
+          likeliestOwner[colour] += province->pixels.size();
 
         } else {
           likeliestOwner.setValue(colour,
-                                  province->baseProvince->pixels.size());
+                                  province->pixels.size());
         }
         int max = 0;
 

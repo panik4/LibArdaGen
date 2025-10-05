@@ -6,7 +6,6 @@ ArdaRegion::ArdaRegion(const std::shared_ptr<Fwg::Areas::Region> &baseRegion)
     : Fwg::Areas::Region(*baseRegion), assigned(false), totalPopulation{-1} {}
 
 ArdaRegion::~ArdaRegion() {}
-void ArdaRegion::sumPopulations() {}
 void ArdaRegion::findLocator(Fwg::Civilization::LocationType locationType,
                              int maxAmount) {
   std::shared_ptr<Fwg::Civilization::Location> addLocation;
@@ -61,12 +60,12 @@ ArdaRegion::getLocation(Fwg::Civilization::LocationType type) {
   return nullptr;
 }
 std::shared_ptr<Arda::Culture> Arda::ArdaRegion::getPrimaryCulture() {
-  if (cultureShares.empty()) {
+  if (cultures.empty()) {
     return nullptr;
   }
 
   auto primaryCulture = std::max_element(
-      cultureShares.begin(), cultureShares.end(),
+      cultures.begin(), cultures.end(),
       [](const auto &a, const auto &b) { return a.second < b.second; });
 
   return primaryCulture->first;

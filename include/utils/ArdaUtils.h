@@ -6,6 +6,23 @@ namespace Arda::Utils {
 
 enum GenerationAge { Medieval, Renaissance, Victorian, WorldWar };
 
+struct AgeConfig {
+  double targetWorldPopulation = 0.0;
+  double targetWorldGdp = 0.0;
+};
+static AgeConfig medievalConfig{300'000'000, 1'000'000};
+static AgeConfig renaissanceConfig{500'000'000, 8'000'000};
+static AgeConfig victorianConfig{1'000'000'000, 300'000'000};
+static AgeConfig worldWarConfig{3'000'000'000, 8'000'000'000'000};
+
+
+
+static std::map<GenerationAge, AgeConfig> ageConfigs{
+    {GenerationAge::Medieval, medievalConfig},
+    {GenerationAge::Renaissance, renaissanceConfig},
+    {GenerationAge::Victorian, victorianConfig},
+    {GenerationAge::WorldWar, worldWarConfig}};
+
 struct NoiseConfig {
   double fractalFrequency;
   double tanFactor;
@@ -65,4 +82,3 @@ Coordinate strToPos(const std::vector<std::string> &tokens,
                     const std::vector<int> positions);
 
 }; // namespace Arda::Utils
-

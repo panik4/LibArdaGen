@@ -16,16 +16,15 @@ public:
   std::shared_ptr<Country> owner;
   int superRegionID = -1;
   // calculate this for the scenario in general
-  double populationFactor = 0.0;
   double worldPopulationShare = 0.0;
-  double developmentFactor = 0.0;
+  double averageDevelopment = 0.0;
   double importanceScore = 0.0;
   double relativeImportance = 0.0;
   // calculate this in every module
-  int totalPopulation = 0;
+  double totalPopulation = 0;
   // this calculated in every module, usually by taking both population and
   // development into account
-  double economicActivity = 0.0;
+  double gdp = 0.0;
   double worldEconomicActivityShare = 0.0;
   std::map<std::string, Arda::Utils::Resource> resources;
 
@@ -39,7 +38,7 @@ public:
   std::vector<double> dateRange;
   std::map<std::shared_ptr<Arda::Religion>, double> religions;
   // the sum here should ALWAYS be 1
-  std::map<std::shared_ptr<Arda::Culture>, double> cultureShares;
+  std::map<std::shared_ptr<Arda::Culture>, double> cultures;
   std::vector<std::shared_ptr<Fwg::Civilization::Location>>
       significantLocations;
 
@@ -48,9 +47,6 @@ public:
   virtual ~ArdaRegion();
 
   // member functions
-  // average given culture and religion shares of all provinces
-  // TODO: calc distinct values for religion and culture mixes
-  void sumPopulations();
 
   void findLocator(Fwg::Civilization::LocationType locationType, int maxAmount);
 
