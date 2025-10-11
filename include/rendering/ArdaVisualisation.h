@@ -22,6 +22,14 @@ Fwg::Gfx::Bitmap
 displayLanguages(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
 
 Fwg::Gfx::Bitmap
+displayLocations(std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions,
+                 Fwg::Gfx::Bitmap worldMap);
+
+Fwg::Gfx::Bitmap displayConnections(
+    const std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions,
+    Fwg::Gfx::Bitmap connectionMap);
+
+Fwg::Gfx::Bitmap
 displayWorldOverlayMap(const Fwg::Climate::ClimateData &climateData,
                        const Fwg::Gfx::Bitmap &worldMap,
                        const Arda::Civilization::CivilizationLayer &civLayer);

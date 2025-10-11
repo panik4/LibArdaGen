@@ -4,14 +4,35 @@
 #include <vector>
 
 namespace Arda::Civilization {
+
 enum class TopographyType {
+  // Hydrological
   MARSH,
   WETLANDS,
   FLOODLANDS,
-  IMPASSABLE,
+  SWAMP,
+  DELTA,
+
+  // Dry or barren
+  WASTELAND,
+  SCRUBLAND,
+  BADLANDS,
+  SALTPLAIN,
+
+  // Human-modified
   FARMLAND,
   CITY,
-  SUBURBS
+  SUBURBS,
+  INDUSTRIAL,
+  RUINS,
+  MINE,
+
+  // Hazardous / unstable
+  IMPASSABLE,
+  VOLCANIC,
+  CRATER,
+  LANDSLIDE_ZONE,
+  ERODED,
 };
 struct CivilizationLayer {
   using Mask = uint32_t;
@@ -76,10 +97,46 @@ struct CivilizationLayer {
     }
     return std::nullopt;
   }
+
+  void clear(TopographyType type) {
+    // 1. Clear the bit flag from every tile
+    for (auto &tile : tiles) {
+      tile.clear(type);
+    }
+
+    // 2. Remove all associated extra data
+    extraData.erase(type);
+  }
+
+  std::vector<int> getAll(TopographyType type) const {
+    std::vector<int> result;
+    result.reserve(tiles.size() / 8); // small optimization guess
+    for (int i = 0; i < static_cast<int>(tiles.size()); ++i) {
+      if (tiles[i].has(type))
+        result.push_back(i);
+    }
+    return result;
+  }
+
+  std::vector<std::pair<int, float>> getAllWithData(TopographyType type) const {
+    std::vector<std::pair<int, float>> result;
+    auto itType = extraData.find(type);
+    if (itType == extraData.end())
+      return result; // no data for this type
+
+    result.reserve(itType->second.size());
+    for (auto &[index, value] : itType->second) {
+      // only include if tile still has that flag (for safety)
+      if (index < static_cast<int>(tiles.size()) && tiles[index].has(type))
+        result.emplace_back(index, value);
+    }
+    return result;
+  }
+
   std::vector<float> wastelandChance;
   void clear() {}
 
   size_t byteSize() const { return 0; }
 };
 
-} // namespace Fwg::Civilization
+} // namespace Arda::Civilization

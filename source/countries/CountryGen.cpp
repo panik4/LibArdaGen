@@ -70,11 +70,17 @@ void distributeCountries(
     // and counting the number of provinces with the same culture
     country->gatherCultureShares();
     auto culture = country->getPrimaryCulture();
-    auto language = culture->language;
-    country->name = language->generateGenericCapitalizedWord();
-    country->adjective = language->getAdjectiveForm(country->name);
-    country->tag =
-        Arda::Names::generateTag(country->name, nData.disallowedTokens);
+    if (culture == nullptr) {
+      Fwg::Utils::Logging::logLine("No culture found for country " +
+                                   country->tag +
+                                   ", cannot give meaningful name");
+    } else {
+      auto language = culture->language;
+      country->name = language->generateGenericCapitalizedWord();
+      country->adjective = language->getAdjectiveForm(country->name);
+      country->tag =
+          Arda::Names::generateTag(country->name, nData.disallowedTokens);
+    }
     for (auto &region : country->ownedRegions) {
       region->owner = country;
     }
@@ -173,8 +179,7 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
           likeliestOwner[colour] += province->pixels.size();
 
         } else {
-          likeliestOwner.setValue(colour,
-                                  province->pixels.size());
+          likeliestOwner.setValue(colour, province->pixels.size());
         }
         int max = 0;
 

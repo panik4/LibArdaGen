@@ -47,7 +47,6 @@ public:
   virtual ~ArdaRegion();
 
   // member functions
-
   void findLocator(Fwg::Civilization::LocationType locationType, int maxAmount);
 
   void findPortLocator(int maxAmount = 1);

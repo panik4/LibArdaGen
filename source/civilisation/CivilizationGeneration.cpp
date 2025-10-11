@@ -493,6 +493,28 @@ void nameContinents(std::vector<std::shared_ptr<ArdaContinent>> &continents,
     }
   }
 }
+void applyCivilisationTopography(
+    Arda::Civilization::CivilizationLayer &civLayer,
+    const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces) {
+  civLayer.clear(Arda::Civilization::TopographyType::CITY);
+  civLayer.clear(Arda::Civilization::TopographyType::FARMLAND);
+  for (auto &province : provinces) {
+    if (!province->isLand())
+      continue;
+    for (auto &location : province->locations) {
+      if (location->type == Fwg::Civilization::LocationType::City ||
+          location->type == Fwg::Civilization::LocationType::Port) {
+        for (auto &pix : location->pixels) {
+          civLayer.set(pix, Arda::Civilization::TopographyType::CITY);
+        }
+      } else if (location->type == Fwg::Civilization::LocationType::Farm) {
+        for (auto &pix : location->pixels) {
+          civLayer.set(pix, Arda::Civilization::TopographyType::FARMLAND);
+        }
+      }
+    }
+  }
+}
 namespace Wastelands {
 
 std::vector<float>

@@ -81,6 +81,9 @@ void nameSuperRegions(
 // after having generated cultures, generate names for the continents
 void nameContinents(std::vector<std::shared_ptr<ArdaContinent>> &continents,
                     std::vector<std::shared_ptr<ArdaRegion>> &regions);
+void applyCivilisationTopography(
+    Arda::Civilization::CivilizationLayer &civLayer,
+    const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces);
 
 namespace Wastelands {
 

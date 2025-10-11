@@ -8,6 +8,7 @@
 #include "areas/SuperRegion.h"
 #include "civilisation/CivilizationGeneration.h"
 #include "civilization/Location.h"
+#include "civilization/NavmeshGeneration.h"
 #include "countries/Country.h"
 #include "countries/CountryGen.h"
 #include "culture/NameUtils.h"

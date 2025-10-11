@@ -103,7 +103,8 @@ void ArdaGen::mapRegions() {
                  const std::shared_ptr<Fwg::Areas::Province> b) {
                 return (*a < *b);
               });
-    auto ardaRegion = std::make_shared<ArdaRegion>(region);
+    auto ardaRegion = std::dynamic_pointer_cast<Arda::ArdaRegion>(region);
+    ardaRegion->ardaProvinces.clear();
 
     for (auto &province : ardaRegion->provinces) {
       ardaRegion->ardaProvinces.push_back(ardaProvinces[province->ID]);
@@ -286,19 +287,19 @@ void ArdaGen::genCivilisationData() {
 void ArdaGen::genLocations() {
   locationMap.clear();
   Fwg::Civilization::Locations::generateLocations(
-      areaData.regions, terrainData, climateData, provinceMap, areaData, ardaConfig.locationConfig);
-  locationMap = Fwg::Gfx::displayLocations(areaData.regions, worldMap);
+      areaData.regions, terrainData, climateData, provinceMap, areaData,
+      ardaConfig.locationConfig);
+  locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   Fwg::Gfx::Png::save(locationMap,
                       Fwg::Cfg::Values().mapsPath + "//world//locations.png");
-
+  Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
+                                                  ardaProvinces);
 }
 void ArdaGen::genNavmesh() {
   Fwg::Civilization::Locations::generateConnections(
-      areaData.regions, terrainData,
-                                               climateData, worldMap);
+      areaData.regions, terrainData, climateData, worldMap);
   // navmeshMap = Fwg::Gfx::displayConnections(areaData.regions, locationMap);
 }
-
 
 bool ArdaGen::genWastelands(Fwg::Cfg &config) {
   Arda::Civilization::Wastelands::detectWastelands(terrainData, climateData,

@@ -103,6 +103,46 @@ Fwg::Gfx::Bitmap displayLanguageGroups(
 }
 
 Fwg::Gfx::Bitmap
+displayLocations(std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions,
+                 Fwg::Gfx::Bitmap worldMap) {
+  for (auto &region : regions) {
+    for (auto &location : region->locations) {
+      for (auto pixel : location->pixels) {
+        worldMap.setColourAtIndex(
+            pixel,
+            Fwg::Civilization::Location::locationColours.at(location->type));
+      }
+    }
+  }
+  return worldMap;
+}
+
+Fwg::Gfx::Bitmap displayConnections(
+    const std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions,
+    Fwg::Gfx::Bitmap connectionMap) {
+  auto &config = Fwg::Cfg::Values();
+  // now visualise connections again
+  for (auto &region : regions) {
+    for (auto &loc : region->locations) {
+      for (auto &conn : loc->connections) {
+        for (int x = 0; x < conn.second.connectingPixels.size(); x++) {
+          connectionMap.setColourAtIndex(conn.second.connectingPixels[x],
+                                         {255, 255, 255 - x});
+          // Paint sourceLoc and destLoc
+          connectionMap.setColourAtIndex(
+              conn.second.source->position.weightedCenter, {0, 255, 255});
+          connectionMap.setColourAtIndex(
+              conn.second.destination->position.weightedCenter, {255, 0, 0});
+        }
+      }
+    }
+  }
+
+  Fwg::Gfx::Png::save(connectionMap, config.mapsPath + "world/connections.png");
+  return connectionMap;
+}
+
+Fwg::Gfx::Bitmap
 displayWorldOverlayMap(const Fwg::Climate::ClimateData &climateData,
                        const Fwg::Gfx::Bitmap &worldMap,
                        const Arda::Civilization::CivilizationLayer &civLayer) {
