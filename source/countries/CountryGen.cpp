@@ -5,7 +5,10 @@ std::shared_ptr<ArdaRegion> &
 findStartRegion(std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   std::vector<std::shared_ptr<ArdaRegion>> freeRegions;
   for (const auto &ardaRegion : ardaRegions)
-    if (!ardaRegion->assigned && !ardaRegion->isSea() && !ardaRegion->isLake())
+    if (!ardaRegion->assigned && !ardaRegion->isSea() &&
+        !ardaRegion->isLake() &&
+        !ardaRegion->topographyTypes.count(
+            Arda::Civilization::TopographyType::WASTELAND))
       freeRegions.push_back(ardaRegion);
 
   if (freeRegions.size() == 0)

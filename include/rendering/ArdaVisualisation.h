@@ -11,6 +11,9 @@ Fwg::Gfx::Bitmap displayDevelopment(
 Fwg::Gfx::Bitmap displayPopulation(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> provinces);
 Fwg::Gfx::Bitmap
+displayTopography(const Arda::Civilization::CivilizationLayer &civLayer,
+                  Fwg::Gfx::Bitmap worldMap);
+Fwg::Gfx::Bitmap
 displayCultureGroups(const Arda::Civilization::CivilizationData &civData);
 Fwg::Gfx::Bitmap
 displayCultures(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);

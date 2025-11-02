@@ -19,30 +19,48 @@ void Country::assignRegions(
     int maxRegions, std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     std::shared_ptr<ArdaRegion> startRegion,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces) {
-  addRegion(startRegion);
-  auto breakCounter = 0;
+  if (!startRegion)
+    return;
+
+  addRegion(startRegion); // Add the starting region
+
+  size_t currentIndex = 0; // Index for iteration over ownedRegions
+  int breakCounter = 0;    // Prevent infinite loops
+
   while (ownedRegions.size() < maxRegions && breakCounter++ < 100) {
-    for (const auto &ardaRegion : ownedRegions) {
-      if (ownedRegions.size() >= maxRegions)
-        break;
-      if (ardaRegion == nullptr)
-        continue;
-      if (ardaRegion->neighbours.size() == 0)
-        continue;
-      if (ardaRegion->neighbours.size()) {
-        auto &nextRegion = Fwg::Utils::selectRandom(ardaRegion->neighbours);
-        if (nextRegion < ardaRegions.size()) {
-          if (!ardaRegions[nextRegion]->assigned &&
-              !ardaRegions[nextRegion]->isSea() &&
-              !ardaRegions[nextRegion]->isLake()) {
-            ardaRegions[nextRegion]->assigned = true;
-            addRegion(ardaRegions[nextRegion]);
-          }
-        }
+    // Stop if we have iterated all regions added so far
+    if (currentIndex >= ownedRegions.size())
+      break;
+
+    auto &ardaRegion = ownedRegions[currentIndex++];
+    if (!ardaRegion)
+      continue;
+
+    // Skip regions without neighbours
+    if (ardaRegion->neighbours.empty())
+      continue;
+
+    // Pick a random neighbour
+    auto &nextRegionIndex = Fwg::Utils::selectRandom(ardaRegion->neighbours);
+
+    // Safety check: index is valid in ardaRegions
+    if (nextRegionIndex >= 0 &&
+        nextRegionIndex < static_cast<int>(ardaRegions.size())) {
+      auto &nextRegion = ardaRegions[nextRegionIndex];
+
+      // Skip regions already assigned, water, or wasteland
+      if (nextRegion && !nextRegion->assigned && !nextRegion->isSea() &&
+          !nextRegion->isLake() &&
+          nextRegion->topographyTypes.count(
+              Arda::Civilization::TopographyType::WASTELAND) == 0) {
+        nextRegion->assigned = true;
+        addRegion(
+            nextRegion); // Safe: modifies vector, but index-based loop is okay
       }
     }
   }
 }
+
 
 void Country::addRegion(std::shared_ptr<ArdaRegion> region) {
   region->assigned = true;

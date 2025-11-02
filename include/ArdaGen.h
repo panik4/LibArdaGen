@@ -6,6 +6,7 @@
 #include "areas/ArdaRegion.h"
 #include "areas/AreaGen.h"
 #include "areas/SuperRegion.h"
+#include "civilisation/NaturalFeatures.h"
 #include "civilisation/CivilizationGeneration.h"
 #include "civilization/Location.h"
 #include "civilization/NavmeshGeneration.h"
@@ -94,6 +95,9 @@ public:
   ~ArdaGen();
   /* member functions*/
 
+  void genNaturalFeatures();
+  bool loadNaturalFeatures(Fwg::Cfg &config,
+                           const Fwg::Gfx::Bitmap &inputFeatures);
   bool loadDevelopment(Fwg::Cfg &config, const std::string &path);
   bool genDevelopment(Fwg::Cfg &config);
   bool loadPopulation(Fwg::Cfg &config, const Fwg::Gfx::Bitmap &inputPop);
@@ -102,6 +106,7 @@ public:
   void genCultureData();
   void genCivilisationData();
   void genLocations();
+  void detectCitiesFromUrbanTopography();
   void genNavmesh();
 
   bool genWastelands(Fwg::Cfg &config);
@@ -118,6 +123,9 @@ public:
   Fwg::Gfx::Bitmap visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
                                       const int ID = -1);
 
+  // mapping terrain types of FastWorldGen to module
+  // compatible terrains
+  virtual Fwg::Gfx::Bitmap mapTerrain();
   //  map base continents to generic paradox compatible game continents
   void mapContinents();
   // map base regions to generic paradox compatible game regions

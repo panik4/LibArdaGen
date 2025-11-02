@@ -52,7 +52,8 @@ void loadDevelopment(
     const std::vector<std::shared_ptr<ArdaContinent>> &continents) {
 
   for (auto &prov : provinces) {
-    if (prov->isLand()) {
+    if (prov->isLand() && !prov->topographyTypes.count(
+                              Arda::Civilization::TopographyType::WASTELAND)) {
       prov->averageDevelopment =
           (double)developmentMap[prov->position.weightedCenter].getBlue() /
           255.0;
@@ -85,10 +86,12 @@ void generateDevelopment(
       continent->developmentModifier = RandNum::getRandom<double>(
           config.minimumDevelopment, config.maximumDevelopment);
     }
-    for (auto &province : continent->provinces) {
-      province->averageDevelopment = 0.0f;
-      // skip lake and sea provinces
-      if (!province->isLand())
+    for (auto &province : continent->ardaProvinces) {
+      province->averageDevelopment = 0.001f;
+      // skip lake and sea provinces, also wastelands
+      if (!province->isLand() ||
+          province->topographyTypes.count(
+              Arda::Civilization::TopographyType::WASTELAND))
         continue;
       // get the average developmentNoise for the province
       const auto provincePixels = province->getNonOwningPixelView();
@@ -120,26 +123,25 @@ void postProcessPopulation(
     const std::vector<std::shared_ptr<ArdaContinent>> &continents,
     const double worldPopulationFactorSum, const double targetWorldPopulation) {
   // now calculate each provinces share of the world population
-  for (auto &province : provinces) {
-    if (province->isLand()) {
-      auto sum = province->populationDensity *
-                 province->getNonOwningPixelView().size();
-      province->worldPopulationShare = sum / worldPopulationFactorSum;
-
-    } else {
-      province->worldPopulationShare = 0.0;
-    }
-    province->population =
-        std::lround(province->worldPopulationShare *
-                    static_cast<double>(targetWorldPopulation));
-  }
-
   for (auto &gR : regions) {
     gR->worldPopulationShare = 0.0;
     gR->totalPopulation = 0;
-    for (auto &province : gR->ardaProvinces) {
-      gR->worldPopulationShare += province->worldPopulationShare;
-      gR->totalPopulation += province->population;
+    if (!gR->topographyTypes.count(
+            Arda::Civilization::TopographyType::WASTELAND)) {
+      for (auto &province : gR->ardaProvinces) {
+        if (province->isLand()) {
+          auto sum = province->populationDensity *
+                     province->getNonOwningPixelView().size();
+          province->worldPopulationShare = sum / worldPopulationFactorSum;
+        } else {
+          province->worldPopulationShare = 0.0;
+        }
+        gR->worldPopulationShare += province->worldPopulationShare;
+        province->population =
+            std::lround(province->worldPopulationShare *
+                        static_cast<double>(targetWorldPopulation));
+        gR->totalPopulation += province->population;
+      }
     }
   }
 }
@@ -154,7 +156,8 @@ void loadPopulation(
   double worldPopulationFactorSum = 0.0;
   for (auto &prov : provinces) {
     prov->populationDensity = 0.0f;
-    if (prov->isSea())
+    if (prov->isSea() || prov->topographyTypes.count(
+                             Arda::Civilization::TopographyType::WASTELAND))
       continue;
     prov->populationDensity =
         (double)populationMap[prov->position.weightedCenter].getRed() / 255.0;
@@ -179,9 +182,11 @@ void generatePopulation(
 
   double worldPopulationFactorSum = 0.0;
   for (auto &province : provinces) {
-    province->populationDensity = 0.0f;
+    province->populationDensity = 0.001f;
     // skip lake and sea provinces
-    if (province->isLand()) {
+    if (province->isLand() &&
+        !province->topographyTypes.count(
+            Arda::Civilization::TopographyType::WASTELAND)) {
       province->populationDensity = std::clamp(
           static_cast<double>(province->habitability) *
               ((config.developmentInfluence) +
@@ -244,6 +249,11 @@ void generateReligions(
   auto &config = Fwg::Cfg::Values();
   civData.religions.clear();
   Fwg::Gfx::Bitmap religionMap(config.width, config.height, 24);
+  if (ardaProvinces.empty()) {
+    Fwg::Utils::Logging::logLine(
+        "SEVERE ERROR: No provinces available for religion generation.");
+    return;
+  }
   for (int i = 0; i < 8; i++) {
     Religion r;
     r.name = "";
@@ -515,51 +525,6 @@ void applyCivilisationTopography(
     }
   }
 }
-namespace Wastelands {
-
-std::vector<float>
-detectWastelands(Fwg::Terrain::TerrainData &terrainData,
-                 Fwg::Climate::ClimateData &climateData,
-                 Arda::Civilization::CivilizationLayer &civLayer,
-                 const Fwg::Cfg &config) {
-  // sum up factors, such as altitude, climate zone habitability
-  std::vector<float> wastelandMap(terrainData.landForms.size(), 0.0f);
-  for (size_t i = 0; i < terrainData.landForms.size(); i++) {
-    const auto &landForm = terrainData.landForms[i];
-    const auto &climateType =
-        climateData.climates[i].getChances(0).second; // get dominant climate
-    const auto &climate = climateData.climateTypes.at((int)climateType);
-    // add altitude factor
-    // if (landForm.altitude > 0.2) {
-    //  wastelandMap[i] += (landForm.altitude - 0.2) * 0.33f;
-    //}
-    // add climate factor
-    // wastelandMap[i] += -climate.arability * 0.33f;
-    // add inclination factor
-    // wastelandMap[i] += landForm.inclination * 0.33f;
-    wastelandMap[i] += (1.0f - climateData.habitabilities[i]);
-  }
-  // normalize the wasteland map
-  // Fwg::Utils::normalizeVector(wastelandMap, 0.0f, 1.0f);
-
-  // visualize wasteland map
-  if (config.debugLevel > 1) {
-    Fwg::Gfx::Bitmap wastelandBitmap(config.width, config.height, 24);
-    for (size_t i = 0; i < wastelandMap.size(); i++) {
-      wastelandBitmap.setColourAtIndex(
-          i, Fwg::Gfx::Colour(static_cast<unsigned char>(0),
-                              static_cast<unsigned char>(std::min<float>(
-                                  255.0f, wastelandMap[i] * 255.0f)),
-                              static_cast<unsigned char>(0)));
-    }
-    Fwg::Gfx::Png::save(wastelandBitmap, config.mapsPath + "wastelands.png",
-                        false);
-  }
-  civLayer.wastelandChance = wastelandMap;
-  return wastelandMap;
-}
-
-} // namespace Wastelands
 
 bool sanityChecks(const CivilizationData &civData) { return true; }
 

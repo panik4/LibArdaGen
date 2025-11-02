@@ -64,8 +64,12 @@ Flag::Flag(const int width, const int height) : width(width), height(height) {
   // alpha values stay the same
   int colIndex = 0;
   for (const auto &mapping : colourMapping) {
-    for (auto index : mapping.second)
+    // ensure colIndex is in range
+    colIndex =
+        std::min<int>(colIndex, static_cast<int>(replacementColours.size() - 1));
+    for (auto index : mapping.second) {
       setPixel(replacementColours[colIndex], index);
+    }
     colIndex++;
   }
 
@@ -146,6 +150,7 @@ Flag::Flag(const int width, const int height) : width(width), height(height) {
     const int symbolLineSize = 52 * 4;
 
 for (const auto &mapping : colourMapping) {
+      colIndex = std::min<int>(colIndex, static_cast<int>(finalColours.size() - 1));
       const auto &colourToUse = finalColours[colIndex];
       for (auto byteIndex : mapping.second) {
         int pixelIndexInSymbol = byteIndex / 4;

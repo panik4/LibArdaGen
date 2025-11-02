@@ -5,7 +5,7 @@
 
 namespace Arda::Civilization {
 
-enum class TopographyType {
+enum class TopographyType : int {
   // Hydrological
   MARSH,
   WETLANDS,
@@ -131,6 +131,22 @@ struct CivilizationLayer {
         result.emplace_back(index, value);
     }
     return result;
+  }
+
+  int countOfTypeInRange(const std::vector<int> &indices,
+                         TopographyType type) const {
+    if (tiles.empty() || indices.empty())
+      return 0;
+
+    int count = 0;
+    const int tileCount = static_cast<int>(tiles.size());
+
+    for (int idx : indices) {
+      if (idx >= 0 && idx < tileCount && this->has(idx, type))
+        ++count;
+    }
+
+    return count;
   }
 
   std::vector<float> wastelandChance;

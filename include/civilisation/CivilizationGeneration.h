@@ -85,15 +85,7 @@ void applyCivilisationTopography(
     Arda::Civilization::CivilizationLayer &civLayer,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces);
 
-namespace Wastelands {
 
-std::vector<float>
-detectWastelands(Fwg::Terrain::TerrainData &terrainData,
-                 Fwg::Climate::ClimateData &climateData,
-                 Arda::Civilization::CivilizationLayer &civLayer,
-                 const Fwg::Cfg &config);
-
-}
 
 bool sanityChecks(const CivilizationData &civData);
 

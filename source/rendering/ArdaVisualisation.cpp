@@ -32,6 +32,25 @@ Fwg::Gfx::Bitmap displayPopulation(
   return populationMap;
 }
 Fwg::Gfx::Bitmap
+displayTopography(const Arda::Civilization::CivilizationLayer &civLayer,
+                  Fwg::Gfx::Bitmap worldMap) {
+  auto cityIndices = civLayer.getAll(Arda::Civilization::TopographyType::CITY);
+  auto farmIndices =
+      civLayer.getAll(Arda::Civilization::TopographyType::FARMLAND);
+  auto marshIndices =
+      civLayer.getAll(Arda::Civilization::TopographyType::MARSH);
+  for (const auto pix : cityIndices) {
+    worldMap.setColourAtIndex(pix, Fwg::Cfg::Values().colours.at("urban"));
+  }
+  for (const auto pix : farmIndices) {
+    worldMap.setColourAtIndex(pix, Fwg::Cfg::Values().colours.at("agriculture"));
+  }
+  for (const auto pix : marshIndices) {
+    worldMap.setColourAtIndex(pix, Fwg::Cfg::Values().colours.at("marsh"));
+  }
+  return worldMap;
+}
+Fwg::Gfx::Bitmap
 displayCultureGroups(const Arda::Civilization::CivilizationData &civData) {
   auto &config = Fwg::Cfg::Values();
   Fwg::Gfx::Bitmap cultureMap(config.width, config.height, 24);

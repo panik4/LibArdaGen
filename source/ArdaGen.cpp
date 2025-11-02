@@ -89,6 +89,10 @@ void ArdaGen::mapContinents() {
   for (const auto &continent : this->areaData.continents) {
     // reinterpret FastWorldGen continent as ArdaContinent
     auto ardaContinent = std::dynamic_pointer_cast<ArdaContinent>(continent);
+    for (const auto &prov : ardaContinent->provinces) {
+      ardaContinent->ardaProvinces.push_back(
+          std::dynamic_pointer_cast<Arda::ArdaProvince>(prov));
+    }
     ardaContinents.push_back(ardaContinent);
   }
 }
@@ -230,14 +234,109 @@ void ArdaGen::mapProvinces() {
   //           [](auto l, auto r) { return *l < *r; });
 }
 
-bool ArdaGen::genDevelopment(Fwg::Cfg &config) {
-  Civilization::generateDevelopment(ardaProvinces, ardaRegions, ardaContinents);
-  gatherStatistics();
+Fwg::Gfx::Bitmap ArdaGen::mapTerrain() {
+
+  auto topoMap =
+      Fwg::Gfx::Bitmap(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
+  auto topographyOverlayColours = Fwg::Cfg::Values().topographyOverlayColours;
+
+  // in all regions, gather share of city, agriculture, wasteland, marsh-
+  // topography
+  for (auto &region : ardaRegions) {
+    int totalMarshPixels = 0;
+    int totalCityPixels = 0;
+    int totalWastelandPixels = 0;
+    int totalAgriculturePixels = 0;
+    for (auto &province : region->ardaProvinces) {
+      int marshPixels = this->ardaData.civLayer.countOfTypeInRange(
+          province->pixels, Arda::Civilization::TopographyType::MARSH);
+      int cityPixels = this->ardaData.civLayer.countOfTypeInRange(
+          province->pixels, Arda::Civilization::TopographyType::CITY);
+      int wastelandPixels = this->ardaData.civLayer.countOfTypeInRange(
+          province->pixels, Arda::Civilization::TopographyType::WASTELAND);
+      int agriculturePixels = this->ardaData.civLayer.countOfTypeInRange(
+          province->pixels, Arda::Civilization::TopographyType::FARMLAND);
+      totalMarshPixels += marshPixels;
+      totalCityPixels += cityPixels;
+      totalWastelandPixels += wastelandPixels;
+      totalAgriculturePixels += agriculturePixels;
+      if (cityPixels > province->pixels.size() / 4) {
+        province->topographyTypes.insert(
+            Arda::Civilization::TopographyType::CITY);
+        for (auto &pix : province->pixels) {
+          topoMap.setColourAtIndex(pix, topographyOverlayColours.at("urban"));
+        }
+      }
+      if (marshPixels > province->pixels.size() / 2) {
+        province->topographyTypes.insert(
+            Arda::Civilization::TopographyType::MARSH);
+        for (auto &pix : province->pixels) {
+          topoMap.setColourAtIndex(pix, topographyOverlayColours.at("marsh"));
+        }
+      }
+      if (wastelandPixels > province->pixels.size() / 2) {
+        province->topographyTypes.insert(
+            Arda::Civilization::TopographyType::WASTELAND);
+        for (auto &pix : province->pixels) {
+          topoMap.setColourAtIndex(pix,
+                                   topographyOverlayColours.at("wasteland"));
+        }
+      }
+      if (agriculturePixels > province->pixels.size() / 2) {
+        province->topographyTypes.insert(
+            Arda::Civilization::TopographyType::FARMLAND);
+        for (auto &pix : province->pixels) {
+          topoMap.setColourAtIndex(pix,
+                                   topographyOverlayColours.at("agriculture"));
+        }
+      }
+    }
+    // now check each type share in region
+    const auto regionSize = region->getNonOwningPixelView().size();
+    if (totalCityPixels > regionSize / 4) {
+      region->topographyTypes.insert(Arda::Civilization::TopographyType::CITY);
+    }
+    if (totalMarshPixels > regionSize / 2) {
+      region->topographyTypes.insert(Arda::Civilization::TopographyType::MARSH);
+    }
+    if (totalWastelandPixels > regionSize / 2) {
+      region->topographyTypes.insert(
+          Arda::Civilization::TopographyType::WASTELAND);
+    }
+    if (totalAgriculturePixels > regionSize / 2) {
+      region->topographyTypes.insert(
+          Arda::Civilization::TopographyType::FARMLAND);
+    }
+  }
+
+  return topoMap;
+}
+
+void ArdaGen::genNaturalFeatures() {
+  // detect marshes
+  // Arda::NaturalFeatures::detectMarshes(terrainData, climateData,
+  //                                     ardaData.civLayer,
+  //                                     Fwg::Cfg::Values());
+  genWastelands(Fwg::Cfg::Values());
+  mapTerrain();
+}
+
+bool ArdaGen::loadNaturalFeatures(Fwg::Cfg &config,
+                                  const Fwg::Gfx::Bitmap &inputFeatures) {
+  Arda::NaturalFeatures::loadNaturalFeatures(config, inputFeatures,
+                                             ardaData.civLayer);
+  mapTerrain();
   return true;
 }
+
 bool ArdaGen::loadDevelopment(Fwg::Cfg &config, const std::string &path) {
   Civilization::loadDevelopment(Fwg::IO::Reader::readGenericImage(path, config),
                                 ardaProvinces, ardaRegions, ardaContinents);
+  gatherStatistics();
+  return true;
+}
+bool ArdaGen::genDevelopment(Fwg::Cfg &config) {
+  Civilization::generateDevelopment(ardaProvinces, ardaRegions, ardaContinents);
   gatherStatistics();
   return true;
 }
@@ -275,6 +374,7 @@ void ArdaGen::genCultureData() {
 }
 
 void ArdaGen::genCivilisationData() {
+  genNaturalFeatures();
   ardaConfig.calculateTargetWorldPopulation();
   ardaConfig.calculateTargetWorldGdp();
   Arda::Civilization::generateFullCivilisationData(
@@ -294,6 +394,20 @@ void ArdaGen::genLocations() {
                       Fwg::Cfg::Values().mapsPath + "//world//locations.png");
   Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
                                                   ardaProvinces);
+  mapTerrain();
+}
+void ArdaGen::detectCitiesFromUrbanTopography() {
+  Fwg::Civilization::Locations::detectCitiesFromTopography(
+      ardaData.civLayer.getAll(Arda::Civilization::TopographyType::CITY),
+      provinceMap, areaData, areaData.regions, Fwg::Cfg::Values().width,
+      Fwg::Cfg::Values().height);
+
+  locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
+  Fwg::Gfx::Png::save(locationMap,
+                      Fwg::Cfg::Values().mapsPath + "//world//locations.png");
+  Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
+                                                  ardaProvinces);
+  mapTerrain();
 }
 void ArdaGen::genNavmesh() {
   Fwg::Civilization::Locations::generateConnections(
@@ -302,8 +416,8 @@ void ArdaGen::genNavmesh() {
 }
 
 bool ArdaGen::genWastelands(Fwg::Cfg &config) {
-  Arda::Civilization::Wastelands::detectWastelands(terrainData, climateData,
-                                                   ardaData.civLayer, config);
+  Arda::NaturalFeatures::detectWastelands(terrainData, climateData, ardaRegions,
+                                          ardaData.civLayer, config);
   auto worldOverlayMap = Arda::Gfx::displayWorldOverlayMap(
       climateData, worldMap, ardaData.civLayer);
   Fwg::Gfx::Png::save(worldOverlayMap, config.mapsPath + "worldOverlayMap.png",
