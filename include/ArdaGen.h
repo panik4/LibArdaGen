@@ -6,8 +6,8 @@
 #include "areas/ArdaRegion.h"
 #include "areas/AreaGen.h"
 #include "areas/SuperRegion.h"
-#include "civilisation/NaturalFeatures.h"
 #include "civilisation/CivilizationGeneration.h"
+#include "civilisation/NaturalFeatures.h"
 #include "civilization/Location.h"
 #include "civilization/NavmeshGeneration.h"
 #include "countries/Country.h"
@@ -105,8 +105,10 @@ public:
   void genEconomyData();
   void genCultureData();
   void genCivilisationData();
+  void clearLocations();
+  void genLocationType(const Fwg::Civilization::LocationType &type);
   void genLocations();
-  void detectCitiesFromUrbanTopography();
+  void detectLocationType(const Fwg::Civilization::LocationType &type);
   void genNavmesh();
 
   bool genWastelands(Fwg::Cfg &config);

@@ -93,7 +93,9 @@ void distributeCountries(
   if (countries.size()) {
     for (auto &ardaRegion : ardaRegions) {
       if (!ardaRegion->isSea() && !ardaRegion->assigned &&
-          !ardaRegion->isLake()) {
+          !ardaRegion->isLake() &&
+          !ardaRegion->topographyTypes.count(
+              Arda::Civilization::TopographyType::WASTELAND)) {
         auto gR = Fwg::Utils::getNearestAssignedLand(
             ardaRegions, ardaRegion, config.width, config.height);
         gR->owner->addRegion(ardaRegion);

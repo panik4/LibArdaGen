@@ -40,13 +40,16 @@ displayTopography(const Arda::Civilization::CivilizationLayer &civLayer,
   auto marshIndices =
       civLayer.getAll(Arda::Civilization::TopographyType::MARSH);
   for (const auto pix : cityIndices) {
-    worldMap.setColourAtIndex(pix, Fwg::Cfg::Values().colours.at("urban"));
+    worldMap.setColourAtIndex(
+        pix, Fwg::Cfg::Values().topographyOverlayColours.at("urban"));
   }
   for (const auto pix : farmIndices) {
-    worldMap.setColourAtIndex(pix, Fwg::Cfg::Values().colours.at("agriculture"));
+    worldMap.setColourAtIndex(
+        pix, Fwg::Cfg::Values().topographyOverlayColours.at("agriculture"));
   }
   for (const auto pix : marshIndices) {
-    worldMap.setColourAtIndex(pix, Fwg::Cfg::Values().colours.at("marsh"));
+    worldMap.setColourAtIndex(
+        pix, Fwg::Cfg::Values().topographyOverlayColours.at("marsh"));
   }
   return worldMap;
 }

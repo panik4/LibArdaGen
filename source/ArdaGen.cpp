@@ -317,12 +317,16 @@ void ArdaGen::genNaturalFeatures() {
   // Arda::NaturalFeatures::detectMarshes(terrainData, climateData,
   //                                     ardaData.civLayer,
   //                                     Fwg::Cfg::Values());
+  clearLocations();
+  ardaData.civLayer.clear();
   genWastelands(Fwg::Cfg::Values());
   mapTerrain();
 }
 
 bool ArdaGen::loadNaturalFeatures(Fwg::Cfg &config,
                                   const Fwg::Gfx::Bitmap &inputFeatures) {
+  clearLocations();
+  ardaData.civLayer.clear();
   Arda::NaturalFeatures::loadNaturalFeatures(config, inputFeatures,
                                              ardaData.civLayer);
   mapTerrain();
@@ -384,6 +388,10 @@ void ArdaGen::genCivilisationData() {
   gatherStatistics();
 }
 
+void ArdaGen::clearLocations() {
+  Fwg::Civilization::Locations::clearLocations(areaData.regions);
+}
+
 void ArdaGen::genLocations() {
   locationMap.clear();
   Fwg::Civilization::Locations::generateLocations(
@@ -396,11 +404,36 @@ void ArdaGen::genLocations() {
                                                   ardaProvinces);
   mapTerrain();
 }
-void ArdaGen::detectCitiesFromUrbanTopography() {
-  Fwg::Civilization::Locations::detectCitiesFromTopography(
-      ardaData.civLayer.getAll(Arda::Civilization::TopographyType::CITY),
-      provinceMap, areaData, areaData.regions, Fwg::Cfg::Values().width,
-      Fwg::Cfg::Values().height);
+
+void ArdaGen::genLocationType(const Fwg::Civilization::LocationType &type) {
+  locationMap.clear();
+  Fwg::Civilization::Locations::generateLocationCategory(
+      areaData.regions, terrainData, climateData, provinceMap, areaData,
+      ardaConfig.locationConfig, type);
+  locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
+  Fwg::Gfx::Png::save(locationMap,
+                      Fwg::Cfg::Values().mapsPath + "//world//locations.png");
+  Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
+                                                  ardaProvinces);
+}
+
+void ArdaGen::detectLocationType(const Fwg::Civilization::LocationType &type) {
+  auto topotype = Arda::Civilization::TopographyType::CITY;
+  if (type == Fwg::Civilization::LocationType::Farm) {
+    topotype = Arda::Civilization::TopographyType::FARMLAND;
+  } else if (type == Fwg::Civilization::LocationType::Forest) {
+    // topotype = Arda::Civilization::TopographyType::;
+  } else if (type == Fwg::Civilization::LocationType::Mine) {
+    topotype = Arda::Civilization::TopographyType::MINE;
+  } else if (type == Fwg::Civilization::LocationType::Port) {
+    topotype = Arda::Civilization::TopographyType::CITY;
+  } else if (type == Fwg::Civilization::LocationType::City) {
+    topotype = Arda::Civilization::TopographyType::CITY;
+  }
+
+  Fwg::Civilization::Locations::detectLocationsFromPixels(
+      ardaData.civLayer.getAll(topotype), provinceMap, areaData,
+      areaData.regions, type);
 
   locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   Fwg::Gfx::Png::save(locationMap,

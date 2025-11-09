@@ -150,7 +150,11 @@ struct CivilizationLayer {
   }
 
   std::vector<float> wastelandChance;
-  void clear() {}
+  void clear() {
+    tiles.clear();
+    extraData.clear();
+    wastelandChance.clear();
+  }
 
   size_t byteSize() const { return 0; }
 };
