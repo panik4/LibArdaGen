@@ -35,6 +35,8 @@ Fwg::Gfx::Bitmap
 displayTopography(const Arda::Civilization::CivilizationLayer &civLayer,
                   Fwg::Gfx::Bitmap worldMap) {
   auto cityIndices = civLayer.getAll(Arda::Civilization::TopographyType::CITY);
+  auto portcityIndices =
+      civLayer.getAll(Arda::Civilization::TopographyType::PORTCITY);
   auto farmIndices =
       civLayer.getAll(Arda::Civilization::TopographyType::FARMLAND);
   auto marshIndices =
@@ -42,6 +44,10 @@ displayTopography(const Arda::Civilization::CivilizationLayer &civLayer,
   for (const auto pix : cityIndices) {
     worldMap.setColourAtIndex(
         pix, Fwg::Cfg::Values().topographyOverlayColours.at("urban"));
+  }
+  for (const auto pix : portcityIndices) {
+    worldMap.setColourAtIndex(
+        pix, Fwg::Cfg::Values().topographyOverlayColours.at("portcity"));
   }
   for (const auto pix : farmIndices) {
     worldMap.setColourAtIndex(

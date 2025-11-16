@@ -21,7 +21,9 @@ enum class TopographyType : int {
 
   // Human-modified
   FARMLAND,
+  FORESTRY,
   CITY,
+  PORTCITY,
   SUBURBS,
   INDUSTRIAL,
   RUINS,

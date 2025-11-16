@@ -139,10 +139,14 @@ void ArdaGen::applyRegionInput() {
   if (regionMappingPath.size() && std::filesystem::exists(regionMappingPath)) {
     auto mappingFileLines = Fwg::Parsing::getLines(regionMappingPath);
     for (auto &line : mappingFileLines) {
-      auto tokens = Fwg::Parsing::getTokens(line, ';');
-      auto colour = Fwg::Gfx::Colour(std::stoi(tokens[0]), std::stoi(tokens[1]),
-                                     std::stoi(tokens[2]));
-      regionInputMap.setValue(colour, tokens);
+      if (line.size()) {
+        auto tokens = Fwg::Parsing::getTokens(line, ';');
+        if (tokens.size() > 3) {
+          auto colour = Fwg::Gfx::Colour(
+              std::stoi(tokens[0]), std::stoi(tokens[1]), std::stoi(tokens[2]));
+          regionInputMap.setValue(colour, tokens);
+        }
+      }
     }
   }
   for (auto &ardaRegion : this->ardaRegions) {
@@ -235,80 +239,75 @@ void ArdaGen::mapProvinces() {
 }
 
 Fwg::Gfx::Bitmap ArdaGen::mapTerrain() {
-
+  using namespace Arda::Civilization;
+  auto &civLayer = this->ardaData.civLayer;
+  auto &overlayColours = Fwg::Cfg::Values().topographyOverlayColours;
   auto topoMap =
       Fwg::Gfx::Bitmap(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
-  auto topographyOverlayColours = Fwg::Cfg::Values().topographyOverlayColours;
 
-  // in all regions, gather share of city, agriculture, wasteland, marsh-
-  // topography
+  // Define the topography types we care about and their thresholds
+  struct TopoDef {
+    TopographyType type;
+    double provinceThreshold; // fraction of province pixels
+    double regionThreshold;   // fraction of region pixels
+  };
+
+  const std::vector<TopoDef> topoDefs = {
+      {TopographyType::CITY, 0.25, 0.25},
+      {TopographyType::PORTCITY, 0.00, 0.00}, // any pixel triggers inclusion
+      {TopographyType::MARSH, 0.50, 0.50},
+      {TopographyType::WASTELAND, 0.50, 0.50},
+      {TopographyType::FARMLAND, 0.50, 0.50},
+  };
+
+  // Process all regions
   for (auto &region : ardaRegions) {
-    int totalMarshPixels = 0;
-    int totalCityPixels = 0;
-    int totalWastelandPixels = 0;
-    int totalAgriculturePixels = 0;
-    for (auto &province : region->ardaProvinces) {
-      int marshPixels = this->ardaData.civLayer.countOfTypeInRange(
-          province->pixels, Arda::Civilization::TopographyType::MARSH);
-      int cityPixels = this->ardaData.civLayer.countOfTypeInRange(
-          province->pixels, Arda::Civilization::TopographyType::CITY);
-      int wastelandPixels = this->ardaData.civLayer.countOfTypeInRange(
-          province->pixels, Arda::Civilization::TopographyType::WASTELAND);
-      int agriculturePixels = this->ardaData.civLayer.countOfTypeInRange(
-          province->pixels, Arda::Civilization::TopographyType::FARMLAND);
-      totalMarshPixels += marshPixels;
-      totalCityPixels += cityPixels;
-      totalWastelandPixels += wastelandPixels;
-      totalAgriculturePixels += agriculturePixels;
-      if (cityPixels > province->pixels.size() / 4) {
-        province->topographyTypes.insert(
-            Arda::Civilization::TopographyType::CITY);
-        for (auto &pix : province->pixels) {
-          topoMap.setColourAtIndex(pix, topographyOverlayColours.at("urban"));
-        }
-      }
-      if (marshPixels > province->pixels.size() / 2) {
-        province->topographyTypes.insert(
-            Arda::Civilization::TopographyType::MARSH);
-        for (auto &pix : province->pixels) {
-          topoMap.setColourAtIndex(pix, topographyOverlayColours.at("marsh"));
-        }
-      }
-      if (wastelandPixels > province->pixels.size() / 2) {
-        province->topographyTypes.insert(
-            Arda::Civilization::TopographyType::WASTELAND);
-        for (auto &pix : province->pixels) {
-          topoMap.setColourAtIndex(pix,
-                                   topographyOverlayColours.at("wasteland"));
-        }
-      }
-      if (agriculturePixels > province->pixels.size() / 2) {
-        province->topographyTypes.insert(
-            Arda::Civilization::TopographyType::FARMLAND);
-        for (auto &pix : province->pixels) {
-          topoMap.setColourAtIndex(pix,
-                                   topographyOverlayColours.at("agriculture"));
-        }
-      }
-    }
-    // now check each type share in region
+    std::unordered_map<TopographyType, int> regionTotals;
+
     const auto regionSize = region->getNonOwningPixelView().size();
-    if (totalCityPixels > regionSize / 4) {
-      region->topographyTypes.insert(Arda::Civilization::TopographyType::CITY);
+
+    // Process each province
+    for (auto &province : region->ardaProvinces) {
+      if (!province->isLand())
+        continue;
+
+      const int provSize = static_cast<int>(province->pixels.size());
+
+      for (const auto &[type, provThresh, _] : topoDefs) {
+        const int count = civLayer.countOfTypeInRange(province->pixels, type);
+        regionTotals[type] += count;
+
+        // Province classification
+        const bool meetsThreshold =
+            provThresh == 0.0 ? (count > 0) : (count > provSize * provThresh);
+
+        if (meetsThreshold)
+          province->topographyTypes.insert(type);
+      }
+
+      // City special case: combine with portcity pixels for density
+      const int cityPixels =
+          civLayer.countOfTypeInRange(province->pixels, TopographyType::CITY);
+      const int portPixels = civLayer.countOfTypeInRange(
+          province->pixels, TopographyType::PORTCITY);
+      if (cityPixels + portPixels > provSize / 4) {
+        province->topographyTypes.insert(TopographyType::CITY);
+      }
     }
-    if (totalMarshPixels > regionSize / 2) {
-      region->topographyTypes.insert(Arda::Civilization::TopographyType::MARSH);
-    }
-    if (totalWastelandPixels > regionSize / 2) {
-      region->topographyTypes.insert(
-          Arda::Civilization::TopographyType::WASTELAND);
-    }
-    if (totalAgriculturePixels > regionSize / 2) {
-      region->topographyTypes.insert(
-          Arda::Civilization::TopographyType::FARMLAND);
+
+    // Region-level classification
+    for (const auto &[type, _, regionThresh] : topoDefs) {
+      const int total = regionTotals[type];
+      const bool meetsThreshold = regionThresh == 0.0
+                                      ? (total > 0)
+                                      : (total > regionSize * regionThresh);
+
+      if (meetsThreshold)
+        region->topographyTypes.insert(type);
     }
   }
 
+  // (Return a dummy or computed bitmap if needed)
   return topoMap;
 }
 
@@ -422,11 +421,11 @@ void ArdaGen::detectLocationType(const Fwg::Civilization::LocationType &type) {
   if (type == Fwg::Civilization::LocationType::Farm) {
     topotype = Arda::Civilization::TopographyType::FARMLAND;
   } else if (type == Fwg::Civilization::LocationType::Forest) {
-    // topotype = Arda::Civilization::TopographyType::;
+    topotype = Arda::Civilization::TopographyType::FORESTRY;
   } else if (type == Fwg::Civilization::LocationType::Mine) {
     topotype = Arda::Civilization::TopographyType::MINE;
   } else if (type == Fwg::Civilization::LocationType::Port) {
-    topotype = Arda::Civilization::TopographyType::CITY;
+    topotype = Arda::Civilization::TopographyType::PORTCITY;
   } else if (type == Fwg::Civilization::LocationType::City) {
     topotype = Arda::Civilization::TopographyType::CITY;
   }
