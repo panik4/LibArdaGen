@@ -95,7 +95,8 @@ detectWastelands(Fwg::Terrain::TerrainData &terrainData,
       }
     }
     float avgRegionHabitability =
-        totalRegionHabitability / static_cast<float>(region->getNonOwningPixelView().size());
+        totalRegionHabitability /
+        static_cast<float>(region->getNonOwningPixelView().size());
     if (avgRegionHabitability < config.lowDensityHabitatThreshold) {
       region->topographyTypes.insert(
           Arda::Civilization::TopographyType::WASTELAND);
@@ -111,14 +112,20 @@ void NaturalFeatures::loadNaturalFeatures(
     Fwg::Cfg &config, const Fwg::Gfx::Bitmap &inputFeatures,
     Arda::Civilization::CivilizationLayer &civLayer) {
   std::map<Fwg::Gfx::Colour, Arda::Civilization::TopographyType> colourMap = {
-      {Fwg::Gfx::Colour(255, 255, 0),
+      {config.topographyOverlayColours.at("marsh"),
        Arda::Civilization::TopographyType::MARSH},
-      {Fwg::Gfx::Colour(0, 255, 0),
+      {config.topographyOverlayColours.at("agriculture"),
        Arda::Civilization::TopographyType::FARMLAND},
-      {Fwg::Gfx::Colour(255, 0, 0),
+      {config.topographyOverlayColours.at("wasteland"),
        Arda::Civilization::TopographyType::WASTELAND},
-      {Fwg::Gfx::Colour(128, 128, 128),
+      {config.topographyOverlayColours.at("urban"),
        Arda::Civilization::TopographyType::CITY},
+      {config.topographyOverlayColours.at("portcity"),
+       Arda::Civilization::TopographyType::PORTCITY},
+      {config.topographyOverlayColours.at("forestry"),
+       Arda::Civilization::TopographyType::FORESTRY},
+      {config.topographyOverlayColours.at("mining"),
+       Arda::Civilization::TopographyType::MINE}
 
   };
   if (inputFeatures.size() == config.bitmapSize) {

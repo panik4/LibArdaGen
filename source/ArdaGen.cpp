@@ -318,7 +318,7 @@ void ArdaGen::genNaturalFeatures() {
   //                                     Fwg::Cfg::Values());
   clearLocations();
   ardaData.civLayer.clear();
-  genWastelands(Fwg::Cfg::Values());
+  // genWastelands(Fwg::Cfg::Values());
   mapTerrain();
 }
 
@@ -405,7 +405,17 @@ void ArdaGen::genLocations() {
 }
 
 void ArdaGen::genLocationType(const Fwg::Civilization::LocationType &type) {
-  locationMap.clear();
+  using namespace Arda::Civilization;
+  using namespace Fwg::Civilization;
+  // Mapping from location types to topography types
+  static const std::unordered_map<LocationType, TopographyType> typeMap = {
+      {LocationType::City, TopographyType::CITY},
+      {LocationType::Port, TopographyType::PORTCITY},
+      {LocationType::Farm, TopographyType::FARMLAND},
+      {LocationType::Mine, TopographyType::MINE},
+      {LocationType::Forest, TopographyType::FORESTRY},
+  };
+  ardaData.civLayer.clear(typeMap.at(type));
   Fwg::Civilization::Locations::generateLocationCategory(
       areaData.regions, terrainData, climateData, provinceMap, areaData,
       ardaConfig.locationConfig, type);
@@ -468,7 +478,9 @@ void ArdaGen::generateStrategicRegions(
 void ArdaGen::loadStrategicRegions(
     std::function<std::shared_ptr<SuperRegion>()> factory,
     const Fwg::Gfx::Bitmap &inputImage) {
-  Civilization::nameSuperRegions(superRegions, ardaRegions);
+  Fwg::Utils::Logging::logLine("Loading Strategic Regions from Image");
+  Fwg::Utils::Logging::logLine("Nothing happens...");
+  // Civilization::nameSuperRegions(superRegions, ardaRegions);
 }
 
 void ArdaGen::generateStateSpecifics() {

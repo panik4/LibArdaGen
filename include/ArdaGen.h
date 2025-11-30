@@ -66,6 +66,10 @@ protected:
   Fwg::Gfx::Bitmap typeMap;
 
 public:
+  struct FactoryRegistry {
+    std::function<std::shared_ptr<Arda::SuperRegion>()> superRegionFactory;
+  } ardaFactories;
+
   // to allow text inputs as addition to country image input
   std::string countryMappingPath = "";
   // to allow text inputs as addition to region image input
