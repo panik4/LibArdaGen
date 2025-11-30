@@ -1,5 +1,5 @@
 #pragma once
-#include "areas/ArdaRegion.h"
+#include "areas/ArdaProvince.h"
 #include "culture/Culture.h"
 #include "entities/Colour.h"
 #include "language/LanguageGroup.h"
@@ -10,8 +10,7 @@ class CultureGroup {
   std::vector<std::shared_ptr<Culture>> cultures;
   Fwg::Gfx::Colour colour;
   std::shared_ptr<Arda::LanguageGroup> languageGroup;
-  std::shared_ptr<ArdaRegion> center;
-  std::vector<std::shared_ptr<ArdaRegion>> regions;
+  std::shared_ptr<ArdaProvince> center;
   VisualType visualType;
 
 public:
@@ -32,16 +31,9 @@ public:
                    cultures.end());
   }
 
-  void addRegion(const std::shared_ptr<ArdaRegion> &region) {
-    regions.push_back(region);
+  void setCenter(const std::shared_ptr<ArdaProvince> &province) {
+    center = province;
   }
-
-  void removeRegion(const std::shared_ptr<ArdaRegion> &region) {
-    regions.erase(std::remove(regions.begin(), regions.end(), region),
-                  regions.end());
-  }
-
-  void setCenter(const std::shared_ptr<ArdaRegion> &region) { center = region; }
   void setLanguageGroup(const std::shared_ptr<Arda::LanguageGroup> &group) {
     languageGroup = group;
 
@@ -52,8 +44,8 @@ public:
           cultures[i]->language->generateGenericCapitalizedWord();
     }
   }
-  std::shared_ptr<ArdaRegion> getCenter() { return center; }
-  std::vector<std::shared_ptr<ArdaRegion>> getRegions() { return regions; }
+  std::shared_ptr<ArdaProvince> getCenter() { return center; }
+
   std::vector<std::shared_ptr<Culture>> getCultures() { return cultures; }
   std::string getName() { return name; }
   Fwg::Gfx::Colour getColour() { return colour; }

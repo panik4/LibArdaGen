@@ -13,12 +13,12 @@ Fwg::Gfx::Bitmap displayPopulation(
 Fwg::Gfx::Bitmap
 displayTopography(const Arda::Civilization::CivilizationLayer &civLayer,
                   Fwg::Gfx::Bitmap worldMap);
-Fwg::Gfx::Bitmap
-displayCultureGroups(const Arda::Civilization::CivilizationData &civData);
-Fwg::Gfx::Bitmap
-displayCultures(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
-Fwg::Gfx::Bitmap
-displayReligions(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
+Fwg::Gfx::Bitmap displayCultureGroups(
+    const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces);
+Fwg::Gfx::Bitmap displayCultures(
+    const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces);
+Fwg::Gfx::Bitmap displayReligions(
+    const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces);
 Fwg::Gfx::Bitmap displayLanguageGroups(
     const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
 Fwg::Gfx::Bitmap

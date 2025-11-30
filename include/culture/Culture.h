@@ -1,6 +1,7 @@
 #pragma once
 #include "language/Language.h"
 #include "entities/Colour.h"
+#include "areas/Area.h"
 #include <string>
 namespace Arda {
 class CultureGroup;
@@ -12,8 +13,8 @@ class Culture {
 public:
   std::string name;
   std::string adjective;
-  // ID of the province that is the center
-  int centerOfCulture;
+  // the area that is the center
+  std::shared_ptr<Fwg::Areas::Area> centerOfCulture;
   Fwg::Gfx::Colour colour;
   std::shared_ptr<Arda::Language> language;
   std::shared_ptr<CultureGroup> cultureGroup;

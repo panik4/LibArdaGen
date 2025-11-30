@@ -41,9 +41,9 @@ Dataset LanguageGenerator::getRandomMergedDataset() {
   // Parameters for random selection count
   size_t minGroups = 2;
   size_t maxGroups = 3;
-  size_t selectionCount =
-      std::min(availableDatasets.size(),
-               minGroups + rand() % (maxGroups - minGroups + 1));
+  size_t selectionCount = 1;
+  /* std::min(availableDatasets.size(),
+               minGroups + rand() % (maxGroups - minGroups + 1));*/
 
   // Shuffle available datasets
   std::random_device rd;

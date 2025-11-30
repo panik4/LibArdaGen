@@ -19,9 +19,9 @@ void generateCultureData(
     std::vector<std::shared_ptr<ArdaContinent>> &continents,
     std::vector<std::shared_ptr<SuperRegion>> &superRegions) {
   generateReligions(civData, ardaProvinces);
-  generateCultures(civData, regions);
-  Arda::Gfx::displayCultureGroups(civData);
-  Arda::Gfx::displayCultures(regions);
+  generateCultures(civData, ardaProvinces);
+  Arda::Gfx::displayCultureGroups(ardaProvinces);
+  Arda::Gfx::displayCultures(ardaProvinces);
   distributeLanguages(civData);
   nameRegions(regions);
   nameContinents(continents, regions);
@@ -290,96 +290,110 @@ void generateReligions(
   Fwg::Gfx::Png::save(religionMap, config.mapsPath + "world/religions.png");
 }
 
-void generateCultures(CivilizationData &civData,
-                      std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
+void generateCultures(
+    CivilizationData &civData,
+    std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces) {
   civData.cultures.clear();
   civData.cultureGroups.clear();
-  auto &config = Fwg::Cfg::Values();
-  int x = 20;
-  int y = 5;
-  int z = 15;
 
-  // Generate x culture groups
-  for (int i = 0; i < x; i++) {
+  auto &config = Fwg::Cfg::Values();
+
+  int numGroups = 20;    // number of culture groups
+  int numCultures = 200; // total number of cultures to spawn
+
+  // -------------------------------------------------------------------------
+  // 1. Generate culture groups (X random starting points)
+  // -------------------------------------------------------------------------
+  for (int i = 0; i < numGroups; i++) {
+
     auto colour = Fwg::Gfx::Colour(0, 0, 0);
     colour.randomize();
 
-    CultureGroup cultureGroup{"", colour};
+    CultureGroup group{"", colour};
 
-    // randomly select a reguion to be the center of the culture group
-    cultureGroup.setCenter(Fwg::Utils::selectRandom(ardaRegions));
-    // add the region to the culture group
-    cultureGroup.addRegion(cultureGroup.getCenter());
-    auto cgPtr = std::make_shared<CultureGroup>(cultureGroup);
-    civData.cultureGroups.push_back(cgPtr);
-    // Generate y to z cultures per culture group
-    int numCultures = RandNum::getRandom(y, z);
-    for (int j = 0; j < numCultures; j++) {
-      Culture culture;
-      culture.name = "";
-      std::transform(culture.name.begin(), culture.name.end(),
-                     culture.name.begin(),
-                     [](unsigned char c) { return std::tolower(c); });
+    // random center province
+    auto center = Fwg::Utils::selectRandom(ardaProvinces);
+    group.setCenter(center);
 
-      culture.colour.randomize();
-      culture.language = std::make_shared<Arda::Language>();
-      culture.cultureGroup = cgPtr;
-      cgPtr->addCulture(std::make_shared<Culture>(culture));
-    }
+    auto groupPtr = std::make_shared<CultureGroup>(group);
+    civData.cultureGroups.push_back(groupPtr);
   }
 
-  // now distribute these culturegroups to the regions
-  for (auto &ardaRegion : ardaRegions) {
-    if (ardaRegion->isSea() || ardaRegion->isLake())
+  // -------------------------------------------------------------------------
+  // 2. Generate cultures (Y random starting points)
+  //    And assign each culture to its closest culture group
+  // -------------------------------------------------------------------------
+  for (int i = 0; i < numCultures; i++) {
+
+    auto centerProv = Fwg::Utils::selectRandom(ardaProvinces);
+
+    auto cult = std::make_shared<Culture>();
+    cult->colour.randomize();
+    cult->language = std::make_shared<Arda::Language>();
+    cult->centerOfCulture = centerProv;
+
+    // find closest group center
+    float bestDist = 100000.0f;
+    std::shared_ptr<CultureGroup> bestGroup = nullptr;
+
+    for (auto &group : civData.cultureGroups) {
+
+      auto groupCenter = group->getCenter();
+      float d = Fwg::getPositionDistance(groupCenter->position,
+                                         centerProv->position, config.width);
+
+      if (d < bestDist) {
+        bestDist = d;
+        bestGroup = group;
+      }
+    }
+
+    // assign the culture to the closest group
+    cult->cultureGroup = bestGroup;
+    bestGroup->addCulture(cult);
+
+    civData.cultures.push_back(cult);
+  }
+
+  // -------------------------------------------------------------------------
+  // 3. Assign each province to the nearest culture
+  // -------------------------------------------------------------------------
+  for (auto &prov : ardaProvinces) {
+
+    prov->cultures.clear();
+
+    if (prov->isSea() || prov->isLake())
       continue;
-    auto closestCultureGroup = 0;
-    auto distance = 100000000.0;
-    for (auto x = 0; x < civData.cultureGroups.size(); x++) {
-      auto cultureGroup = civData.cultureGroups[x];
-      auto cultureCenter = cultureGroup->getCenter();
-      auto nDistance = Fwg::getPositionDistance(
-          cultureCenter->position, ardaRegion->position, config.width);
-      if (Fwg::Utils::switchIfComparator(nDistance, distance, std::less())) {
-        closestCultureGroup = x;
+
+    float bestDist = 100000.0f;
+    std::shared_ptr<Culture> bestCulture = nullptr;
+
+    for (auto &cult : civData.cultures) {
+
+      const auto cultureCenter = cult->centerOfCulture;
+
+      float d = Fwg::getPositionDistance(cultureCenter->position,
+                                         prov->position, config.width);
+
+      if (d < bestDist) {
+        bestDist = d;
+        bestCulture = cult;
       }
     }
-    civData.cultureGroups[closestCultureGroup]->addRegion(ardaRegion);
-  }
 
-  // randomly distribute culture centers inside the culturegroup
-  for (auto &cultureGroup : civData.cultureGroups) {
-    auto regs = cultureGroup->getRegions();
-
-    for (auto &culture : cultureGroup->getCultures()) {
-      culture->centerOfCulture = Fwg::Utils::selectRandom(regs)->ID;
+    if (bestCulture) {
+      prov->cultures.insert({bestCulture, 1.0f});
     }
   }
 
-  // now subdivide all culturegroups into cultures
-  for (auto &cultureGroup : civData.cultureGroups) {
-    for (auto &region : cultureGroup->getRegions()) {
-      region->cultures.clear();
-      auto closestCulture = 0;
-      auto distance = 100000000.0;
-      for (auto x = 0; x < cultureGroup->getCultures().size(); x++) {
-        auto culture = cultureGroup->getCultures()[x];
-        auto cultureCenter = ardaRegions[culture->centerOfCulture];
-        auto nDistance = Fwg::getPositionDistance(
-            cultureCenter->position, region->position, config.width);
-        if (Fwg::Utils::switchIfComparator(nDistance, distance, std::less())) {
-          closestCulture = x;
-        }
-      }
-      region->cultures.insert({cultureGroup->getCultures()[closestCulture],
-                               region->totalPopulation});
-    }
-  }
-  // now calculate the visual type of the culture groups and set the cultures of
-  // the culture group to it
-  for (auto &cultureGroup : civData.cultureGroups) {
-    cultureGroup->determineVisualType();
-    for (auto &culture : cultureGroup->getCultures()) {
-      culture->visualType = cultureGroup->getVisualType();
+  // -------------------------------------------------------------------------
+  // 4. Determine visual type for each group, apply to its cultures
+  // -------------------------------------------------------------------------
+  for (auto &group : civData.cultureGroups) {
+    group->determineVisualType();
+
+    for (auto &cult : group->getCultures()) {
+      cult->visualType = group->getVisualType();
     }
   }
 }
@@ -404,8 +418,6 @@ void distributeLanguages(CivilizationData &civData) {
             cultureGroup->getCultures().size(), {}));
     civData.languageGroups.push_back(languageGroup);
     cultureGroup->setLanguageGroup(languageGroup);
-    // generateLanguageGroup(cultureGroup);
-    //  now assign each culture a language
   }
 }
 
@@ -526,8 +538,8 @@ void applyCivilisationTopography(
 
   // Apply topography by location type
   for (const auto &province : provinces) {
-    //if (!province->isLand())
-    //  continue;
+    // if (!province->isLand())
+    //   continue;
 
     for (const auto &location : province->locations) {
       auto it = typeMap.find(location->type);

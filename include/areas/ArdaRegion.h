@@ -38,9 +38,6 @@ public:
   std::vector<std::shared_ptr<Arda::ArdaProvince>> ardaProvinces;
   std::vector<double> temperatureRange;
   std::vector<double> dateRange;
-  std::map<std::shared_ptr<Arda::Religion>, double> religions;
-  // the sum here should ALWAYS be 1
-  std::map<std::shared_ptr<Arda::Culture>, double> cultures;
   std::vector<std::shared_ptr<Fwg::Civilization::Location>>
       significantLocations;
 
@@ -64,5 +61,7 @@ public:
   getLocation(Fwg::Civilization::LocationType type);
   std::shared_ptr<Arda::Culture> getPrimaryCulture();
   std::string exportLine() const;
+  std::map<std::shared_ptr<Arda::Culture>, double> gatherCultures() const;
+  std::map<std::shared_ptr<Arda::Religion>, double> gatherReligions() const;
 };
 } // namespace Arda

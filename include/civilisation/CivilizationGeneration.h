@@ -36,8 +36,9 @@ void generateFullCivilisationData(
 void generateReligions(
     CivilizationData &civData,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces);
-void generateCultures(CivilizationData &civData,
-                      std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
+void generateCultures(
+    CivilizationData &civData,
+    std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces);
 void generateLanguageGroup(std::shared_ptr<CultureGroup> &cultureGroup);
 void distributeLanguages(CivilizationData &civData);
 

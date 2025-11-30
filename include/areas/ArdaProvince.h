@@ -1,7 +1,9 @@
 #pragma once
 #include "areas/Province.h"
-#include "generic/VictoryPoint.h"
 #include "civilisation/CivilisationLayer.h"
+#include "culture/Culture.h"
+#include "culture/Religion.h"
+#include "generic/VictoryPoint.h"
 #include <unordered_set>
 namespace Arda {
 enum class PositionType {
@@ -38,6 +40,10 @@ public:
   std::vector<Arda::ArdaProvince> neighbours;
   // these positions are used for victory points, units, etc
   std::vector<ScenarioPosition> positions;
+  // the sum here should ALWAYS be 1
+  std::map<std::shared_ptr<Arda::Religion>, double> religions;
+  // the sum here should ALWAYS be 1
+  std::map<std::shared_ptr<Arda::Culture>, double> cultures;
 
   // constructors/destructor
   ArdaProvince(std::shared_ptr<Fwg::Areas::Province> province);

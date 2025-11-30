@@ -164,7 +164,7 @@ void Country::evaluateProperties() {
 void Country::gatherCultureShares() {
   cultures.clear();
   for (const auto &region : ownedRegions) {
-    for (const auto &culture : region->cultures) {
+    for (const auto &culture : region->gatherCultures()) {
       if (cultures.find(culture.first) == cultures.end())
         cultures[culture.first] = 0;
       cultures[culture.first] +=

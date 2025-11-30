@@ -60,6 +60,8 @@ ArdaRegion::getLocation(Fwg::Civilization::LocationType type) {
   return nullptr;
 }
 std::shared_ptr<Arda::Culture> Arda::ArdaRegion::getPrimaryCulture() {
+
+  auto cultures = gatherCultures();
   if (cultures.empty()) {
     return nullptr;
   }
@@ -76,5 +78,29 @@ std::string ArdaRegion::exportLine() const {
   retLine += this->name + ";";
   retLine += std::to_string(this->totalPopulation) + ";";
   return retLine;
+}
+std::map<std::shared_ptr<Arda::Culture>, double>
+ArdaRegion::gatherCultures() const {
+  std::map<std::shared_ptr<Arda::Culture>, double> cultures;
+  for (auto &ardaProvinces : ardaProvinces) {
+    auto provinceCultures = ardaProvinces->cultures;
+    for (const auto &[culture, share] : provinceCultures) {
+      cultures[culture] +=
+          share * static_cast<double>(ardaProvinces->population);
+    }
+  }
+  return cultures;
+}
+std::map<std::shared_ptr<Arda::Religion>, double>
+ArdaRegion::gatherReligions() const {
+  std::map<std::shared_ptr<Arda::Religion>, double> religions;
+  for (auto &ardaProvinces : ardaProvinces) {
+    auto provinceReligions = ardaProvinces->religions;
+    for (const auto &[religion, share] : provinceReligions) {
+      religions[religion] +=
+          share * static_cast<double>(ardaProvinces->population);
+    }
+  }
+  return religions;
 }
 } // namespace Arda

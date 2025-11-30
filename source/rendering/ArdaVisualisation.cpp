@@ -59,38 +59,37 @@ displayTopography(const Arda::Civilization::CivilizationLayer &civLayer,
   }
   return worldMap;
 }
-Fwg::Gfx::Bitmap
-displayCultureGroups(const Arda::Civilization::CivilizationData &civData) {
+Fwg::Gfx::Bitmap displayCultureGroups(
+    const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces) {
   auto &config = Fwg::Cfg::Values();
   Fwg::Gfx::Bitmap cultureMap(config.width, config.height, 24);
-  for (auto &cultureGroup : civData.cultureGroups) {
-    for (auto &ardaRegion : cultureGroup->getRegions())
-      // add only the main culture at this time
-      for (auto &province : ardaRegion->ardaProvinces) {
-        for (const auto pix : province->getNonOwningPixelView()) {
-          cultureMap.setColourAtIndex(pix, cultureGroup->getColour());
-        }
+  for (auto& ardaProvince : ardaProvinces) {
+    if (ardaProvince->isSea() || ardaProvince->isLake())
+      continue;
+    for (auto &culture : ardaProvince->cultures) {
+      for (const auto pix : ardaProvince->getNonOwningPixelView()) {
+        cultureMap.setColourAtIndex(pix, culture.first->cultureGroup->getColour());
       }
+    }
   }
+
 
   Fwg::Gfx::Png::save(cultureMap,
                       Fwg::Cfg::Values().mapsPath + "/world/cultureGroups.png");
   return cultureMap;
 }
 
-Fwg::Gfx::Bitmap
-displayCultures(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
+Fwg::Gfx::Bitmap displayCultures(
+    const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces) {
   auto &config = Fwg::Cfg::Values();
   Fwg::Gfx::Bitmap cultureMap(config.width, config.height, 24);
   // now write the cultures to the culture map
-  for (auto &ardaRegion : ardaRegions) {
-    if (ardaRegion->isSea() || ardaRegion->isLake())
+  for (auto &ardaProvince : ardaProvinces) {
+    if (ardaProvince->isSea() || ardaProvince->isLake())
       continue;
-    for (auto &culture : ardaRegion->cultures) {
-      for (auto &province : ardaRegion->ardaProvinces) {
-        for (const auto pix : province->getNonOwningPixelView()) {
-          cultureMap.setColourAtIndex(pix, culture.first->colour);
-        }
+    for (auto &culture : ardaProvince->cultures) {
+      for (const auto pix : ardaProvince->getNonOwningPixelView()) {
+        cultureMap.setColourAtIndex(pix, culture.first->colour);
       }
     }
   }
@@ -100,19 +99,17 @@ displayCultures(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   return cultureMap;
 }
 
-Fwg::Gfx::Bitmap
-displayReligions(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
+Fwg::Gfx::Bitmap displayReligions(
+    const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces) {
   auto &config = Fwg::Cfg::Values();
   Fwg::Gfx::Bitmap religionMap(config.width, config.height, 24);
   // now write the cultures to the culture map
-  for (auto &ardaRegion : ardaRegions) {
-    if (ardaRegion->isSea() || ardaRegion->isLake())
+  for (auto &ardaProvince : ardaProvinces) {
+    if (ardaProvince->isSea() || ardaProvince->isLake())
       continue;
-    for (auto &religion : ardaRegion->religions) {
-      for (auto &province : ardaRegion->ardaProvinces) {
-        for (const auto pix : province->getNonOwningPixelView()) {
-          religionMap.setColourAtIndex(pix, religion.first->colour);
-        }
+    for (auto &religion : ardaProvince->religions) {
+      for (const auto pix : ardaProvince->getNonOwningPixelView()) {
+        religionMap.setColourAtIndex(pix, religion.first->colour);
       }
     }
   }
