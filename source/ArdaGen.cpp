@@ -93,6 +93,10 @@ void ArdaGen::mapContinents() {
       ardaContinent->ardaProvinces.push_back(
           std::dynamic_pointer_cast<Arda::ArdaProvince>(prov));
     }
+    for (const auto &region : ardaContinent->regions) {
+      ardaContinent->ardaRegions.push_back(
+          std::dynamic_pointer_cast<Arda::ArdaRegion>(region));
+    }
     ardaContinents.push_back(ardaContinent);
   }
 }
@@ -494,7 +498,7 @@ void ArdaGen::evaluateCountries() {}
 Bitmap ArdaGen::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp, const int ID) {
   Logging::logLine("Drawing borders");
   auto &config = Fwg::Cfg::Values();
-  if (!countryBmp.initialised()) {
+  if (!countryBmp.initialised() || countryBmp.size() != config.bitmapSize) {
     countryBmp = Bitmap(config.width, config.height, 24);
   }
   if (ID > -1) {

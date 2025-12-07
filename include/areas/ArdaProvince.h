@@ -56,6 +56,6 @@ public:
   bool operator<(const Arda::ArdaProvince &right) const {
     return ID < right.ID;
   };
-  std::string toHexString();
+  std::string toHexString(bool prefix, bool uppercase);
 };
 } // namespace Arda

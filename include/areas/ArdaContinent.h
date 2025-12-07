@@ -1,6 +1,7 @@
 #pragma once
-#include "areas/Continent.h"
 #include "areas/ArdaProvince.h"
+#include "areas/ArdaRegion.h"
+#include "areas/Continent.h"
 namespace Arda {
 class ArdaContinent : public Fwg::Areas::Continent {
 
@@ -13,6 +14,7 @@ public:
   double worldPopulationShare = 0.0;
   double worldEconomicActivityShare = 0.0;
   std::vector<std::shared_ptr<Arda::ArdaProvince>> ardaProvinces;
+  std::vector<std::shared_ptr<Arda::ArdaRegion>> ardaRegions;
 
   ArdaContinent(const Continent &continent);
   ~ArdaContinent();

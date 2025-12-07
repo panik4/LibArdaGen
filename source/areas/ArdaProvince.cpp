@@ -6,12 +6,16 @@ ArdaProvince::ArdaProvince() {}
 
 ArdaProvince::~ArdaProvince() {}
 
-std::string ArdaProvince::toHexString() {
-  std::string hexString = "x";
+std::string ArdaProvince::toHexString(bool prefix, bool uppercase) {
+  std::string hexString = "";
+  if (prefix) {
+    hexString.append("x");
+  }
   std::stringstream stream;
   for (int i = 2; i >= 0; i--)
-    stream << std::setfill('0') << std::setw(sizeof(char) * 2) << std::uppercase
-           << std::hex << (int)this->colour.getBGR()[i];
+    stream << std::setfill('0') << std::setw(sizeof(char) * 2)
+           << (uppercase ? std::nouppercase : std::nouppercase) << std::hex
+           << (int)this->colour.getBGR()[i];
   hexString.append(stream.str());
   return hexString;
 }
