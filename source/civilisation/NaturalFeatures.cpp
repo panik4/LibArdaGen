@@ -6,21 +6,21 @@ void detectMarshes(Fwg::Terrain::TerrainData &terrainData,
                    Arda::Civilization::CivilizationLayer &civLayer,
                    const Fwg::Cfg &config) {
   const auto &heightMap = terrainData.detailedHeightMap;
-  std::vector<float> marshMap(terrainData.landForms.size(), 0.0f);
-  for (size_t i = 0; i < terrainData.landForms.size(); i++) {
-    const auto &landForm = terrainData.landForms[i];
-    const auto &climateType =
-        climateData.climates[i].getChances(0).second; // get dominant climate
-    const auto &climate = climateData.climateTypes.at((int)climateType);
-    // add altitude factor
-    if (landForm.altitude > 0.0f && landForm.altitude < 0.1f &&
-        landForm.inclination < 0.05f) {
-      // add climate factor
-      marshMap[i] += climate.humidity * 0.5f;
-      // add inclination factor
-      marshMap[i] += (1.0f - landForm.inclination) * 0.5f;
-    }
-  }
+  std::vector<float> marshMap(terrainData.landFormIds.size(), 0.0f);
+  //for (size_t i = 0; i < terrainData.landFormIds.size(); i++) {
+  //  const auto &landForm = terrainData.landFormIds[i];
+  //  const auto &climateType =
+  //      climateData.climates[i].getChances(0).second; // get dominant climate
+  //  const auto &climate = climateData.climateClassDefinitions.at((int)climateType);
+  //  // add altitude factor
+  //  if (landForm.altitude > 0.0f && landForm.altitude < 0.1f &&
+  //      landForm.inclination < 0.05f) {
+  //    // add climate factor
+  //    marshMap[i] += climate.referenceHumidity * 0.5f;
+  //    // add inclination factor
+  //    marshMap[i] += (1.0f - landForm.inclination) * 0.5f;
+  //  }
+  //}
   // debug visualize marsh map
   if (config.debugLevel > -1) {
     Fwg::Gfx::Bitmap marshBitmap(config.width, config.height, 24);
@@ -41,12 +41,12 @@ detectWastelands(Fwg::Terrain::TerrainData &terrainData,
                  Arda::Civilization::CivilizationLayer &civLayer,
                  const Fwg::Cfg &config) {
   // sum up factors, such as altitude, climate zone habitability
-  std::vector<float> wastelandMap(terrainData.landForms.size(), 0.0f);
-  // for (size_t i = 0; i < terrainData.landForms.size(); i++) {
-  //   const auto &landForm = terrainData.landForms[i];
+  std::vector<float> wastelandMap(terrainData.landFormIds.size(), 0.0f);
+  // for (size_t i = 0; i < terrainData.landFormIds.size(); i++) {
+  //   const auto &landForm = terrainData.landFormIds[i];
   //   const auto &climateType =
   //       climateData.climates[i].getChances(0).second; // get dominant climate
-  //   const auto &climate = climateData.climateTypes.at((int)climateType);
+  //   const auto &climate = climateData.climateClassDefinitions.at((int)climateType);
   //   // add altitude factor
   //   if (landForm.altitude > 0.2) {
   //     wastelandMap[i] += (landForm.altitude - 0.2) * 0.33f;
