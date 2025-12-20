@@ -46,11 +46,11 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
                    std::map<std::string, std::shared_ptr<Country>> &countries,
                    Civilization::CivilizationData &civData,
                    Arda::Names::NameData &nData,
-                   const Fwg::Gfx::Bitmap &inputImage,
+                   const Fwg::Gfx::Image &inputImage,
                    const std::string &mappingPath);
 void saveCountries(std::map<std::string, std::shared_ptr<Country>> &countries,
                    const std::string &mappingPath,
-                   const Fwg::Gfx::Bitmap &countryImage);
+                   const Fwg::Gfx::Image &countryImage);
 void generateCountrySpecifics(
     const Arda::Utils::GenerationAge &generationAge,
     std::map<std::string, std::shared_ptr<Country>> &countries);

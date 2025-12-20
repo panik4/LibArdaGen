@@ -1,10 +1,10 @@
 #include "rendering/ArdaVisualisation.h"
 
 namespace Arda::Gfx {
-Fwg::Gfx::Bitmap displayDevelopment(
+Fwg::Gfx::Image displayDevelopment(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> provinces) {
   auto &config = Fwg::Cfg::Values();
-  Fwg::Gfx::Bitmap averageDevelopment(config.width, config.height, 24);
+  Fwg::Gfx::Image averageDevelopment(config.width, config.height, 24);
   for (const auto &province : provinces) {
     for (const auto pixel : province->getNonOwningPixelView()) {
       averageDevelopment.setColourAtIndex(
@@ -16,10 +16,10 @@ Fwg::Gfx::Bitmap displayDevelopment(
                         config.mapsPath + "world//development.png");
   return averageDevelopment;
 }
-Fwg::Gfx::Bitmap displayPopulation(
+Fwg::Gfx::Image displayPopulation(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> provinces) {
   const auto &config = Fwg::Cfg::Values();
-  Fwg::Gfx::Bitmap populationMap(config.width, config.height, 24);
+  Fwg::Gfx::Image populationMap(config.width, config.height, 24);
   populationMap.fill(Fwg::Gfx::Colour(0, 0, 0));
   for (const auto &prov : provinces) {
     if (prov->isSea())
@@ -31,9 +31,9 @@ Fwg::Gfx::Bitmap displayPopulation(
   }
   return populationMap;
 }
-Fwg::Gfx::Bitmap
+Fwg::Gfx::Image
 displayTopography(const Arda::Civilization::CivilizationLayer &civLayer,
-                  Fwg::Gfx::Bitmap worldMap) {
+                  Fwg::Gfx::Image worldMap) {
   auto cityIndices = civLayer.getAll(Arda::Civilization::TopographyType::CITY);
   auto portcityIndices =
       civLayer.getAll(Arda::Civilization::TopographyType::PORTCITY);
@@ -59,10 +59,10 @@ displayTopography(const Arda::Civilization::CivilizationLayer &civLayer,
   }
   return worldMap;
 }
-Fwg::Gfx::Bitmap displayCultureGroups(
+Fwg::Gfx::Image displayCultureGroups(
     const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces) {
   auto &config = Fwg::Cfg::Values();
-  Fwg::Gfx::Bitmap cultureMap(config.width, config.height, 24);
+  Fwg::Gfx::Image cultureMap(config.width, config.height, 24);
   for (auto& ardaProvince : ardaProvinces) {
     if (ardaProvince->isSea() || ardaProvince->isLake())
       continue;
@@ -79,10 +79,10 @@ Fwg::Gfx::Bitmap displayCultureGroups(
   return cultureMap;
 }
 
-Fwg::Gfx::Bitmap displayCultures(
+Fwg::Gfx::Image displayCultures(
     const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces) {
   auto &config = Fwg::Cfg::Values();
-  Fwg::Gfx::Bitmap cultureMap(config.width, config.height, 24);
+  Fwg::Gfx::Image cultureMap(config.width, config.height, 24);
   // now write the cultures to the culture map
   for (auto &ardaProvince : ardaProvinces) {
     if (ardaProvince->isSea() || ardaProvince->isLake())
@@ -99,10 +99,10 @@ Fwg::Gfx::Bitmap displayCultures(
   return cultureMap;
 }
 
-Fwg::Gfx::Bitmap displayReligions(
+Fwg::Gfx::Image displayReligions(
     const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces) {
   auto &config = Fwg::Cfg::Values();
-  Fwg::Gfx::Bitmap religionMap(config.width, config.height, 24);
+  Fwg::Gfx::Image religionMap(config.width, config.height, 24);
   // now write the cultures to the culture map
   for (auto &ardaProvince : ardaProvinces) {
     if (ardaProvince->isSea() || ardaProvince->isLake())
@@ -119,17 +119,17 @@ Fwg::Gfx::Bitmap displayReligions(
   return religionMap;
 }
 
-Fwg::Gfx::Bitmap displayLanguageGroups(
+Fwg::Gfx::Image displayLanguageGroups(
     const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   auto &config = Fwg::Cfg::Values();
-  Fwg::Gfx::Bitmap languageMap(config.width, config.height, 24);
+  Fwg::Gfx::Image languageMap(config.width, config.height, 24);
 
-  return Fwg::Gfx::Bitmap();
+  return Fwg::Gfx::Image();
 }
 
-Fwg::Gfx::Bitmap
+Fwg::Gfx::Image
 displayLocations(std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions,
-                 Fwg::Gfx::Bitmap worldMap) {
+                 Fwg::Gfx::Image worldMap) {
   for (auto &region : regions) {
     for (auto &location : region->locations) {
       for (auto pixel : location->pixels) {
@@ -142,9 +142,9 @@ displayLocations(std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions,
   return worldMap;
 }
 
-Fwg::Gfx::Bitmap displayConnections(
+Fwg::Gfx::Image displayConnections(
     const std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions,
-    Fwg::Gfx::Bitmap connectionMap) {
+    Fwg::Gfx::Image connectionMap) {
   auto &config = Fwg::Cfg::Values();
   // now visualise connections again
   for (auto &region : regions) {
@@ -167,14 +167,14 @@ Fwg::Gfx::Bitmap displayConnections(
   return connectionMap;
 }
 
-Fwg::Gfx::Bitmap
+Fwg::Gfx::Image
 displayWorldOverlayMap(const Fwg::Climate::ClimateData &climateData,
-                       const Fwg::Gfx::Bitmap &worldMap,
+                       const Fwg::Gfx::Image &worldMap,
                        const Arda::Civilization::CivilizationLayer &civLayer) {
   Fwg::Utils::Logging::logLine("Visualising World Overlay Map");
 
   // overlay the wasteland on the world map
-  Fwg::Gfx::Bitmap overlayMap(worldMap);
+  Fwg::Gfx::Image overlayMap(worldMap);
   const auto &config = Fwg::Cfg::Values();
   for (size_t i = 0; i < civLayer.wastelandChance.size(); i++) {
     if (civLayer.wastelandChance[i] > config.wastelandThreshold) {
@@ -187,12 +187,12 @@ displayWorldOverlayMap(const Fwg::Climate::ClimateData &climateData,
   return overlayMap;
 }
 
-Fwg::Gfx::Bitmap visualiseStrategicRegions(
-    Fwg::Gfx::Bitmap &superRegionMap,
+Fwg::Gfx::Image visualiseStrategicRegions(
+    Fwg::Gfx::Image &superRegionMap,
     const std::vector<std::shared_ptr<Arda::SuperRegion>> &superRegions,
     const int ID) {
   if (!superRegionMap.initialised()) {
-    superRegionMap = Fwg::Gfx::Bitmap(Fwg::Cfg::Values().width,
+    superRegionMap = Fwg::Gfx::Image(Fwg::Cfg::Values().width,
                                       Fwg::Cfg::Values().height, 24);
   }
   if (ID > -1) {
@@ -208,7 +208,7 @@ Fwg::Gfx::Bitmap visualiseStrategicRegions(
       }
     }
   } else {
-    auto noBorderMap = Fwg::Gfx::Bitmap(Fwg::Cfg::Values().width,
+    auto noBorderMap = Fwg::Gfx::Image(Fwg::Cfg::Values().width,
                                         Fwg::Cfg::Values().height, 24);
     for (auto &strat : superRegions) {
 
@@ -239,10 +239,10 @@ Fwg::Gfx::Bitmap visualiseStrategicRegions(
   return superRegionMap;
 }
 
-Fwg::Gfx::Bitmap
+Fwg::Gfx::Image
 visualiseRegions(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   auto regionMap =
-      Fwg::Gfx::Bitmap(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
+      Fwg::Gfx::Image(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
 
   for (const auto &region : ardaRegions) {
     for (const auto pix : region->getNonOwningPixelView()) {
@@ -252,11 +252,11 @@ visualiseRegions(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   return regionMap;
 }
 
-Fwg::Gfx::Bitmap visualiseCountries(
+Fwg::Gfx::Image visualiseCountries(
     const std::map<std::string, std::shared_ptr<Country>> &countries) {
   Fwg::Utils::Logging::logLine("Drawing borders");
   auto &config = Fwg::Cfg::Values();
-  auto countryBmp = Fwg::Gfx::Bitmap(config.width, config.height, 24);
+  auto countryBmp = Fwg::Gfx::Image(config.width, config.height, 24);
 
   for (auto &country : countries) {
     for (auto &region : country.second->ownedRegions) {

@@ -63,7 +63,7 @@ struct ArdaData {
 class ArdaGen : public Fwg::FastWorldGenerator {
 
 protected:
-  Fwg::Gfx::Bitmap typeMap;
+  Fwg::Gfx::Image typeMap;
 
 public:
   struct FactoryRegistry {
@@ -90,8 +90,8 @@ public:
   std::map<int, std::vector<std::shared_ptr<Country>>> countryImportanceScores;
   Civilization::CivilizationData civData;
   // images
-  Fwg::Gfx::Bitmap countryMap;
-  Fwg::Gfx::Bitmap superRegionMap;
+  Fwg::Gfx::Image countryMap;
+  Fwg::Gfx::Image superRegionMap;
   // constructors/destructors
   ArdaGen();
   ArdaGen(const std::string &configSubFolder);
@@ -101,10 +101,10 @@ public:
 
   void genNaturalFeatures();
   bool loadNaturalFeatures(Fwg::Cfg &config,
-                           const Fwg::Gfx::Bitmap &inputFeatures);
+                           const Fwg::Gfx::Image &inputFeatures);
   bool loadDevelopment(Fwg::Cfg &config, const std::string &path);
   bool genDevelopment(Fwg::Cfg &config);
-  bool loadPopulation(Fwg::Cfg &config, const Fwg::Gfx::Bitmap &inputPop);
+  bool loadPopulation(Fwg::Cfg &config, const Fwg::Gfx::Image &inputPop);
   bool genPopulation(Fwg::Cfg &config);
   void genEconomyData();
   void genCultureData();
@@ -120,18 +120,18 @@ public:
       std::function<std::shared_ptr<SuperRegion>()> factory);
   void
   loadStrategicRegions(std::function<std::shared_ptr<SuperRegion>()> factory,
-                       const Fwg::Gfx::Bitmap &inputImage);
+                       const Fwg::Gfx::Image &inputImage);
   virtual void generateStateSpecifics();
   void generateCountries(std::function<std::shared_ptr<Country>()> factory);
   void loadCountries(std::function<std::shared_ptr<Country>()> factory,
-                     const Fwg::Gfx::Bitmap &inputImage);
+                     const Fwg::Gfx::Image &inputImage);
   // print a map showing all countries for debug purposes
-  Fwg::Gfx::Bitmap visualiseCountries(Fwg::Gfx::Bitmap &countryBmp,
+  Fwg::Gfx::Image visualiseCountries(Fwg::Gfx::Image &countryBmp,
                                       const int ID = -1);
 
   // mapping terrain types of FastWorldGen to module
   // compatible terrains
-  virtual Fwg::Gfx::Bitmap mapTerrain();
+  virtual Fwg::Gfx::Image mapTerrain();
   //  map base continents to generic paradox compatible game continents
   void mapContinents();
   // map base regions to generic paradox compatible game regions

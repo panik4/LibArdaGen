@@ -147,7 +147,7 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
                    std::map<std::string, std::shared_ptr<Country>> &countries,
                    Civilization::CivilizationData &civData,
                    Arda::Names::NameData &nData,
-                   const Fwg::Gfx::Bitmap &inputImage,
+                   const Fwg::Gfx::Image &inputImage,
                    const std::string &mappingPath) {
   int counter = 0;
   countries.clear();
@@ -257,7 +257,7 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
 
 void saveCountries(std::map<std::string, std::shared_ptr<Country>> &countries,
                    const std::string &mappingPath,
-                   const Fwg::Gfx::Bitmap &countryImage) {
+                   const Fwg::Gfx::Image &countryImage) {
   std::string fileContent = "#r;g;b;tag;name;adjective\n";
   for (const auto &country : countries) {
     fileContent += country.second->exportLine();

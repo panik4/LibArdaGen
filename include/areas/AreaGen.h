@@ -13,6 +13,6 @@ void generateStrategicRegions(
     const float &superRegionFactor);
 void saveRegions(std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
                  const std::string &mappingPath,
-                 const Fwg::Gfx::Bitmap &regionImage);
+                 const Fwg::Gfx::Image &regionImage);
 
 } // namespace Arda::Areas

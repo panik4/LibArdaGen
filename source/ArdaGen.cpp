@@ -20,7 +20,7 @@ ArdaGen::ArdaGen(const std::string &configSubFolder)
   Gfx::Flag::readFlagTypes();
   Gfx::Flag::readFlagTemplates();
   Gfx::Flag::readSymbolTemplates();
-  superRegionMap = Bitmap(0, 0, 24);
+  superRegionMap = Image(0, 0, 24);
   factories.provinceFactory = []() {
     return std::make_shared<Arda::ArdaProvince>();
   };
@@ -70,7 +70,7 @@ void ArdaGen::generateCountries(
 }
 
 void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
-                            const Fwg::Gfx::Bitmap &inputImage) {
+                            const Fwg::Gfx::Image &inputImage) {
   // generate country data
   if (factory != nullptr) {
     Arda::Countries::loadCountries(ardaConfig.generationAge, factory,
@@ -178,7 +178,7 @@ void ArdaGen::applyRegionInput() {
   }
   // debug visualisation of all regions, if coastal they are yellow, if sea they
   // are blue, if non-coastal they are green
-  Bitmap regionMap(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
+  Image regionMap(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
   for (auto &ardaRegion : this->ardaRegions) {
     for (auto &gameProv : ardaRegion->ardaProvinces) {
       for (auto &pix : gameProv->pixels) {
@@ -242,12 +242,12 @@ void ArdaGen::mapProvinces() {
   //           [](auto l, auto r) { return *l < *r; });
 }
 
-Fwg::Gfx::Bitmap ArdaGen::mapTerrain() {
+Fwg::Gfx::Image ArdaGen::mapTerrain() {
   using namespace Arda::Civilization;
   auto &civLayer = this->ardaData.civLayer;
   auto &overlayColours = Fwg::Cfg::Values().topographyOverlayColours;
   auto topoMap =
-      Fwg::Gfx::Bitmap(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
+      Fwg::Gfx::Image(Fwg::Cfg::Values().width, Fwg::Cfg::Values().height, 24);
 
   // Define the topography types we care about and their thresholds
   struct TopoDef {
@@ -311,7 +311,6 @@ Fwg::Gfx::Bitmap ArdaGen::mapTerrain() {
     }
   }
 
-  // (Return a dummy or computed bitmap if needed)
   return topoMap;
 }
 
@@ -327,7 +326,7 @@ void ArdaGen::genNaturalFeatures() {
 }
 
 bool ArdaGen::loadNaturalFeatures(Fwg::Cfg &config,
-                                  const Fwg::Gfx::Bitmap &inputFeatures) {
+                                  const Fwg::Gfx::Image &inputFeatures) {
   clearLocations();
   ardaData.civLayer.clear();
   Arda::NaturalFeatures::loadNaturalFeatures(config, inputFeatures,
@@ -348,7 +347,7 @@ bool ArdaGen::genDevelopment(Fwg::Cfg &config) {
   return true;
 }
 bool ArdaGen::loadPopulation(Fwg::Cfg &config,
-                             const Fwg::Gfx::Bitmap &inputPop) {
+                             const Fwg::Gfx::Image &inputPop) {
   ardaConfig.calculateTargetWorldPopulation();
   Civilization::loadPopulation(inputPop, ardaProvinces, ardaRegions,
                                ardaContinents,
@@ -481,7 +480,7 @@ void ArdaGen::generateStrategicRegions(
 
 void ArdaGen::loadStrategicRegions(
     std::function<std::shared_ptr<SuperRegion>()> factory,
-    const Fwg::Gfx::Bitmap &inputImage) {
+    const Fwg::Gfx::Image &inputImage) {
   Fwg::Utils::Logging::logLine("Loading Strategic Regions from Image");
   Fwg::Utils::Logging::logLine("Nothing happens...");
   // Civilization::nameSuperRegions(superRegions, ardaRegions);
@@ -495,11 +494,11 @@ void ArdaGen::generateStateSpecifics() {
 
 void ArdaGen::evaluateCountries() {}
 
-Bitmap ArdaGen::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp, const int ID) {
+Image ArdaGen::visualiseCountries(Fwg::Gfx::Image &countryBmp, const int ID) {
   Logging::logLine("Drawing borders");
   auto &config = Fwg::Cfg::Values();
-  if (!countryBmp.initialised() || countryBmp.size() != config.bitmapSize) {
-    countryBmp = Bitmap(config.width, config.height, 24);
+  if (!countryBmp.initialised() || countryBmp.size() != config.processingArea) {
+    countryBmp = Image(config.width, config.height, 24);
   }
   if (ID > -1) {
     const auto &region = ardaRegions[ID];
@@ -523,7 +522,7 @@ Bitmap ArdaGen::visualiseCountries(Fwg::Gfx::Bitmap &countryBmp, const int ID) {
       countryBmp.imageData[pix] = borderColour;
     }
   } else {
-    Fwg::Gfx::Bitmap noBorderCountries(config.width, config.height, 24);
+    Fwg::Gfx::Image noBorderCountries(config.width, config.height, 24);
 
     // Parallel loop over regions
     std::for_each(std::execution::par, ardaRegions.begin(), ardaRegions.end(),

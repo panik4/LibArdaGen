@@ -46,7 +46,7 @@ void generateFullCivilisationData(
 }
 
 void loadDevelopment(
-    const Fwg::Gfx::Bitmap &developmentMap,
+    const Fwg::Gfx::Image &developmentMap,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
     const std::vector<std::shared_ptr<ArdaContinent>> &continents) {
@@ -147,7 +147,7 @@ void postProcessPopulation(
 }
 
 void loadPopulation(
-    const Fwg::Gfx::Bitmap &populationMap,
+    const Fwg::Gfx::Image &populationMap,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
     const std::vector<std::shared_ptr<ArdaContinent>> &continents,
@@ -248,7 +248,7 @@ void generateReligions(
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces) {
   auto &config = Fwg::Cfg::Values();
   civData.religions.clear();
-  Fwg::Gfx::Bitmap religionMap(config.width, config.height, 24);
+  Fwg::Gfx::Image religionMap(config.width, config.height, 24);
   if (ardaProvinces.empty()) {
     Fwg::Utils::Logging::logLine(
         "SEVERE ERROR: No provinces available for religion generation.");

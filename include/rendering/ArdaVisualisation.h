@@ -6,46 +6,46 @@
 #include "rendering/Visualization.h"
 
 namespace Arda::Gfx {
-Fwg::Gfx::Bitmap displayDevelopment(
+Fwg::Gfx::Image displayDevelopment(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> provinces);
-Fwg::Gfx::Bitmap displayPopulation(
+Fwg::Gfx::Image displayPopulation(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> provinces);
-Fwg::Gfx::Bitmap
+Fwg::Gfx::Image
 displayTopography(const Arda::Civilization::CivilizationLayer &civLayer,
-                  Fwg::Gfx::Bitmap worldMap);
-Fwg::Gfx::Bitmap displayCultureGroups(
+                  Fwg::Gfx::Image worldMap);
+Fwg::Gfx::Image displayCultureGroups(
     const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces);
-Fwg::Gfx::Bitmap displayCultures(
+Fwg::Gfx::Image displayCultures(
     const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces);
-Fwg::Gfx::Bitmap displayReligions(
+Fwg::Gfx::Image displayReligions(
     const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces);
-Fwg::Gfx::Bitmap displayLanguageGroups(
+Fwg::Gfx::Image displayLanguageGroups(
     const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
-Fwg::Gfx::Bitmap
+Fwg::Gfx::Image
 displayLanguages(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
 
-Fwg::Gfx::Bitmap
+Fwg::Gfx::Image
 displayLocations(std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions,
-                 Fwg::Gfx::Bitmap worldMap);
+                 Fwg::Gfx::Image worldMap);
 
-Fwg::Gfx::Bitmap displayConnections(
+Fwg::Gfx::Image displayConnections(
     const std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions,
-    Fwg::Gfx::Bitmap connectionMap);
+    Fwg::Gfx::Image connectionMap);
 
-Fwg::Gfx::Bitmap
+Fwg::Gfx::Image
 displayWorldOverlayMap(const Fwg::Climate::ClimateData &climateData,
-                       const Fwg::Gfx::Bitmap &worldMap,
+                       const Fwg::Gfx::Image &worldMap,
                        const Arda::Civilization::CivilizationLayer &civLayer);
 
-Fwg::Gfx::Bitmap visualiseStrategicRegions(
-    Fwg::Gfx::Bitmap &superRegionMap,
+Fwg::Gfx::Image visualiseStrategicRegions(
+    Fwg::Gfx::Image &superRegionMap,
     const std::vector<std::shared_ptr<Arda::SuperRegion>> &superRegions,
     const int ID = -1);
 
-Fwg::Gfx::Bitmap
+Fwg::Gfx::Image
 visualiseRegions(const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions);
 
-Fwg::Gfx::Bitmap visualiseCountries(
+Fwg::Gfx::Image visualiseCountries(
     const std::map<std::string, std::shared_ptr<Country>> &countries);
 
 } // namespace Arda::Gfx

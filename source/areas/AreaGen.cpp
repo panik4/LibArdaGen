@@ -84,7 +84,7 @@ void generateStrategicRegions(
 
   if (config.debugLevel > 5) {
     // debug visualise landVoronoi
-    Fwg::Gfx::Bitmap landVoronoiBmp(config.width, config.height, 24);
+    Fwg::Gfx::Image landVoronoiBmp(config.width, config.height, 24);
     for (auto &landvor : landVoronois) {
       Fwg::Gfx::Colour c;
       c.randomize();
@@ -95,7 +95,7 @@ void generateStrategicRegions(
     Fwg::Gfx::Png::save(landVoronoiBmp,
                         config.mapsPath + "debug//landVoronoi.png", false);
     //  debug visualise waterVoronoi
-    Fwg::Gfx::Bitmap waterVoronoiBmp(config.width, config.height, 24);
+    Fwg::Gfx::Image waterVoronoiBmp(config.width, config.height, 24);
     for (auto &watervor : waterVoronois) {
       Fwg::Gfx::Colour c;
       c.randomize();
@@ -107,7 +107,7 @@ void generateStrategicRegions(
                         config.mapsPath + "debug//waterVoronoi.png", false);
   }
 
-  std::vector<int> indexToVoronoiID(config.bitmapSize);
+  std::vector<int> indexToVoronoiID(config.processingArea);
   for (int i = 0; i < landVoronois.size(); ++i) {
     for (const auto &pix : landVoronois[i]) {
       indexToVoronoiID[pix] = i;
@@ -356,7 +356,7 @@ void generateStrategicRegions(
 
 void saveRegions(std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
                    const std::string &mappingPath,
-                   const Fwg::Gfx::Bitmap &regionImage) {
+                   const Fwg::Gfx::Image &regionImage) {
   std::string fileContent = "#r;g;b;name;population\n";
   for (const auto &region : ardaRegions) {
     fileContent += region->exportLine();

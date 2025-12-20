@@ -43,7 +43,7 @@ void generateLanguageGroup(std::shared_ptr<CultureGroup> &cultureGroup);
 void distributeLanguages(CivilizationData &civData);
 
 void loadDevelopment(
-    const Fwg::Gfx::Bitmap &developmentMap,
+    const Fwg::Gfx::Image &developmentMap,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
     const std::vector<std::shared_ptr<ArdaContinent>> &continents);
@@ -53,7 +53,7 @@ void generateDevelopment(
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
     const std::vector<std::shared_ptr<ArdaContinent>> &continents);
 void loadPopulation(
-    const Fwg::Gfx::Bitmap &populationMap,
+    const Fwg::Gfx::Image &populationMap,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
     const std::vector<std::shared_ptr<ArdaContinent>> &continents,

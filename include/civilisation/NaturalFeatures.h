@@ -17,7 +17,7 @@ detectWastelands(Fwg::Terrain::TerrainData &terrainData,
 
 
 void loadNaturalFeatures(Fwg::Cfg &config,
-                         const Fwg::Gfx::Bitmap &inputFeatures,
+                         const Fwg::Gfx::Image &inputFeatures,
                          Arda::Civilization::CivilizationLayer &civLayer);
 
 } // namespace Wastelands

@@ -23,15 +23,15 @@ void detectMarshes(Fwg::Terrain::TerrainData &terrainData,
   //}
   // debug visualize marsh map
   if (config.debugLevel > -1) {
-    Fwg::Gfx::Bitmap marshBitmap(config.width, config.height, 24);
+    Fwg::Gfx::Image marshImage(config.width, config.height, 24);
     for (size_t i = 0; i < marshMap.size(); i++) {
-      marshBitmap.setColourAtIndex(
+      marshImage.setColourAtIndex(
           i, Fwg::Gfx::Colour(static_cast<unsigned char>(0),
                               static_cast<unsigned char>(0),
                               static_cast<unsigned char>(std::min<float>(
                                   255.0f, marshMap[i] * 255.0f))));
     }
-    Fwg::Gfx::Png::save(marshBitmap, config.mapsPath + "marshes.png", false);
+    Fwg::Gfx::Png::save(marshImage, config.mapsPath + "marshes.png", false);
   }
 }
 std::vector<float>
@@ -62,15 +62,15 @@ detectWastelands(Fwg::Terrain::TerrainData &terrainData,
 
   //// visualize wasteland map
   // if (config.debugLevel > 1) {
-  //   Fwg::Gfx::Bitmap wastelandBitmap(config.width, config.height, 24);
+  //   Fwg::Gfx::Bitmap wastelandImage(config.width, config.height, 24);
   //   for (size_t i = 0; i < wastelandMap.size(); i++) {
-  //     wastelandBitmap.setColourAtIndex(
+  //     wastelandImage.setColourAtIndex(
   //         i, Fwg::Gfx::Colour(static_cast<unsigned char>(0),
   //                             static_cast<unsigned char>(std::min<float>(
   //                                 255.0f, wastelandMap[i] * 255.0f)),
   //                             static_cast<unsigned char>(0)));
   //   }
-  //   Fwg::Gfx::Png::save(wastelandBitmap, config.mapsPath + "wastelands.png",
+  //   Fwg::Gfx::Png::save(wastelandImage, config.mapsPath + "wastelands.png",
   //                       false);
   // }
   // civLayer.wastelandChance = wastelandMap;
@@ -109,7 +109,7 @@ detectWastelands(Fwg::Terrain::TerrainData &terrainData,
 }
 
 void NaturalFeatures::loadNaturalFeatures(
-    Fwg::Cfg &config, const Fwg::Gfx::Bitmap &inputFeatures,
+    Fwg::Cfg &config, const Fwg::Gfx::Image &inputFeatures,
     Arda::Civilization::CivilizationLayer &civLayer) {
   std::map<Fwg::Gfx::Colour, Arda::Civilization::TopographyType> colourMap = {
       {config.topographyOverlayColours.at("marsh"),
@@ -128,7 +128,7 @@ void NaturalFeatures::loadNaturalFeatures(
        Arda::Civilization::TopographyType::MINE}
 
   };
-  if (inputFeatures.size() == config.bitmapSize) {
+  if (inputFeatures.size() == config.processingArea) {
     for (int i = 0; i < inputFeatures.size(); i++) {
       const auto &colour = inputFeatures[i];
       auto it = colourMap.find(colour);
