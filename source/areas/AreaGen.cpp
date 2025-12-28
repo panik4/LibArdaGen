@@ -3,7 +3,8 @@ namespace Arda::Areas {
 void generateStrategicRegions(
     std::function<std::shared_ptr<SuperRegion>()> factory,
     std::vector<std::shared_ptr<SuperRegion>> &superRegions,
-    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions, const float& superRegionFactor) {
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    const float &superRegionFactor) {
   Fwg::Utils::Logging::logLine(
       "Scenario: Dividing world into strategic regions");
   superRegions.clear();
@@ -23,17 +24,22 @@ void generateStrategicRegions(
         region->type == Arda::ArdaRegion::RegionType::CoastalIsland ||
         region->type == Arda::ArdaRegion::RegionType::Island ||
         region->type == Arda::ArdaRegion::RegionType::IslandLake) {
-      for (auto &province : region->provinces) {
-        waterAreaPixels.insert(waterAreaPixels.end(), region->pixels.begin(),
-                               region->pixels.end());
-      }
+      waterAreaPixels.insert(waterAreaPixels.end(), region->pixels.begin(),
+                             region->pixels.end());
     } else {
-      for (auto &province : region->provinces) {
-        landAreaPixels.insert(landAreaPixels.end(), region->pixels.begin(),
-                              region->pixels.end());
-      }
+      landAreaPixels.insert(landAreaPixels.end(), region->pixels.begin(),
+                            region->pixels.end());
     }
   }
+  auto assignedPixels = landAreaPixels.size() + waterAreaPixels.size();
+  Fwg::Utils::Logging::logLine("We have a total of ", assignedPixels,
+                               " pixels for investigation");
+  if (assignedPixels > config.processingArea) {
+    Fwg::Utils::Logging::logLine(
+        "We have gathered too many pixels, maximum size should be ",
+        config.processingArea);
+  }
+
   auto landShare = static_cast<double>(landAreaPixels.size()) /
                    (landAreaPixels.size() + waterAreaPixels.size());
   Fwg::Utils::Logging::logLine("Land share: ", landShare);
@@ -46,9 +52,9 @@ void generateStrategicRegions(
   }
   // calculate the amount of strategic regions we want to have
   int landSuperRegions =
-      static_cast<int>(landShare * 110.0 * 2.0 * superRegionFactor);
+      static_cast<int>(landShare * 110.0 * 4.0 * superRegionFactor);
   int waterSuperRegions =
-      static_cast<int>(waterShare * 110.0 * 1.0 * superRegionFactor);
+      static_cast<int>(waterShare * 110.0 * 3.0 * superRegionFactor);
 
   int landMinDist = Fwg::Utils::computePoissonMinDistFromArea(
       landAreaPixels.size(), landSuperRegions, config.width, 8.0);
@@ -353,10 +359,9 @@ void generateStrategicRegions(
   return;
 }
 
-
 void saveRegions(std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
-                   const std::string &mappingPath,
-                   const Fwg::Gfx::Image &regionImage) {
+                 const std::string &mappingPath,
+                 const Fwg::Gfx::Image &regionImage) {
   std::string fileContent = "#r;g;b;name;population\n";
   for (const auto &region : ardaRegions) {
     fileContent += region->exportLine();

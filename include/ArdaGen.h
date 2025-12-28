@@ -27,6 +27,7 @@ struct ArdaConfig {
   double worldIndustryFactor = 1.0;
   double resourceFactor = 1.0;
   float superRegionFactor = 1.0;
+  float superRegionMinDistanceFactor = 1.0;
   double targetWorldPopulation = 3'000'000'000;
   double targetWorldGdp = 8'000'000'000'000;
   Fwg::Civilization::LocationConfig locationConfig;

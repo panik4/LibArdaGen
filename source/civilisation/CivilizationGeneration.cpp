@@ -80,7 +80,7 @@ void generateDevelopment(
   noiseGenerator.SetSeed(config.mapSeed);
   noiseGenerator.SetFrequency(0.02 / config.sizeFactor);
   auto developmentNoise = Fwg::Noise::genNoise(noiseGenerator, height, width,
-                                               0.0, 0.0, 0.0, 0.2, 0.0);
+                                               0.0, 0.0, 0.0, 0.2, 0.0, true);
   for (auto &continent : continents) {
     if (config.randomDevelopment) {
       continent->developmentModifier = RandNum::getRandom<double>(
@@ -422,6 +422,7 @@ void distributeLanguages(CivilizationData &civData) {
 }
 
 void generateImportance(std::vector<std::shared_ptr<ArdaRegion>> &regions) {
+  Fwg::Utils::Logging::logLine("Evaluating importance of regions");
   double worldImportanceSum = 0.0;
   for (auto &region : regions) {
     region->importanceScore =
