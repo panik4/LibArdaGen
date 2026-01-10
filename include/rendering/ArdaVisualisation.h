@@ -36,7 +36,9 @@ Fwg::Gfx::Image
 displayWorldOverlayMap(const Fwg::Climate::ClimateData &climateData,
                        const Fwg::Gfx::Image &worldMap,
                        const Arda::Civilization::CivilizationLayer &civLayer);
-
+Fwg::Gfx::Image generateStrategicRegionTemplate(
+    const std::vector<std::shared_ptr<Fwg::Areas::Province>> &provinces,
+    const std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions);
 Fwg::Gfx::Image visualiseStrategicRegions(
     Fwg::Gfx::Image &superRegionMap,
     const std::vector<std::shared_ptr<Arda::SuperRegion>> &superRegions,

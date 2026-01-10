@@ -1,15 +1,11 @@
 #include "areas/AreaGen.h"
 namespace Arda::Areas {
-void generateStrategicRegions(
-    std::function<std::shared_ptr<SuperRegion>()> factory,
-    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
-    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
-    const float &superRegionFactor) {
-  Fwg::Utils::Logging::logLine(
-      "Scenario: Dividing world into strategic regions");
-  superRegions.clear();
-  const auto &config = Fwg::Cfg::Values();
 
+void generateSuperRegionVoronoi(
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    const float &superRegionFactor, std::vector<std::vector<int>> &landVoronois,
+    std::vector<std::vector<int>> &waterVoronois) {
+  const auto &config = Fwg::Cfg::Values();
   std::vector<int> waterAreaPixels;
   std::vector<int> landAreaPixels;
   for (auto &region : ardaRegions) {
@@ -77,13 +73,13 @@ void generateStrategicRegions(
   auto landPoints = landFuture.get();
 
   std::vector<int> validLandSeeds;
-  auto landVoronois = Fwg::Utils::growRegionsMultiSourceClusters(
+  landVoronois = Fwg::Utils::growRegionsMultiSourceClusters(
       landAreaPixels, landPoints, config.width, config.height,
       /*wrapX=*/false,
       /*fillIslands=*/true, &validLandSeeds);
 
   std::vector<int> validWaterSeeds;
-  auto waterVoronois = Fwg::Utils::growRegionsMultiSourceClusters(
+  waterVoronois = Fwg::Utils::growRegionsMultiSourceClusters(
       waterAreaPixels, waterPoints, config.width, config.height,
       /*wrapX=*/false,
       /*fillIslands=*/true, &validWaterSeeds);
@@ -112,7 +108,16 @@ void generateStrategicRegions(
     Fwg::Gfx::Png::save(waterVoronoiBmp,
                         config.mapsPath + "debug//waterVoronoi.png", false);
   }
+}
 
+void assignStrategicRegionsFromClusters(
+    std::function<std::shared_ptr<SuperRegion>()> factory,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    std::map<int, Fwg::Areas::AreaType> &regionAreaTypeMap,
+    const std::vector<std::vector<int>> &landVoronois,
+    const std::vector<std::vector<int>> &waterVoronois) {
+  auto &config = Fwg::Cfg::Values();
   std::vector<int> indexToVoronoiID(config.processingArea);
   for (int i = 0; i < landVoronois.size(); ++i) {
     for (const auto &pix : landVoronois[i]) {
@@ -136,13 +141,12 @@ void generateStrategicRegions(
     superRegion->areaType = Fwg::Areas::AreaType::Sea;
     superRegions.push_back(superRegion);
   }
-  // just add a map to track which region belongs to which type of voronoiArea
-  std::map<int, Fwg::Areas::AreaType> regionAreaTypeMap;
+
   // now we match the regions to the voronoi areas, and create the strategic
   // regions by a best fit
   for (auto &region : ardaRegions) {
     std::unordered_map<int, int> voronoiOverlap;
-    auto &regionPixels = region->pixels;
+    const auto regionPixels = region->getNonOwningPixelView();
     for (const auto &pix : regionPixels) {
       auto voronoiID = indexToVoronoiID[pix];
       if (voronoiOverlap.find(voronoiID) == voronoiOverlap.end()) {
@@ -163,10 +167,17 @@ void generateStrategicRegions(
     superRegions[bestVoronoiID]->addRegion(region);
     regionAreaTypeMap[region->ID] = superRegions[bestVoronoiID]->areaType;
   }
+}
+
+void postProcessStrategicRegions(
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    const std::map<int, Fwg::Areas::AreaType> &regionAreaTypeMap) {
+
+  const auto &config = Fwg::Cfg::Values();
   // to track which regions should be reassigned later after evaluation of
   // some metrics
   std::queue<std::shared_ptr<Arda::ArdaRegion>> regionsToBeReassigned;
-
   // postprocess stratregions
   for (auto &superRegion : superRegions) {
     superRegion->colour = Fwg::Gfx::generateUniqueColour(
@@ -271,8 +282,8 @@ void generateStrategicRegions(
       auto &neighbourRegion = ardaRegions[neighbourId];
       // if the neighbour region is of the same area type, we can consider
       // that ones distance, and it must already be assigned
-      if (regionAreaTypeMap[neighbourRegion->ID] ==
-              regionAreaTypeMap[region->ID] &&
+      if (regionAreaTypeMap.at(neighbourRegion->ID) ==
+              regionAreaTypeMap.at(region->ID) &&
           assignedToIDs.count(neighbourRegion->ID)) {
         // calculate the distance between the two regions
         auto distance = Fwg::Utils::getDistance(
@@ -356,6 +367,59 @@ void generateStrategicRegions(
     superRegion->checkPosition(superRegions);
     superRegion->name = std::to_string(superRegion->ID + 1);
   }
+}
+
+void loadStrategicRegions(
+    const Fwg::Gfx::Image &inputImage,
+    std::function<std::shared_ptr<SuperRegion>()> factory,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    const Fwg::Terrain::TerrainData &terrainData) {
+  Fwg::Utils::Logging::logLine(
+      "Arda::Areas: Loading superregions regions");
+  superRegions.clear();
+  // detect areas from inputImage
+  auto inputAreas = Fwg::Areas::detectAreasByColour(inputImage);
+  std::vector<std::vector<int>> landVoronois;
+  std::vector<std::vector<int>> waterVoronois;
+  for (auto &inputArea : inputAreas) {
+    inputArea.calculateTerrainType(terrainData);
+    if (inputArea.areaType == Fwg::Areas::AreaType::Land) {
+      landVoronois.push_back(inputArea.pixels);
+    } else {
+      waterVoronois.push_back(inputArea.pixels);
+    }
+  }
+
+  // just add a map to track which region belongs to which type of voronoiArea
+  std::map<int, Fwg::Areas::AreaType> regionAreaTypeMap;
+  assignStrategicRegionsFromClusters(factory, superRegions, ardaRegions,
+                                     regionAreaTypeMap, landVoronois,
+                                     waterVoronois);
+  postProcessStrategicRegions(superRegions, ardaRegions, regionAreaTypeMap);
+}
+
+void generateStrategicRegions(
+    std::function<std::shared_ptr<SuperRegion>()> factory,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    const float &superRegionFactor) {
+  Fwg::Utils::Logging::logLine(
+      "Arda::Areas: Dividing world into super regions");
+  superRegions.clear();
+  const auto &config = Fwg::Cfg::Values();
+
+  std::vector<std::vector<int>> landVoronois;
+  std::vector<std::vector<int>> waterVoronois;
+  generateSuperRegionVoronoi(ardaRegions, superRegionFactor, landVoronois,
+                             waterVoronois);
+  // just add a map to track which region belongs to which type of voronoiArea
+  std::map<int, Fwg::Areas::AreaType> regionAreaTypeMap;
+  assignStrategicRegionsFromClusters(factory, superRegions, ardaRegions,
+                                     regionAreaTypeMap, landVoronois,
+                                     waterVoronois);
+  postProcessStrategicRegions(superRegions, ardaRegions, regionAreaTypeMap);
+
   return;
 }
 

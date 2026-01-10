@@ -63,16 +63,16 @@ Fwg::Gfx::Image displayCultureGroups(
     const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces) {
   auto &config = Fwg::Cfg::Values();
   Fwg::Gfx::Image cultureMap(config.width, config.height, 24);
-  for (auto& ardaProvince : ardaProvinces) {
+  for (auto &ardaProvince : ardaProvinces) {
     if (ardaProvince->isSea() || ardaProvince->isLake())
       continue;
     for (auto &culture : ardaProvince->cultures) {
       for (const auto pix : ardaProvince->getNonOwningPixelView()) {
-        cultureMap.setColourAtIndex(pix, culture.first->cultureGroup->getColour());
+        cultureMap.setColourAtIndex(pix,
+                                    culture.first->cultureGroup->getColour());
       }
     }
   }
-
 
   Fwg::Gfx::Png::save(cultureMap,
                       Fwg::Cfg::Values().mapsPath + "/world/cultureGroups.png");
@@ -187,13 +187,26 @@ displayWorldOverlayMap(const Fwg::Climate::ClimateData &climateData,
   return overlayMap;
 }
 
+Fwg::Gfx::Image generateStrategicRegionTemplate(
+    const std::vector<std::shared_ptr<Fwg::Areas::Province>> &provinces,
+    const std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions) {
+  const auto &cfg = Fwg::Cfg::Values();
+  Fwg::Gfx::Image resultImage(cfg.width, cfg.height, 24);
+  Fwg::Gfx::regionMap(regions, provinces, resultImage);
+  Fwg::Gfx::applyAreaBorders(resultImage, regions, {255, 255, 255});
+
+  Fwg::Gfx::Png::save(
+      resultImage, cfg.mapsPath + "areas/strategicRegionTemplate.png", false);
+  return resultImage;
+}
+
 Fwg::Gfx::Image visualiseStrategicRegions(
     Fwg::Gfx::Image &superRegionMap,
     const std::vector<std::shared_ptr<Arda::SuperRegion>> &superRegions,
     const int ID) {
   if (!superRegionMap.initialised()) {
     superRegionMap = Fwg::Gfx::Image(Fwg::Cfg::Values().width,
-                                      Fwg::Cfg::Values().height, 24);
+                                     Fwg::Cfg::Values().height, 24);
   }
   if (ID > -1) {
     auto &strat = superRegions[ID];
@@ -209,7 +222,7 @@ Fwg::Gfx::Image visualiseStrategicRegions(
     }
   } else {
     auto noBorderMap = Fwg::Gfx::Image(Fwg::Cfg::Values().width,
-                                        Fwg::Cfg::Values().height, 24);
+                                       Fwg::Cfg::Values().height, 24);
     for (auto &strat : superRegions) {
 
       for (auto &reg : strat->ardaRegions) {

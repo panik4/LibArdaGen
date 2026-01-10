@@ -12,6 +12,13 @@ ArdaGen::ArdaGen() {
   factories.continentFactory = [](const std::vector<int> &pixels) {
     return std::make_shared<Arda::ArdaContinent>(pixels);
   };
+  ardaFactories.superRegionFactory =
+      []() -> std::shared_ptr<Arda::SuperRegion> {
+    return std::make_shared<Arda::SuperRegion>();
+  };
+  ardaFactories.countryFactory = []() -> std::shared_ptr<Arda::Country> {
+    return std::make_shared<Arda::Country>();
+  };
 }
 
 ArdaGen::ArdaGen(const std::string &configSubFolder)
@@ -30,6 +37,13 @@ ArdaGen::ArdaGen(const std::string &configSubFolder)
   factories.continentFactory = [](const std::vector<int> &pixels) {
     return std::make_shared<Arda::ArdaContinent>(pixels);
   };
+  ardaFactories.superRegionFactory =
+      []() -> std::shared_ptr<Arda::SuperRegion> {
+    return std::make_shared<Arda::SuperRegion>();
+  };
+  ardaFactories.countryFactory = []() -> std::shared_ptr<Arda::Country> {
+    return std::make_shared<Arda::Country>();
+  };
 }
 
 ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {
@@ -41,6 +55,13 @@ ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {
   };
   factories.continentFactory = [](const std::vector<int> &pixels) {
     return std::make_shared<Arda::ArdaContinent>(pixels);
+  };
+  ardaFactories.superRegionFactory =
+      []() -> std::shared_ptr<Arda::SuperRegion> {
+    return std::make_shared<Arda::SuperRegion>();
+  };
+  ardaFactories.countryFactory = []() -> std::shared_ptr<Arda::Country> {
+    return std::make_shared<Arda::Country>();
   };
 }
 
@@ -483,7 +504,10 @@ void ArdaGen::loadStrategicRegions(
     const Fwg::Gfx::Image &inputImage) {
   Fwg::Utils::Logging::logLine("Loading Strategic Regions from Image");
   Fwg::Utils::Logging::logLine("Nothing happens...");
+  Arda::Areas::loadStrategicRegions(inputImage, factory, superRegions,
+                                    ardaRegions, terrainData);
   // Civilization::nameSuperRegions(superRegions, ardaRegions);
+  Civilization::nameSuperRegions(superRegions, ardaRegions);
 }
 
 void ArdaGen::generateStateSpecifics() {

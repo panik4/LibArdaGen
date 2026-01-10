@@ -69,6 +69,7 @@ protected:
 public:
   struct FactoryRegistry {
     std::function<std::shared_ptr<Arda::SuperRegion>()> superRegionFactory;
+    std::function<std::shared_ptr<Arda::Country>()> countryFactory;
   } ardaFactories;
 
   // to allow text inputs as addition to country image input
@@ -128,7 +129,7 @@ public:
                      const Fwg::Gfx::Image &inputImage);
   // print a map showing all countries for debug purposes
   Fwg::Gfx::Image visualiseCountries(Fwg::Gfx::Image &countryBmp,
-                                      const int ID = -1);
+                                     const int ID = -1);
 
   // mapping terrain types of FastWorldGen to module
   // compatible terrains
