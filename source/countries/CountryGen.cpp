@@ -130,11 +130,11 @@ void evaluateCountryNeighbours(
 
       for (const auto &neighbourRegion : gR->neighbours) {
         // TO DO: Investigate rare crash issue with index being out of range
-        if (ardaRegions[neighbourRegion]->owner == nullptr)
+        if (ardaRegions[neighbourRegion->ID]->owner == nullptr)
           continue;
-        if (neighbourRegion < ardaRegions.size() &&
-            ardaRegions[neighbourRegion]->owner->tag != c.second->tag) {
-          c.second->neighbours.insert(ardaRegions[neighbourRegion]->owner);
+        if (neighbourRegion->ID < ardaRegions.size() &&
+            ardaRegions[neighbourRegion->ID]->owner->tag != c.second->tag) {
+          c.second->neighbourCountries.insert(ardaRegions[neighbourRegion->ID]->owner);
         }
       }
     }

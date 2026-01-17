@@ -1,6 +1,6 @@
 #include "countries/Country.h"
 namespace Arda {
-Country::Country() : ID{-1} {
+Country::Country() {
   colour = {static_cast<unsigned char>(RandNum::getRandom(0, 255)),
             static_cast<unsigned char>(RandNum::getRandom(0, 255)),
             static_cast<unsigned char>(RandNum::getRandom(0, 255))};
@@ -8,7 +8,8 @@ Country::Country() : ID{-1} {
 
 Country::Country(std::string tag, int ID, std::string name,
                  std::string adjective, Gfx::Flag flag)
-    : ID{ID}, tag{tag}, name{name}, adjective{adjective}, flag{flag} {
+    : tag{tag}, name{name}, adjective{adjective}, flag{flag}, Fwg::Areas::Area() {
+  this->ID = ID;
   colour = {static_cast<unsigned char>(RandNum::getRandom(0, 255)),
             static_cast<unsigned char>(RandNum::getRandom(0, 255)),
             static_cast<unsigned char>(RandNum::getRandom(0, 255))};
@@ -41,26 +42,23 @@ void Country::assignRegions(
       continue;
 
     // Pick a random neighbour
-    auto &nextRegionIndex = Fwg::Utils::selectRandom(ardaRegion->neighbours);
+    auto nextRegion = Fwg::Utils::selectRandom(ardaRegion->neighbourRegions);
 
     // Safety check: index is valid in ardaRegions
-    if (nextRegionIndex >= 0 &&
-        nextRegionIndex < static_cast<int>(ardaRegions.size())) {
-      auto &nextRegion = ardaRegions[nextRegionIndex];
-
+    if (nextRegion != nullptr) {
+      auto nextArdaRegion = ardaRegions[nextRegion->ID];
       // Skip regions already assigned, water, or wasteland
-      if (nextRegion && !nextRegion->assigned && !nextRegion->isSea() &&
-          !nextRegion->isLake() &&
-          nextRegion->topographyTypes.count(
+      if (nextArdaRegion && !nextArdaRegion->assigned &&
+          !nextArdaRegion->isSea() && !nextArdaRegion->isLake() &&
+          nextArdaRegion->topographyTypes.count(
               Arda::Civilization::TopographyType::WASTELAND) == 0) {
-        nextRegion->assigned = true;
-        addRegion(
-            nextRegion); // Safe: modifies vector, but index-based loop is okay
+        nextArdaRegion->assigned = true;
+        addRegion(nextArdaRegion); // Safe: modifies vector, but index-based
+                                   // loop is okay
       }
     }
   }
 }
-
 
 void Country::addRegion(std::shared_ptr<ArdaRegion> region) {
   region->assigned = true;

@@ -278,8 +278,8 @@ void postProcessStrategicRegions(
     auto region = regionsToBeReassigned.front();
     regionsToBeReassigned.pop();
     std::map<int, int> regionDistances;
-    for (auto &neighbourId : region->neighbours) {
-      auto &neighbourRegion = ardaRegions[neighbourId];
+    for (auto &neighbour : region->neighbours) {
+      auto &neighbourRegion = ardaRegions[neighbour->ID];
       // if the neighbour region is of the same area type, we can consider
       // that ones distance, and it must already be assigned
       if (regionAreaTypeMap.at(neighbourRegion->ID) ==
@@ -289,7 +289,7 @@ void postProcessStrategicRegions(
         auto distance = Fwg::Utils::getDistance(
             region->position.weightedCenter,
             neighbourRegion->position.weightedCenter, config.width);
-        regionDistances[neighbourId] = distance;
+        regionDistances[neighbour->ID] = distance;
       }
     }
     // now find the closest neighbour region

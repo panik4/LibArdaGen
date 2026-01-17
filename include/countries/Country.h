@@ -17,11 +17,10 @@ enum class Rank {
   MinorPower,
   Unranked
 };
-class Country {
+class Country : public Fwg::Areas::Area {
 
 public:
   // member variables
-  int ID;
   std::string tag;
   std::string name;
   std::string adjective;
@@ -52,9 +51,6 @@ public:
   double airFocus;
   double landFocus;
 
-
-
-
   // constructors/destructors
   Country();
   Country(std::string tag, int ID, std::string name, std::string adjective,
@@ -64,7 +60,7 @@ public:
   std::vector<std::shared_ptr<ArdaRegion>> ownedRegions;
   std::vector<std::shared_ptr<Arda::ArdaProvince>> ownedProvinces;
 
-  std::set<std::shared_ptr<Country>> neighbours;
+  std::set<std::shared_ptr<Country>> neighbourCountries;
   // member functions
   void assignRegions(
       int maxRegions, std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
@@ -82,6 +78,16 @@ public:
   void evaluateProperties();
 
   void gatherCultureShares();
+  mutable std::vector<int> pixelCache;
+
+  std::span<const int> getNonOwningPixelView() const override {
+    pixelCache.clear();
+    for (const auto region : ownedRegions) {
+      auto p = region->getNonOwningPixelView();
+      pixelCache.insert(pixelCache.end(), p.begin(), p.end());
+    }
+    return pixelCache;
+  }
   virtual std::shared_ptr<Culture> getPrimaryCulture() const;
 
   virtual std::string exportLine() const;

@@ -37,7 +37,6 @@ public:
 
   std::shared_ptr<VictoryPoint> victoryPoint;
   // containers
-  std::vector<Arda::ArdaProvince> neighbours;
   // these positions are used for victory points, units, etc
   std::vector<ScenarioPosition> positions;
   // the sum here should ALWAYS be 1

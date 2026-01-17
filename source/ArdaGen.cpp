@@ -475,9 +475,27 @@ void ArdaGen::detectLocationType(const Fwg::Civilization::LocationType &type) {
                                                   ardaProvinces);
   mapTerrain();
 }
-void ArdaGen::genNavmesh() {
-  Fwg::Civilization::Locations::generateConnections(
-      areaData.regions, terrainData, climateData, worldMap);
+void ArdaGen::genNavmesh(
+    const std::vector<Fwg::Civilization::Locations::AreaLocationSet>
+        &inputSet) {
+  // no input means we default to all locations in a region
+  if (inputSet.size() == 0) {
+    std::vector<Fwg::Civilization::Locations::AreaLocationSet>
+        defaultInputSet;
+    for (auto &region : areaData.regions) {
+      Fwg::Civilization::Locations::AreaLocationSet regionLocationSet;
+      regionLocationSet.area = region;
+      for (auto &location : region->locations) {
+        regionLocationSet.locations.push_back(location);
+      }
+      defaultInputSet.push_back(regionLocationSet);
+    }
+    Fwg::Civilization::Locations::generateConnections(defaultInputSet,
+                                                      terrainData, climateData);
+  } else {
+    Fwg::Civilization::Locations::generateConnections(inputSet, terrainData,
+                                                      climateData);
+  }
   // navmeshMap = Fwg::Gfx::displayConnections(areaData.regions, locationMap);
 }
 

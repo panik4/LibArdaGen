@@ -94,11 +94,11 @@ std::vector<Cluster> Arda::SuperRegion::getClusters(
     visited.insert(current->ID);
     cluster.push_back(current);
 
-    for (int neighborID : current->neighbours) {
-      if (neighborID < 0 || neighborID >= (int)regions.size())
+    for (auto neighbour : current->neighbours) {
+      if (neighbour == nullptr)
         continue; // skip invalid IDs
 
-      auto neighbor = regions[neighborID];
+      auto neighbor = regions[neighbour->ID];
       // Only visit neighbors belonging to the same superregion
       if (neighbor && visited.find(neighbor->ID) == visited.end()) {
         if (std::find(allOwnRegions.begin(), allOwnRegions.end(), neighbor) !=
