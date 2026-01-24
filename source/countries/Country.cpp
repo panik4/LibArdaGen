@@ -8,7 +8,8 @@ Country::Country() {
 
 Country::Country(std::string tag, int ID, std::string name,
                  std::string adjective, Gfx::Flag flag)
-    : tag{tag}, name{name}, adjective{adjective}, flag{flag}, Fwg::Areas::Area() {
+    : tag{tag}, name{name}, adjective{adjective}, flag{flag},
+      Fwg::Areas::Area() {
   this->ID = ID;
   colour = {static_cast<unsigned char>(RandNum::getRandom(0, 255)),
             static_cast<unsigned char>(RandNum::getRandom(0, 255)),
@@ -121,31 +122,34 @@ void Country::evaluateProvinces() {
               return a->ID < b->ID;
             });
 }
-void Country::evaluatePopulations(const double worldPopulation) {
+int Country::getTotalPopulation() const {
   // gather all population factors of the regions
-  totalPopulation = 0.0;
+  auto totalPopulation = 0.0;
   for (const auto &region : ownedRegions) {
     totalPopulation += region->totalPopulation;
   }
-  worldPopulationShare = totalPopulation / worldPopulation;
+  return totalPopulation;
 }
 
-void Country::evaluateDevelopment() {
-  averageDevelopment = 0.0;
+void Country::evaluateTechnologyLevel() {
+  double totalEconomicShare = 0.0;
   for (auto &state : this->ownedRegions) {
-    // development should be weighed by the pop in the state
-    averageDevelopment +=
-        state->averageDevelopment *
-        (state->worldPopulationShare / this->worldPopulationShare);
+    totalEconomicShare += state->worldEconomicActivityShare;
   }
-}
 
-void Country::evaluateEconomicActivity(const double worldEconomicActivity) {
-  gdp = 0.0;
-  for (const auto &region : ownedRegions) {
-    gdp += region->gdp;
+  if (totalEconomicShare <= 0.0) {
+    this->technologyLevel = 0.0;
+    std::cout << "Warning: country has zero economic share\n";
+    return;
   }
-  worldEconomicActivityShare = gdp / worldEconomicActivity;
+
+  double countryAverageDevelopment = 0.0;
+  for (auto &state : this->ownedRegions) {
+    double weight = state->worldEconomicActivityShare / totalEconomicShare;
+    countryAverageDevelopment += state->averageDevelopment * weight;
+  }
+
+  this->technologyLevel = countryAverageDevelopment;
 }
 
 void Country::evaluateProperties() {

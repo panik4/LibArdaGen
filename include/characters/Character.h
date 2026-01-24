@@ -1,18 +1,9 @@
 #pragma once
+#include "utils/ArdaUtils.h"
 #include <string>
 #include <vector>
 namespace Arda {
 enum class Gender { Male, Female };
-
-enum class Ideology {
-  Neutral,
-  Fascist,
-  Communist,
-  Democratic,
-  Monarchist,
-  Anarchist,
-  None
-};
 enum class Type {
   Leader,
   ArmyChief,
@@ -33,7 +24,7 @@ public:
   std::string surname;
   Gender gender;
 
-  Arda::Ideology ideology;
+  Arda::Utils::Ideology ideology;
   Type type;
   std::vector<std::string> traits;
 };

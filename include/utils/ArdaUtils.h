@@ -15,13 +15,25 @@ static AgeConfig renaissanceConfig{500'000'000, 8'000'000};
 static AgeConfig victorianConfig{1'000'000'000, 300'000'000};
 static AgeConfig worldWarConfig{3'000'000'000, 8'000'000'000'000};
 
-
-
 static std::map<GenerationAge, AgeConfig> ageConfigs{
     {GenerationAge::Medieval, medievalConfig},
     {GenerationAge::Renaissance, renaissanceConfig},
     {GenerationAge::Victorian, victorianConfig},
     {GenerationAge::WorldWar, worldWarConfig}};
+
+enum class Ideology { NONE, FASCISM, DEMOCRATIC, COMMUNISM, NEUTRALITY };
+inline std::map<Ideology, std::string> ideologyToString = {
+    {Ideology::NONE, "none"},
+    {Ideology::FASCISM, "fascism"},
+    {Ideology::DEMOCRATIC, "democratic"},
+    {Ideology::COMMUNISM, "communism"},
+    {Ideology::NEUTRALITY, "neutrality"}};
+inline std::map<std::string, Ideology> stringToIdeology = {
+    {"none", Ideology::NONE},
+    {"fascism", Ideology::FASCISM},
+    {"democratic", Ideology::DEMOCRATIC},
+    {"communism", Ideology::COMMUNISM},
+    {"neutrality", Ideology::NEUTRALITY}};
 
 struct NoiseConfig {
   double fractalFrequency;

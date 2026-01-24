@@ -221,17 +221,12 @@ Fwg::Gfx::Image visualiseStrategicRegions(
       }
     }
   } else {
-    auto noBorderMap = Fwg::Gfx::Image(Fwg::Cfg::Values().width,
-                                       Fwg::Cfg::Values().height, 24);
     for (auto &strat : superRegions) {
 
       for (auto &reg : strat->ardaRegions) {
         for (auto &prov : reg->ardaProvinces) {
           for (auto &pix : prov->pixels) {
             superRegionMap.setColourAtIndex(pix, strat->colour);
-            if (ID == -1) {
-              noBorderMap.setColourAtIndex(pix, strat->colour);
-            }
           }
         }
         for (auto &pix : reg->borderPixels) {
@@ -244,8 +239,6 @@ Fwg::Gfx::Image visualiseStrategicRegions(
         }
       }
     }
-    Fwg::Gfx::Png::save(noBorderMap, Fwg::Cfg::Values().mapsPath +
-                                         "superRegions_no_borders.png");
     Fwg::Gfx::Png::save(superRegionMap,
                         Fwg::Cfg::Values().mapsPath + "superRegions.png");
   }

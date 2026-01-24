@@ -97,7 +97,7 @@ void generateDevelopment(
       const auto provincePixels = province->getNonOwningPixelView();
       for (const auto pixel : provincePixels) {
         province->averageDevelopment +=
-            (float)developmentNoise[pixel] / provincePixels.size();
+            (float)developmentNoise[pixel];
       }
       province->averageDevelopment /= provincePixels.size();
 
@@ -114,6 +114,15 @@ void generateDevelopment(
             province->averageDevelopment);
       }
     }
+  }
+  for (auto &region : regions) {
+    auto totalDevelopment = 0.0;
+    for (const auto province : region->ardaProvinces) {
+      totalDevelopment += province->averageDevelopment;
+    }
+
+    region->averageDevelopment =
+        totalDevelopment / region->ardaProvinces.size();
   }
 }
 

@@ -105,7 +105,6 @@ void distributeCountries(
   }
   Fwg::Utils::Logging::logLine("Distributing Evaluating Populations");
   for (auto &country : countries) {
-    country.second->evaluatePopulations(civData.worldPopulationFactorSum);
     country.second->gatherCultureShares();
   }
   generateCountrySpecifics(generationAge, countries);
@@ -119,6 +118,9 @@ void evaluateCountryNeighbours(
   Fwg::Areas::Regions::evaluateRegionNeighbours(baseRegions);
 
   for (auto &c : countries) {
+    c.second->neighbourCountries.clear();
+    c.second->neighbours.clear();
+
     for (const auto &gR : c.second->ownedRegions) {
       if (gR->neighbours.size() != baseRegions[gR->ID]->neighbours.size())
         throw(std::exception("Fatal: Neighbour count mismatch, terminating"));
@@ -130,11 +132,13 @@ void evaluateCountryNeighbours(
 
       for (const auto &neighbourRegion : gR->neighbours) {
         // TO DO: Investigate rare crash issue with index being out of range
-        if (ardaRegions[neighbourRegion->ID]->owner == nullptr)
+        auto neighbourCountry = ardaRegions[neighbourRegion->ID]->owner;
+        if (neighbourCountry == nullptr)
           continue;
         if (neighbourRegion->ID < ardaRegions.size() &&
-            ardaRegions[neighbourRegion->ID]->owner->tag != c.second->tag) {
-          c.second->neighbourCountries.insert(ardaRegions[neighbourRegion->ID]->owner);
+            neighbourCountry->tag != c.second->tag) {
+          c.second->neighbourCountries.insert(neighbourCountry);
+          c.second->neighbours.push_back(neighbourCountry);
         }
       }
     }
@@ -250,7 +254,6 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
     for (auto &region : country.second->ownedRegions) {
       region->owner = country.second;
     }
-    country.second->evaluatePopulations(civData.worldPopulationFactorSum);
     generateCountrySpecifics(generationAge, countries);
   }
 }
@@ -271,8 +274,9 @@ void generateCountrySpecifics(
     const Arda::Utils::GenerationAge &generationAge,
     std::map<std::string, std::shared_ptr<Country>> &countries) {
   // military: navalFocus, airFocus, landFocus
-  for (auto &countryEntry : countries) {
+  for (int countryID = 0; auto &countryEntry : countries) {
     auto &country = countryEntry.second;
+    country->ID = countryID++;
     // military focus: first gather info about position of the country, taking
     // coastline into account
     auto coastalRegions = 0.0;

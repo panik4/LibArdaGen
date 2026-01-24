@@ -5,6 +5,7 @@
 #include "characters/Character.h"
 #include "culture/Culture.h"
 #include "flags/Flag.h"
+#include "utils/ArdaUtils.h"
 #include <string>
 #include <vector>
 namespace Arda {
@@ -25,21 +26,18 @@ public:
   std::string name;
   std::string adjective;
   int capitalRegionID = 0;
-  int capitalProvinceID;
-  double totalPopulation;
-  double averageDevelopment;
-  double worldPopulationShare;
-  double gdp;
-  double worldEconomicActivityShare;
+  int capitalProvinceID = 0;
+  double technologyLevel = 0.0;
+  double gdp = 0.0;
   bool landlocked = true;
+  Arda::Utils::Ideology ideology = Arda::Utils::Ideology::NONE;
 
   Rank rank = Rank::Unranked;
   // total importance
   double importanceScore;
   // relative importance to most important country
   double relativeScore;
-  // the gamemodule calculates the total population
-  int pop;
+
   // the cultures and their population
   std::map<std::shared_ptr<Culture>, double> cultures;
   Gfx::Flag flag;
@@ -72,9 +70,8 @@ public:
   // operators
   bool operator<(const Country &right) const { return ID < right.ID; };
   void evaluateProvinces();
-  void evaluatePopulations(const double worldPopulation);
-  void evaluateDevelopment();
-  void evaluateEconomicActivity(const double worldEconomicActivity);
+  int getTotalPopulation() const;
+  void evaluateTechnologyLevel();
   void evaluateProperties();
 
   void gatherCultureShares();

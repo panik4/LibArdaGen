@@ -115,8 +115,11 @@ public:
   void genLocationType(const Fwg::Civilization::LocationType &type);
   void genLocations();
   void detectLocationType(const Fwg::Civilization::LocationType &type);
-  void genNavmesh(const std::vector<Fwg::Civilization::Locations::AreaLocationSet>
-                 &inputSet);
+  void
+  genNavmesh(const std::vector<Fwg::Civilization::Locations::AreaLocationSet>
+                 &inputSet,
+             const std::vector<std::shared_ptr<Fwg::Areas::Area>>
+                 &inputNavigationAreas);
 
   bool genWastelands(Fwg::Cfg &config);
   void generateStrategicRegions(
