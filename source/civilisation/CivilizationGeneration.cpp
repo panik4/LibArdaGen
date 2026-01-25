@@ -80,7 +80,7 @@ void generateDevelopment(
   noiseGenerator.SetSeed(config.mapSeed);
   noiseGenerator.SetFrequency(0.02 / config.sizeFactor);
   auto developmentNoise = Fwg::Noise::genNoise(noiseGenerator, height, width,
-                                               0.0, 0.0, 0.0, 0.2, 0.0, true);
+                                               0.0, 0.0, 0.0, 0.2, 0.0, false);
   for (auto &continent : continents) {
     if (config.randomDevelopment) {
       continent->developmentModifier = RandNum::getRandom<double>(

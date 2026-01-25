@@ -145,31 +145,78 @@ void evaluateCountryNeighbours(
   }
 }
 
-void loadCountries(const Arda::Utils::GenerationAge &generationAge,
-                   std::function<std::shared_ptr<Country>()> factory,
-                   std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
-                   std::map<std::string, std::shared_ptr<Country>> &countries,
-                   Civilization::CivilizationData &civData,
-                   Arda::Names::NameData &nData,
-                   const Fwg::Gfx::Image &inputImage,
-                   const std::string &mappingPath) {
+void loadCountriesFromText(
+    const Arda::Utils::GenerationAge &generationAge,
+    std::function<std::shared_ptr<Country>()> factory,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    std::map<std::string, std::shared_ptr<Country>> &countries,
+    Civilization::CivilizationData &civData, Arda::Names::NameData &nData,
+    const std::string &countryMappings) {
+
   int counter = 0;
-  countries.clear();
+  // countries.clear();
   std::vector<std::string> mappingFileLines;
-  Fwg::Utils::ColourTMap<std::vector<std::string>> mapOfCountries;
+  Fwg::Utils::ColourTMap<std::vector<std::string>> inputCountryMap;
   try {
-    mappingFileLines = Fwg::Parsing::getLines(mappingPath);
+    mappingFileLines = Fwg::Parsing::splitLines(countryMappings);
     for (auto &line : mappingFileLines) {
       auto tokens = Fwg::Parsing::getTokens(line, ';');
       auto colour = Fwg::Gfx::Colour(std::stoi(tokens[0]), std::stoi(tokens[1]),
                                      std::stoi(tokens[2]));
-      mapOfCountries.setValue(colour, tokens);
+      inputCountryMap.setValue(colour, tokens);
     }
   } catch (std::exception e) {
     Fwg::Utils::Logging::logLine(
         "Exception while parsing country input, ", e.what(),
         " continuing with randomly generated countries");
   }
+
+  Fwg::Utils::ColourTMap<std::shared_ptr<Country>> existingCountryMap;
+  for (auto &country : countries) {
+    existingCountryMap.setValue(country.second->colour, country.second);
+  }
+
+  // now we check if we already have countries that exist with this colour. This
+  // way we can just rename the existing ones and apply the other inputs from
+  // the textfile, without further modifying anything else
+  for (auto &countryMapEntry : inputCountryMap.getMap()) {
+
+    auto tokens = countryMapEntry.second;
+    auto colour = Fwg::Gfx::Colour(std::stoi(tokens[0]), std::stoi(tokens[1]),
+                                   std::stoi(tokens[2]));
+
+    if (existingCountryMap.contains(colour)) {
+      auto &existingCountry = existingCountryMap.at(colour);
+      existingCountry->tag = inputCountryMap.at(colour)[3];
+      existingCountry->name = inputCountryMap.at(colour)[4];
+      existingCountry->adjective = inputCountryMap.at(colour)[5];
+    } else {
+      // we always expect to find every single country that we currently have
+      // in the mapentry. We log that we can't find it, and create an empty
+      // country
+
+      auto country = factory();
+      country->ID = counter++;
+      country->tag = tokens[3];
+      country->name = tokens[4];
+      country->adjective = tokens[5];
+      country->flag = Arda::Gfx::Flag(82, 52);
+      country->colour = colour;
+      countries.insert({country->tag, country});
+    }
+  }
+}
+
+void loadCountries(const Arda::Utils::GenerationAge &generationAge,
+                   std::function<std::shared_ptr<Country>()> factory,
+                   std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+                   std::map<std::string, std::shared_ptr<Country>> &countries,
+                   Civilization::CivilizationData &civData,
+                   Arda::Names::NameData &nData,
+                   const Fwg::Gfx::Image &inputImage) {
+  int counter = 0;
+  countries.clear();
+
   Fwg::Utils::ColourTMap<std::vector<std::shared_ptr<Arda::ArdaRegion>>>
       mapOfRegions;
   for (auto &region : ardaRegions) {
@@ -179,28 +226,28 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
     Fwg::Utils::ColourTMap<int> likeliestOwner;
     Fwg::Gfx::Colour selectedCol;
 
-    for (auto province : region->ardaProvinces) {
-      if (!province->isSea()) {
-        //  we have the colour already
-        auto colour = inputImage[province->pixels[0]];
+    // Count ownership using all pixels belonging to the region
+    for (const auto pixelIndex : region->getNonOwningPixelView()) {
+      auto colour = inputImage[pixelIndex];
 
-        if (likeliestOwner.find(colour)) {
-          likeliestOwner[colour] += province->pixels.size();
-
-        } else {
-          likeliestOwner.setValue(colour, province->pixels.size());
-        }
-        int max = 0;
-
-        for (auto &potOwner : likeliestOwner.getMap()) {
-          if (potOwner.second > max) {
-            max = potOwner.second;
-            selectedCol = potOwner.first;
-          }
-        }
+      if (likeliestOwner.contains(colour)) {
+        likeliestOwner[colour]++;
+      } else {
+        likeliestOwner.setValue(colour, 1);
       }
     }
-    if (mapOfRegions.find(selectedCol)) {
+
+    // Determine dominant colour once, after accumulation
+    int max = -1;
+    for (const auto &potOwner : likeliestOwner.getMap()) {
+      if (potOwner.second > max) {
+        max = potOwner.second;
+        selectedCol = potOwner.first;
+      }
+    }
+
+    // Assign region to dominant colour
+    if (mapOfRegions.contains(selectedCol)) {
       mapOfRegions[selectedCol].push_back(region);
     } else {
       mapOfRegions.setValue(selectedCol, {region});
@@ -208,35 +255,18 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
   }
   for (auto &entry : mapOfRegions.getMap()) {
     auto entryCol = entry.first;
-    if (mapOfCountries.find(entryCol)) {
-      auto tokens = mapOfCountries[entryCol];
-      auto colour = Fwg::Gfx::Colour(std::stoi(tokens[0]), std::stoi(tokens[1]),
-                                     std::stoi(tokens[2]));
 
-      auto country = factory();
-      country->ID = counter++;
-      country->tag = tokens[3];
-      country->name = tokens[4];
-      country->adjective = tokens[5];
-      country->flag = Arda::Gfx::Flag(82, 52);
-      country->colour = colour;
-      for (auto &region : entry.second) {
-        country->addRegion(region);
-      }
-      countries.insert({country->tag, country});
-    } else {
-      auto country = factory();
-      country->ID = counter++;
-      country->tag = std::to_string(counter);
-      country->name = "";
-      country->adjective = "";
-      country->flag = Arda::Gfx::Flag(82, 52);
-      country->colour = entryCol;
-      for (auto &region : entry.second) {
-        country->addRegion(region);
-      }
-      countries.insert({country->tag, country});
+    auto country = factory();
+    country->ID = counter++;
+    country->tag = std::to_string(counter);
+    country->name = "";
+    country->adjective = "";
+    country->flag = Arda::Gfx::Flag(82, 52);
+    country->colour = entryCol;
+    for (auto &region : entry.second) {
+      country->addRegion(region);
     }
+    countries.insert({country->tag, country});
   }
   for (auto &country : countries) {
     country.second->gatherCultureShares();
@@ -259,15 +289,13 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
 }
 
 void saveCountries(std::map<std::string, std::shared_ptr<Country>> &countries,
-                   const std::string &mappingPath,
-                   const Fwg::Gfx::Image &countryImage) {
+                   const std::string &mappingPath) {
   std::string fileContent = "#r;g;b;tag;name;adjective\n";
   for (const auto &country : countries) {
     fileContent += country.second->exportLine();
     fileContent += "\n";
   }
   Fwg::Parsing::writeFile(mappingPath + "//countryMappings.txt", fileContent);
-  Fwg::Gfx::Png::save(countryImage, mappingPath + "//countries.png");
 }
 
 void generateCountrySpecifics(

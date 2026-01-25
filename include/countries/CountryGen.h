@@ -39,6 +39,14 @@ void evaluateCountryNeighbours(
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     std::map<std::string, std::shared_ptr<Country>> &countries);
 
+void loadCountriesFromText(
+    const Arda::Utils::GenerationAge &generationAge,
+    std::function<std::shared_ptr<Country>()> factory,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    std::map<std::string, std::shared_ptr<Country>> &countries,
+    Civilization::CivilizationData &civData, Arda::Names::NameData &nData,
+    const std::string &countryMappings);
+
 // load countries from an image and map them to regions
 void loadCountries(const Arda::Utils::GenerationAge &generationAge,
                    std::function<std::shared_ptr<Country>()> factory,
@@ -46,11 +54,9 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
                    std::map<std::string, std::shared_ptr<Country>> &countries,
                    Civilization::CivilizationData &civData,
                    Arda::Names::NameData &nData,
-                   const Fwg::Gfx::Image &inputImage,
-                   const std::string &mappingPath);
+                   const Fwg::Gfx::Image &inputImage);
 void saveCountries(std::map<std::string, std::shared_ptr<Country>> &countries,
-                   const std::string &mappingPath,
-                   const Fwg::Gfx::Image &countryImage);
+                   const std::string &mappingPath);
 void generateCountrySpecifics(
     const Arda::Utils::GenerationAge &generationAge,
     std::map<std::string, std::shared_ptr<Country>> &countries);

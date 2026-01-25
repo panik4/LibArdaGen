@@ -240,7 +240,7 @@ Fwg::Gfx::Image visualiseStrategicRegions(
       }
     }
     Fwg::Gfx::Png::save(superRegionMap,
-                        Fwg::Cfg::Values().mapsPath + "superRegions.png");
+                        Fwg::Cfg::Values().mapsPath + "areas/superRegions.png");
   }
   return superRegionMap;
 }

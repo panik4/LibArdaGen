@@ -82,14 +82,27 @@ void ArdaGen::generateCountries(
   Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
                                              countries);
   Fwg::Utils::Logging::logLine("Visualising Countries");
-  visualiseCountries(countryMap);
+  visualiseCountries(countryMap, worldMap);
   Fwg::Gfx::Png::save(countryMap,
                       Fwg::Cfg::Values().mapsPath + "countries/countries.png");
   mapCountries();
   evaluateCountries();
   Arda::Countries::saveCountries(countries,
-                                 Fwg::Cfg::Values().mapsPath + "//areas//",
-                                 Arda::Gfx::visualiseCountries(countries));
+                                 Fwg::Cfg::Values().mapsPath + "/countries/");
+}
+
+void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
+                            const std::string &path) {
+  // generate country data
+  if (factory != nullptr) {
+    Arda::Countries::loadCountriesFromText(ardaConfig.generationAge, factory,
+                                           ardaRegions, countries, civData,
+                                           nData, Fwg::Parsing::readFile(path));
+  }
+  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
+                                             countries);
+  mapCountries();
+  evaluateCountries();
 }
 
 void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
@@ -98,7 +111,7 @@ void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
   if (factory != nullptr) {
     Arda::Countries::loadCountries(ardaConfig.generationAge, factory,
                                    ardaRegions, countries, civData, nData,
-                                   inputImage, countryMappingPath);
+                                   inputImage);
   }
   Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
                                              countries);
@@ -177,7 +190,7 @@ void ArdaGen::applyRegionInput() {
     }
   }
   for (auto &ardaRegion : this->ardaRegions) {
-    if (regionInputMap.find(ardaRegion->colour)) {
+    if (regionInputMap.contains(ardaRegion->colour)) {
       if (regionInputMap[ardaRegion->colour].size() > 3 &&
           regionInputMap[ardaRegion->colour][3].size()) {
         // get the predefined name
@@ -228,8 +241,8 @@ void ArdaGen::applyRegionInput() {
       }
     }
   }
-  Png::save(regionMap, Fwg::Cfg::Values().mapsPath + "debug/ardaRegionTypes.png",
-            false);
+  Png::save(regionMap,
+            Fwg::Cfg::Values().mapsPath + "debug/ardaRegionTypes.png", false);
 }
 
 void ArdaGen::applyCountryInput() {}
@@ -350,7 +363,7 @@ void ArdaGen::genNaturalFeatures() {
 
 bool ArdaGen::loadNaturalFeatures(Fwg::Cfg &config,
                                   const Fwg::Gfx::Image &inputFeatures) {
-  clearLocations();
+  // clearLocations();
   ardaData.civLayer.clear();
   Arda::NaturalFeatures::loadNaturalFeatures(config, inputFeatures,
                                              ardaData.civLayer);
@@ -415,6 +428,7 @@ void ArdaGen::genCivilisationData() {
 
 void ArdaGen::clearLocations() {
   Fwg::Civilization::Locations::clearLocations(areaData.regions);
+  locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
 }
 
 void ArdaGen::genLocations() {
@@ -469,14 +483,26 @@ void ArdaGen::detectLocationType(const Fwg::Civilization::LocationType &type) {
   Fwg::Civilization::Locations::detectLocationsFromPixels(
       ardaData.civLayer.getAll(topotype), provinceMap, areaData,
       areaData.regions, type);
-
-  locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
-  Fwg::Gfx::Png::save(locationMap,
-                      Fwg::Cfg::Values().mapsPath + "//world//locations.png");
-  Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
-                                                  ardaProvinces);
+  //Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
+  //                                                ardaProvinces);
   mapTerrain();
 }
+
+void ArdaGen::loadLocations(const Fwg::Gfx::Image &inputImage) {
+  auto &cfg = Fwg::Cfg::Values();
+  clearLocations();
+  loadNaturalFeatures(cfg, inputImage);
+  detectLocationType(Fwg::Civilization::LocationType::Farm);
+  detectLocationType(Fwg::Civilization::LocationType::City);
+  detectLocationType(Fwg::Civilization::LocationType::Port);
+  //detectLocationType(Fwg::Civilization::LocationType::Mine);
+  //detectLocationType(Fwg::Civilization::LocationType::Forest);
+  Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
+                                                  ardaProvinces);
+  locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
+  mapTerrain();
+}
+
 void ArdaGen::genNavmesh(
     const std::vector<Fwg::Civilization::Locations::AreaLocationSet> &inputSet,
     const std::vector<std::shared_ptr<Fwg::Areas::Area>>
@@ -538,7 +564,9 @@ void ArdaGen::generateStateSpecifics() {
 
 void ArdaGen::evaluateCountries() {}
 
-Image ArdaGen::visualiseCountries(Fwg::Gfx::Image &countryBmp, const int ID) {
+Image ArdaGen::visualiseCountries(Fwg::Gfx::Image &countryBmp,
+                                  const Fwg::Gfx::Image &worldMap,
+                                  const int ID) {
   Logging::logLine("Drawing borders");
   auto &config = Fwg::Cfg::Values();
   const auto stateBorderColour = Fwg::Gfx::Colour(0, 0, 0);
@@ -551,19 +579,23 @@ Image ArdaGen::visualiseCountries(Fwg::Gfx::Image &countryBmp, const int ID) {
 
     if (region->owner) {
       countryColour = region->owner->colour;
-    }
 
-    for (const auto &prov : region->provinces) {
-      for (const auto pix : prov->getNonOwningPixelView()) {
-        // do not overwrite state borders
-        if (countryBmp.imageData[pix] != stateBorderColour) {
-          countryBmp.imageData[pix] = countryColour;
+      for (const auto &prov : region->provinces) {
+        for (const auto pix : prov->getNonOwningPixelView()) {
+          // do not overwrite state borders
+          if (countryBmp.imageData[pix] != stateBorderColour) {
+            countryBmp.imageData[pix] = countryColour;
+          }
+        }
+      }
+    } else {
+      for (const auto &prov : region->provinces) {
+        for (const auto pix : prov->getNonOwningPixelView()) {
+          countryBmp.imageData[pix] = worldMap[pix];
         }
       }
     }
   } else {
-    Fwg::Gfx::Image noBorderCountries(config.width, config.height, 24);
-
     // Parallel loop over regions
     std::for_each(std::execution::par, ardaRegions.begin(), ardaRegions.end(),
                   [&](const auto &region) {
@@ -571,25 +603,24 @@ Image ArdaGen::visualiseCountries(Fwg::Gfx::Image &countryBmp, const int ID) {
 
                     if (region->owner) {
                       countryColour = region->owner->colour;
-                    }
 
-                    // Fill provinces
-                    for (const auto &prov : region->provinces) {
-                      for (const auto pix : prov->getNonOwningPixelView()) {
-                        countryBmp.imageData[pix] = countryColour;
-
-                        noBorderCountries.imageData[pix] = countryColour;
+                      // Fill provinces
+                      for (const auto &prov : region->provinces) {
+                        for (const auto pix : prov->getNonOwningPixelView()) {
+                          countryBmp.imageData[pix] = countryColour;
+                        }
                       }
-                    }
-
-                    // Fill borders
-                    for (auto pix : region->borderPixels) {
-                      countryBmp.imageData[pix] = countryColour * 0.0;
+                    } else {
+                      for (const auto &prov : region->provinces) {
+                        for (const auto pix : prov->getNonOwningPixelView()) {
+                          countryBmp.imageData[pix] = worldMap[pix];
+                        }
+                      }
                     }
                   });
 
-    Png::save(noBorderCountries, Fwg::Cfg::Values().mapsPath +
-                                     "countries/countries_no_borders.png");
+    Png::save(countryBmp, Fwg::Cfg::Values().mapsPath +
+                              "countries/countries_no_borders.png");
     std::vector<std::shared_ptr<Country>> countriesVector;
     for (auto const &country : countries) {
       countriesVector.push_back(country.second);

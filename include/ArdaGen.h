@@ -71,9 +71,6 @@ public:
     std::function<std::shared_ptr<Arda::SuperRegion>()> superRegionFactory;
     std::function<std::shared_ptr<Arda::Country>()> countryFactory;
   } ardaFactories;
-
-  // to allow text inputs as addition to country image input
-  std::string countryMappingPath = "";
   // to allow text inputs as addition to region image input
   std::string regionMappingPath = "";
   ArdaConfig ardaConfig;
@@ -115,6 +112,7 @@ public:
   void genLocationType(const Fwg::Civilization::LocationType &type);
   void genLocations();
   void detectLocationType(const Fwg::Civilization::LocationType &type);
+  void loadLocations(const Fwg::Gfx::Image &inputImage);
   void
   genNavmesh(const std::vector<Fwg::Civilization::Locations::AreaLocationSet>
                  &inputSet,
@@ -130,9 +128,12 @@ public:
   virtual void generateStateSpecifics();
   void generateCountries(std::function<std::shared_ptr<Country>()> factory);
   void loadCountries(std::function<std::shared_ptr<Country>()> factory,
+                     const std::string &path);
+  void loadCountries(std::function<std::shared_ptr<Country>()> factory,
                      const Fwg::Gfx::Image &inputImage);
   // print a map showing all countries for debug purposes
   Fwg::Gfx::Image visualiseCountries(Fwg::Gfx::Image &countryBmp,
+                                     const Fwg::Gfx::Image &worldMap,
                                      const int ID = -1);
 
   // mapping terrain types of FastWorldGen to module
