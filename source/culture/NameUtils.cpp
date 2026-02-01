@@ -32,11 +32,11 @@ std::string generateTag(const std::string name,
   }
   if (tag.size() != 3) {
     std::cerr << "Incorrect tag size" << std::endl;
-    throw(std::exception(
+    throw(std::runtime_error(
         std::string("Incorrect tag size in generating tag " + tag).c_str()));
   }
   if (retries >= 20)
-    throw(std::exception(
+    throw(std::runtime_error(
         std::string("Too many tries generating tag " + tag).c_str()));
 
   disallowedTokens.insert(tag);

@@ -65,8 +65,8 @@ Flag::Flag(const int width, const int height) : width(width), height(height) {
   int colIndex = 0;
   for (const auto &mapping : colourMapping) {
     // ensure colIndex is in range
-    colIndex =
-        std::min<int>(colIndex, static_cast<int>(replacementColours.size() - 1));
+    colIndex = std::min<int>(colIndex,
+                             static_cast<int>(replacementColours.size() - 1));
     for (auto index : mapping.second) {
       setPixel(replacementColours[colIndex], index);
     }
@@ -149,8 +149,9 @@ Flag::Flag(const int width, const int height) : width(width), height(height) {
     const int lineSize = 328;
     const int symbolLineSize = 52 * 4;
 
-for (const auto &mapping : colourMapping) {
-      colIndex = std::min<int>(colIndex, static_cast<int>(finalColours.size() - 1));
+    for (const auto &mapping : colourMapping) {
+      colIndex =
+          std::min<int>(colIndex, static_cast<int>(finalColours.size() - 1));
       const auto &colourToUse = finalColours[colIndex];
       for (auto byteIndex : mapping.second) {
         int pixelIndexInSymbol = byteIndex / 4;
@@ -175,7 +176,6 @@ for (const auto &mapping : colourMapping) {
       }
       colIndex++;
     }
-
   }
   return;
 }
@@ -258,18 +258,31 @@ std::vector<uint8_t> Flag::resize(const int width, const int height,
 }
 
 void Flag::readColourGroups() {
-  auto lines = PU::getLines(Fwg::Cfg::Values().resourcePath +
-                            "flags//colour_groups.txt");
+
+  Fwg::Utils::Logging::logLine(Fwg::Cfg::Values().resourcePath +
+                               "flags//colour_groups.txt");
+  auto lines =
+      PU::getLines(Fwg::Cfg::Values().resourcePath + "flags/colour_groups.txt");
   for (const auto &line : lines) {
-    if (!line.size())
+    if (line.empty())
       continue;
+
     auto tokens = PU::getTokens(line, ';');
-    for (auto i = 1; i < tokens.size(); i++) {
-      const auto nums =
-          Arda::Parsing::getNumbers(tokens[i], ',', std::set<int>{});
-      Fwg::Gfx::Colour c{(unsigned char)nums[0], (unsigned char)nums[1],
-                         (unsigned char)nums[2]};
-      colourGroups[tokens[0]].push_back(c);
+    const std::string &groupName = tokens[0];
+
+    for (size_t i = 1; i < tokens.size(); ++i) {
+      auto nums = Arda::Parsing::getNumbers(tokens[i], ',', std::set<int>{});
+
+      if (nums.size() < 3) {
+        std::cerr << "Skipping invalid colour entry in group '" << groupName
+                  << "' at line: " << line << std::endl;
+        continue;
+      }
+
+      Fwg::Gfx::Colour c{static_cast<unsigned char>(nums[0]),
+                         static_cast<unsigned char>(nums[1]),
+                         static_cast<unsigned char>(nums[2])};
+      colourGroups[groupName].push_back(c);
     }
   }
 }

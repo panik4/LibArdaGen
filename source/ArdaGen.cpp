@@ -23,6 +23,7 @@ ArdaGen::ArdaGen() {
 
 ArdaGen::ArdaGen(const std::string &configSubFolder)
     : FastWorldGenerator(configSubFolder) {
+  Fwg::Utils::Logging::logLine("ArdaGen::ArdaGen");
   Gfx::Flag::readColourGroups();
   Gfx::Flag::readFlagTypes();
   Gfx::Flag::readFlagTemplates();
@@ -44,6 +45,7 @@ ArdaGen::ArdaGen(const std::string &configSubFolder)
   ardaFactories.countryFactory = []() -> std::shared_ptr<Arda::Country> {
     return std::make_shared<Arda::Country>();
   };
+  Fwg::Utils::Logging::logLine("ArdaGen::ArdaGen Done");
 }
 
 ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {
@@ -161,12 +163,12 @@ void ArdaGen::mapRegions() {
   //          [](auto l, auto r) { return *l < *r; });
   // check if we have the same amount of ardaProvinces as FastWorldGen provinces
   if (ardaProvinces.size() != this->areaData.provinces.size())
-    throw(std::exception("Fatal: Lost provinces, terminating"));
+    throw(std::runtime_error("Fatal: Lost provinces, terminating"));
   if (ardaRegions.size() != this->areaData.regions.size())
-    throw(std::exception("Fatal: Lost regions, terminating"));
+    throw(std::runtime_error("Fatal: Lost regions, terminating"));
   for (const auto &ardaRegion : ardaRegions) {
     if (ardaRegion->ID > ardaRegions.size()) {
-      throw(std::exception("Fatal: Invalid region IDs, terminating"));
+      throw(std::runtime_error("Fatal: Invalid region IDs, terminating"));
     }
   }
   applyRegionInput();

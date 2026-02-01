@@ -123,11 +123,12 @@ void evaluateCountryNeighbours(
 
     for (const auto &gR : c.second->ownedRegions) {
       if (gR->neighbours.size() != baseRegions[gR->ID]->neighbours.size())
-        throw(std::exception("Fatal: Neighbour count mismatch, terminating"));
+        throw(
+            std::runtime_error("Fatal: Neighbour count mismatch, terminating"));
       // now compare if all IDs in those neighbour vectors match
       for (int i = 0; i < gR->neighbours.size(); i++) {
         if (gR->neighbours[i] != baseRegions[gR->ID]->neighbours[i])
-          throw(std::exception("Fatal: Neighbour mismatch, terminating"));
+          throw(std::runtime_error("Fatal: Neighbour mismatch, terminating"));
       }
 
       for (const auto &neighbourRegion : gR->neighbours) {

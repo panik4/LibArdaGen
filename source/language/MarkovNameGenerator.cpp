@@ -48,7 +48,14 @@ std::string MarkovNameGenerator::generate(int minLength, int maxLength) {
   }
 
   // Strip start marker and validate length
-  result.erase(std::remove(result.begin(), result.end(), '^'), result.end());
+  //result.erase(std::remove(result.begin(), result.end(), '^'), result.end());
+  std::string clean;
+  clean.reserve(result.size());
+  for (char c : result) {
+    if (c != '^')
+      clean += c;
+  }
+  result = std::move(clean);
   if (result.size() < static_cast<size_t>(minLength))
     return generate(minLength, maxLength); // retry
 

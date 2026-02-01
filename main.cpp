@@ -2,8 +2,8 @@
 #define _SCL_SECURE_NO_WARNINGS
 #pragma warning(disable : 4996)
 #include "FastWorldGenerator.h"
-#include "Utils/Logging.h"
-#include "Utils/Utils.h"
+#include "utils/Logging.h"
+#include "utils/Utils.h"
 #include "generic/ScenarioGenerator.h"
 #include <filesystem>
 

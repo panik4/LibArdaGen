@@ -108,7 +108,7 @@ detectWastelands(Fwg::Terrain::TerrainData &terrainData,
   return wastelandMap;
 }
 
-void NaturalFeatures::loadNaturalFeatures(
+void loadNaturalFeatures(
     Fwg::Cfg &config, const Fwg::Gfx::Image &inputFeatures,
     Arda::Civilization::CivilizationLayer &civLayer) {
   std::map<Fwg::Gfx::Colour, Arda::Civilization::TopographyType> colourMap = {
