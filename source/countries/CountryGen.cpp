@@ -166,7 +166,7 @@ void loadCountriesFromText(
                                      std::stoi(tokens[2]));
       inputCountryMap.setValue(colour, tokens);
     }
-  } catch (std::exception e) {
+  } catch (std::exception& e) {
     Fwg::Utils::Logging::logLine(
         "Exception while parsing country input, ", e.what(),
         " continuing with randomly generated countries");

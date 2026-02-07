@@ -41,11 +41,11 @@ struct NoiseConfig {
   double cutOff;
   double mountainBonus;
 };
-static NoiseConfig defaultNoise{0.02, 0.0, 0.8, 2.0};
-static NoiseConfig semiRareNoise{0.015, 0.0, 0.85, 2.0};
-static NoiseConfig rareLargePatch{0.005, 0.0, 0.7, 0.0};
-static NoiseConfig rareNoise{0.01, 0.0, 0.9, 2.0};
-static NoiseConfig agriNoise{0.24, 0.0, 0.0, 0.0};
+static NoiseConfig defaultNoise{0.004, 0.0, 0.8, 2.0};
+static NoiseConfig semiRareNoise{0.003, 0.0, 0.85, 2.0};
+static NoiseConfig rareLargePatch{0.001, 0.0, 0.7, 0.0};
+static NoiseConfig rareNoise{0.002, 0.0, 0.9, 2.0};
+static NoiseConfig agriNoise{0.05, 0.0, 0.0, 0.0};
 
 struct ResConfig {
   std::string name;

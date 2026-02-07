@@ -258,9 +258,6 @@ std::vector<uint8_t> Flag::resize(const int width, const int height,
 }
 
 void Flag::readColourGroups() {
-
-  Fwg::Utils::Logging::logLine(Fwg::Cfg::Values().resourcePath +
-                               "flags//colour_groups.txt");
   auto lines =
       PU::getLines(Fwg::Cfg::Values().resourcePath + "flags/colour_groups.txt");
   for (const auto &line : lines) {

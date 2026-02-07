@@ -205,7 +205,7 @@ void ArdaGen::applyRegionInput() {
           // get the predefined population
           ardaRegion->totalPopulation =
               stoi(regionInputMap[ardaRegion->colour][4]);
-        } catch (std::exception e) {
+        } catch (std::exception& e) {
           Fwg::Utils::Logging::logLine(
               "ERROR: Some of the tokens can't be turned into a population "
               "number. The faulty token is ",

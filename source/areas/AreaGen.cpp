@@ -201,54 +201,59 @@ void postProcessStrategicRegions(
 
     // now if the strategic region is of AreaType sea, free the smaller
     // clusters, add their regions to the regionsToBeReassigned vector
-    if (superRegion->regionClusters.size() > 1 &&
-        superRegion->areaType == Fwg::Areas::AreaType::Sea) {
-      Fwg::Utils::Logging::logLineLevel(
-          9, "Strategic region with ID: ", superRegion->ID,
-          " has multiple clusters, trying to free smaller clusters");
-      // the biggest cluster by pixels size remains
-      auto biggestCluster =
-          std::max_element(superRegion->regionClusters.begin(),
-                           superRegion->regionClusters.end(),
-                           [](const Arda::Cluster &a, const Arda::Cluster &b) {
-                             return a.size() < b.size();
-                           });
-      // free the others
-      for (auto &cluster : superRegion->regionClusters) {
-        if (&cluster != &(*biggestCluster)) {
-          Fwg::Utils::Logging::logLine("Freeing cluster with size: ",
-                                       cluster.size());
-          // add the regions of the cluster to the regionsToBeReassigned
-          // vector
-          for (auto &region : cluster.regions) {
-            regionsToBeReassigned.push(region);
-            // remove the region from the superRegion ardaRegions vector
-            auto it = std::find(superRegion->ardaRegions.begin(),
-                                superRegion->ardaRegions.end(), region);
-            if (it != superRegion->ardaRegions.end()) {
-              Fwg::Utils::Logging::logLine(
-                  "Removing region with ID: ", region->ID,
-                  " from strategic region with ID: ", superRegion->ID);
-              superRegion->ardaRegions.erase(it);
+    if (superRegion->areaType == Fwg::Areas::AreaType::Sea) {
+      if (superRegion->regionClusters.size() > 1) {
+        Fwg::Utils::Logging::logLineLevel(
+            9, "Strategic region with ID: ", superRegion->ID,
+            " has multiple clusters, trying to free smaller clusters");
+        // the biggest cluster by pixels size remains
+        auto biggestCluster = std::max_element(
+            superRegion->regionClusters.begin(),
+            superRegion->regionClusters.end(),
+            [](const Arda::Cluster &a, const Arda::Cluster &b) {
+              return a.size() < b.size();
+            });
+        // free the others
+        for (auto &cluster : superRegion->regionClusters) {
+          if (&cluster != &(*biggestCluster)) {
+            Fwg::Utils::Logging::logLine("Freeing cluster with size: ",
+                                         cluster.size());
+            // add the regions of the cluster to the regionsToBeReassigned
+            // vector
+            for (auto &region : cluster.regions) {
+              regionsToBeReassigned.push(region);
+              // remove the region from the superRegion ardaRegions vector
+              auto it = std::find(superRegion->ardaRegions.begin(),
+                                  superRegion->ardaRegions.end(), region);
+              if (it != superRegion->ardaRegions.end()) {
+                Fwg::Utils::Logging::logLine(
+                    "Removing region with ID: ", region->ID,
+                    " from strategic region with ID: ", superRegion->ID);
+                superRegion->ardaRegions.erase(it);
 
-            } else {
-              Fwg::Utils::Logging::logLine("Warning: Region not found in "
-                                           "strategic region ardaRegions");
+              } else {
+                Fwg::Utils::Logging::logLine("Warning: Region not found in "
+                                             "strategic region ardaRegions");
+              }
             }
+            // clear the cluster regions
+            cluster.regions.clear();
           }
-          // clear the cluster regions
-          cluster.regions.clear();
         }
-      }
 
-      // remove empty clusters
-      superRegion->regionClusters.erase(
-          std::remove_if(superRegion->regionClusters.begin(),
-                         superRegion->regionClusters.end(),
-                         [](const Arda::Cluster &cluster) {
-                           return cluster.regions.empty();
-                         }),
-          superRegion->regionClusters.end());
+        // remove empty clusters
+        superRegion->regionClusters.erase(
+            std::remove_if(superRegion->regionClusters.begin(),
+                           superRegion->regionClusters.end(),
+                           [](const Arda::Cluster &cluster) {
+                             return cluster.regions.empty();
+                           }),
+            superRegion->regionClusters.end());
+      }
+      // additionally check ifa sea region is NOT contiguous. Fractured sea
+      // regions are not desired. We want to split them into fractured clusters
+      // and
+      // TODO
     }
   }
 
@@ -375,8 +380,7 @@ void loadStrategicRegions(
     std::vector<std::shared_ptr<SuperRegion>> &superRegions,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     const Fwg::Terrain::TerrainData &terrainData) {
-  Fwg::Utils::Logging::logLine(
-      "Arda::Areas: Loading superregions regions");
+  Fwg::Utils::Logging::logLine("Arda::Areas: Loading superregions regions");
   superRegions.clear();
   // detect areas from inputImage
   auto inputAreas = Fwg::Areas::detectAreasByColour(inputImage);
