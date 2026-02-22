@@ -40,9 +40,9 @@ void SuperRegion::setType() {
 }
 // gathers all pixels from all regions in the super region, calculates the
 // weighted position
-void Arda::SuperRegion::checkPosition(
+bool Arda::SuperRegion::checkPosition(
     const std::vector<std::shared_ptr<Arda::SuperRegion>> &superRegions) {
-  if (Fwg::Cfg::Values().debugLevel > 5) {
+  if (Fwg::Cfg::Values().debugLevel > -1) {
     std::vector<int> pixels;
     for (auto &reg : ardaRegions) {
       for (auto &prov : reg->provinces) {
@@ -51,34 +51,47 @@ void Arda::SuperRegion::checkPosition(
         }
       }
     }
-
     this->position.calcWeightedCenter(pixels);
     if (!this->position.centerPresent(pixels)) {
       Fwg::Utils::Logging::logLine("Warning: Weighted center not inside the "
                                    "pixels of the super region with ID: ",
-                                   this->ID, " type is: ", (int)this->areaType);
-      this->centerOutsidePixels = true;
+                                   this->ID + 1,
+                                   " type is: ", (int)this->areaType);
       // print the position of the super region
-      Fwg::Utils::Logging::logLine("Position: ", this->position);
+      Fwg::Utils::Logging::logLine("This SuperRegion's weighted center: ",
+                                   this->position);
+      return true;
       // now we check the type of the super region our center is actually in
-      for (auto &superReg : superRegions) {
-        std::unordered_set<int> othersPixels;
-        for (auto &reg : superReg->ardaRegions) {
-          for (auto &prov : reg->provinces) {
-            for (const auto pix : prov->getNonOwningPixelView()) {
-              othersPixels.insert(pix);
-            }
-          }
-        }
-        if (othersPixels.find(this->position.weightedCenter) !=
-            othersPixels.end()) {
-          Fwg::Utils::Logging::logLine(
-              "The center is in super region with ID: ", superReg->ID,
-              " type is: ", (int)superReg->areaType);
-        }
-      }
+      //for (auto &superReg : superRegions) {
+      //  std::unordered_set<int> othersPixels;
+      //  for (auto &reg : superReg->ardaRegions) {
+      //    for (auto &prov : reg->provinces) {
+      //      for (const auto pix : prov->getNonOwningPixelView()) {
+      //        othersPixels.insert(pix);
+      //      }
+      //    }
+      //  }
+      //  if (othersPixels.find(this->position.weightedCenter) !=
+      //      othersPixels.end()) {
+      //    Fwg::Utils::Logging::logLine(
+      //        "The center is in super region with ID: ", superReg->ID + 1,
+      //        " type is: ", (int)superReg->areaType);
+
+      //    // Print the neighbor's weighted center for comparison
+      //    Fwg::Utils::Logging::logLine(
+      //        "Neighbor SuperRegion's weighted center: ", superReg->position);
+
+      //    // Compare the two weighted centers
+      //    Fwg::Utils::Logging::logLine(
+      //        "Distance between centers: ",
+      //        Fwg::Utils::getDistance(this->position.weightedCenter,
+      //                                superReg->position.weightedCenter,
+      //                                Fwg::Cfg::Values().width));
+      //  }
+      //}
     }
   }
+  return false;
 }
 std::vector<Cluster> Arda::SuperRegion::getClusters(
     std::vector<std::shared_ptr<ArdaRegion>> &regions) {
@@ -121,8 +134,8 @@ std::vector<Cluster> Arda::SuperRegion::getClusters(
       for (const auto &reg : clusterObj.regions) {
         clusterObj.getPixelsForManipulation().insert(
             clusterObj.getPixelsForManipulation().end(),
-                                 region->getNonOwningPixelView().begin(),
-                                 region->getNonOwningPixelView().end());
+            region->getNonOwningPixelView().begin(),
+            region->getNonOwningPixelView().end());
       }
 
       clusters.push_back(std::move(clusterObj));

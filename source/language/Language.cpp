@@ -25,6 +25,9 @@ void Language::generateVocabulary() {
     if (key == "MaleNames" || key == "FemaleNames" || key == "Surnames") {
       count = 100;
     }
+    if (key == "GenericWords") {
+      count = 1000;
+    }
 
     std::unordered_set<std::string> uniqueWords; // avoid duplicates
     int attempts = 0;

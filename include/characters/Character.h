@@ -22,6 +22,7 @@ public:
 
   std::string name;
   std::string surname;
+  std::string portraitPath = "";
   Gender gender;
 
   Arda::Utils::Ideology ideology;

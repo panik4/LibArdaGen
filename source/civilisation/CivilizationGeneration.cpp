@@ -96,8 +96,7 @@ void generateDevelopment(
       // get the average developmentNoise for the province
       const auto provincePixels = province->getNonOwningPixelView();
       for (const auto pixel : provincePixels) {
-        province->averageDevelopment +=
-            (float)developmentNoise[pixel];
+        province->averageDevelopment += (float)developmentNoise[pixel];
       }
       province->averageDevelopment /= provincePixels.size();
 
@@ -446,13 +445,21 @@ void generateImportance(std::vector<std::shared_ptr<ArdaRegion>> &regions) {
 void nameRegions(std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   // take all regions and name them by taking their dominant cultures language
   // and generating a name
+  std::set<std::string> usedRegionNames;
   for (auto &region : regions) {
     auto culture = region->getPrimaryCulture();
     if (culture == nullptr) {
       continue;
     }
     auto language = culture->language;
-    region->name = language->generateAreaName("");
+    auto name = language->generateAreaName("");
+    int attempt = 0;
+    // ensure the name is unique, if not generate a new one until it is
+    while (usedRegionNames.count(name) && attempt++ < 10) {
+      name = language->generateAreaName("");
+    }
+    region->name = name;
+    usedRegionNames.insert(region->name);
     for (auto &province : region->ardaProvinces) {
       province->name = language->generateAreaName("");
     }
