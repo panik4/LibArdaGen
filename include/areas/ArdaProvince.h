@@ -4,7 +4,6 @@
 #include "culture/Culture.h"
 #include "culture/Religion.h"
 #include "generic/VictoryPoint.h"
-#include <unordered_set>
 namespace Arda {
 enum class PositionType {
   Standstill,
@@ -28,7 +27,7 @@ class ArdaProvince : public Fwg::Areas::Province {
 public:
   std::string owner;
   std::string terrainType;
-  std::unordered_set<Civilization::TopographyType> topographyTypes;
+  std::set<Civilization::TopographyType> topographyTypes;
   double populationDensity = 0.0;
   double worldPopulationShare = 0.0;
   double population = 0;

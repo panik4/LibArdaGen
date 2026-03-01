@@ -67,6 +67,7 @@ void generateDevelopment(
     const std::vector<std::shared_ptr<ArdaContinent>> &continents) {
   Fwg::Utils::Logging::logLine("Generating State Development");
   auto &config = Fwg::Cfg::Values();
+  Fwg::Utils::Randomisation::resetRandomisation();
 
   const auto height = config.height;
   const auto width = config.width;
@@ -186,6 +187,7 @@ void generatePopulation(
     const std::vector<std::shared_ptr<ArdaContinent>> &continents,
     double targetWorldPopulation) {
   Fwg::Utils::Logging::logLine("Generating Population");
+  Fwg::Utils::Randomisation::resetRandomisation();
   const auto &config = Fwg::Cfg::Values();
 
   double worldPopulationFactorSum = 0.0;
@@ -226,6 +228,7 @@ void generateEconomicActivity(
     const std::vector<std::shared_ptr<ArdaContinent>> &continents,
     const double targetWorldGdp) {
   double worldEconomicActivitySum = 0.0;
+  Fwg::Utils::Randomisation::resetRandomisation();
   for (auto &province : provinces) {
     worldEconomicActivitySum +=
         province->averageDevelopment * province->populationDensity;
@@ -255,6 +258,7 @@ void generateReligions(
     CivilizationData &civData,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces) {
   auto &config = Fwg::Cfg::Values();
+  Fwg::Utils::Randomisation::resetRandomisation();
   civData.religions.clear();
   Fwg::Gfx::Image religionMap(config.width, config.height, 24);
   if (ardaProvinces.empty()) {
@@ -301,7 +305,10 @@ void generateReligions(
 void generateCultures(
     CivilizationData &civData,
     std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces) {
+  Fwg::Utils::Randomisation::resetRandomisation();
   civData.cultures.clear();
+  for (auto &cultureGroup : civData.cultureGroups)
+    cultureGroup->clear();
   civData.cultureGroups.clear();
 
   auto &config = Fwg::Cfg::Values();
@@ -419,11 +426,13 @@ void generateLanguageGroup(std::shared_ptr<CultureGroup> &cultureGroup) {
 void distributeLanguages(CivilizationData &civData) {
   LanguageGenerator languageGenerator(Fwg::Cfg::Values().resourcePath +
                                       "//names//languageGroups//");
+  civData.languageGroups.clear();
+  Fwg::Utils::Randomisation::resetRandomisation();
   // assign a language group to each culture group
   for (auto &cultureGroup : civData.cultureGroups) {
     auto languageGroup = std::make_shared<Arda::LanguageGroup>(
         languageGenerator.generateLanguageGroup(
-            cultureGroup->getCultures().size(), {}));
+            cultureGroup->getCultures().size(), {}, RandNum::getRandom<int>()));
     civData.languageGroups.push_back(languageGroup);
     cultureGroup->setLanguageGroup(languageGroup);
   }
@@ -540,7 +549,7 @@ void applyCivilisationTopography(
   using namespace Fwg::Civilization;
 
   // Mapping from location types to topography types
-  static const std::unordered_map<LocationType, TopographyType> typeMap = {
+  static const std::map<LocationType, TopographyType> typeMap = {
       {LocationType::City, TopographyType::CITY},
       {LocationType::Port, TopographyType::PORTCITY},
       {LocationType::Farm, TopographyType::FARMLAND},

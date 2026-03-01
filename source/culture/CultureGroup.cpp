@@ -2,5 +2,5 @@
 
 void Arda::CultureGroup::determineVisualType() {
   // placeholder, select one of the VisualTypes randomly
-  visualType = static_cast<VisualType>(rand() % 5);
+  visualType = static_cast<VisualType>(RandNum::getRandom(5));
 }

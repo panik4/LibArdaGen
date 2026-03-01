@@ -107,7 +107,7 @@ void generateSuperRegionVoronoi(
   }
   // calculate the amount of strategic regions we want to have
   int landSuperRegions =
-      static_cast<int>(landShare * 110.0 * 4.0 * superRegionFactor);
+      static_cast<int>(landShare * 110.0 * 6.0 * superRegionFactor);
   int waterSuperRegions =
       static_cast<int>(waterShare * 110.0 * 3.0 * superRegionFactor);
 
@@ -119,12 +119,12 @@ void generateSuperRegionVoronoi(
   // Launch parallel Poisson disk generation
   auto waterFuture = std::async(std::launch::async, [&]() {
     return Fwg::Utils::generatePoissonDiskPoints(
-        waterAreaPixels, config.width, waterSuperRegions, waterMinDist);
+        waterAreaPixels, config.width, waterSuperRegions, waterMinDist, config.mapSeed);
   });
 
   auto landFuture = std::async(std::launch::async, [&]() {
     return Fwg::Utils::generatePoissonDiskPoints(landAreaPixels, config.width,
-                                                 landSuperRegions, landMinDist);
+                                                 landSuperRegions, landMinDist, config.mapSeed);
   });
 
   // Wait and retrieve the results

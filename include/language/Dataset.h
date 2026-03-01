@@ -2,13 +2,12 @@
 #include <fstream>
 #include <sstream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 namespace Arda {
 
 struct Dataset {
   std::vector<std::string> influences;
-  std::unordered_map<std::string, std::vector<std::string>> vocabulary;
+  std::map<std::string, std::vector<std::string>> vocabulary;
 
   bool loadFromFile(const std::string &filename) {
     std::ifstream in(filename);

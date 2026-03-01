@@ -5,7 +5,6 @@
 #include "culture/Religion.h"
 #include "utils/ArdaUtils.h"
 #include <map>
-#include <unordered_set>
 namespace Arda {
 class Country;
 enum class LocatorType { NONE, CITY, FARM, MINE, PORT, WOOD };
@@ -31,7 +30,7 @@ public:
 
   // other
   bool assigned = false;
-  std::unordered_set<Arda::Civilization::TopographyType> topographyTypes;
+  std::set<Arda::Civilization::TopographyType> topographyTypes;
   double snowChance, lightRainChance, heavyRainChance, blizzardChance,
       mudChance, sandStormChance;
   // containers

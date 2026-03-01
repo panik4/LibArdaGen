@@ -1,7 +1,7 @@
 #include "language/MarkovNameGenerator.h"
 
-MarkovNameGenerator::MarkovNameGenerator(int order)
-    : order(order), rng(std::random_device{}()) {}
+MarkovNameGenerator::MarkovNameGenerator(int order, int seed)
+    : order(order), rng(seed) {}
 
 void MarkovNameGenerator::train(const std::vector<std::string> &names) {
   chain.clear();

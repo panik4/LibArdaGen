@@ -1,13 +1,13 @@
 #include "language/LanguageGroup.h"
 namespace Arda {
 
-void LanguageGroup::generate(int languageAmount, const Dataset &dataset) {
+void LanguageGroup::generate(int languageAmount, const Dataset &dataset, int seed) {
   mergedDataset = dataset;
   languages.clear();
   for (int i = 0; i < languageAmount; i++) {
     Language language;
     language.reducedDataset = dataset;
-    language.train();
+    language.train(seed);
     language.generateVocabulary();
     language.fillAllLists();
 

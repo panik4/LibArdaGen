@@ -58,6 +58,7 @@ public:
   void determineVisualType();
 
   VisualType getVisualType() { return visualType; }
+  inline void clear() { cultures.clear(); }
 };
 
 } // namespace Arda

@@ -3,7 +3,6 @@
 #include "language/Dataset.h"
 #include "language/MarkovNameGenerator.h"
 #include <string>
-#include <unordered_set>
 #include <vector>
 namespace Arda {
 
@@ -19,8 +18,8 @@ class Language {
 public:
   Dataset reducedDataset;
   std::map<std::string, MarkovNameGenerator> markovGeneratorsByVocabulary;
-  std::unordered_map<std::string, std::vector<std::string>> vocabulary;
-  void train();
+  std::map<std::string, std::vector<std::string>> vocabulary;
+  void train(int seed);
 
   void generateVocabulary();
   static std::string capitaliseName(const std::string &word);

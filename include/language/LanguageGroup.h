@@ -10,6 +10,6 @@ public:
   std::string name;
   std::vector<std::shared_ptr<Language>> languages;
   Dataset mergedDataset;
-  void generate(int languageAmount, const Dataset &dataset);
+  void generate(int languageAmount, const Dataset &dataset, int seed);
 };
 } // namespace Arda

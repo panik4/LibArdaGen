@@ -30,7 +30,7 @@ void LanguageGenerator::loadDatasets(
   }
 }
 
-Dataset LanguageGenerator::getRandomMergedDataset() {
+Dataset LanguageGenerator::getRandomMergedDataset(int seed) {
   // Convert map to vector of pairs to access keys and values
   std::vector<std::pair<std::string, Dataset>> availableDatasets(
       datasetsByLanguage.begin(), datasetsByLanguage.end());
@@ -46,8 +46,7 @@ Dataset LanguageGenerator::getRandomMergedDataset() {
                minGroups + rand() % (maxGroups - minGroups + 1));*/
 
   // Shuffle available datasets
-  std::random_device rd;
-  std::mt19937 g(rd());
+  std::mt19937 g(seed);
   std::shuffle(availableDatasets.begin(), availableDatasets.end(), g);
 
   // Collect selected datasets
@@ -82,11 +81,11 @@ Dataset LanguageGenerator::reduceDataset(const std::vector<Dataset> &dataset) {
 }
 
 LanguageGroup LanguageGenerator::generateLanguageGroup(
-    int languageAmount, const std::vector<std::string> &datasetsToUse) {
+    int languageAmount, const std::vector<std::string> &datasetsToUse, int seed) {
 
   Arda::Dataset mergedDataset;
   if (datasetsToUse.empty()) {
-    mergedDataset = getRandomMergedDataset();
+    mergedDataset = getRandomMergedDataset(seed);
   } else {
     // Convert map to vector of pairs to access keys and values
     std::vector<std::pair<std::string, Dataset>> availableDatasets(
@@ -108,7 +107,7 @@ LanguageGroup LanguageGenerator::generateLanguageGroup(
     return LanguageGroup();
   }
   LanguageGroup languageGroup;
-  languageGroup.generate(languageAmount, mergedDataset);
+  languageGroup.generate(languageAmount, mergedDataset, seed);
 
   return languageGroup;
 }

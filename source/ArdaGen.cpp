@@ -69,58 +69,6 @@ ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {
 
 ArdaGen::~ArdaGen() {}
 
-void ArdaGen::generateCountries(
-    std::function<std::shared_ptr<Country>()> factory) {
-
-  std::filesystem::create_directory(Fwg::Cfg::Values().mapsPath + "/countries");
-  // generate country data
-  if (factory != nullptr) {
-    Arda::Countries::generateCountries(
-        ardaConfig.generationAge, factory, ardaConfig.numCountries, ardaRegions,
-        countries, ardaProvinces, civData, nData);
-  }
-  //  first gather generic neighbours, they will be mapped to hoi4 countries
-  //  in mapCountries
-  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
-                                             countries);
-  Fwg::Utils::Logging::logLine("Visualising Countries");
-  visualiseCountries(countryMap, worldMap);
-  Fwg::Gfx::Png::save(countryMap,
-                      Fwg::Cfg::Values().mapsPath + "countries/countries.png");
-  mapCountries();
-  evaluateCountries();
-  Arda::Countries::saveCountries(countries,
-                                 Fwg::Cfg::Values().mapsPath + "/countries/");
-}
-
-void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
-                            const std::string &path) {
-  // generate country data
-  if (factory != nullptr) {
-    Arda::Countries::loadCountriesFromText(ardaConfig.generationAge, factory,
-                                           ardaRegions, countries, civData,
-                                           nData, Fwg::Parsing::readFile(path));
-  }
-  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
-                                             countries);
-  mapCountries();
-  evaluateCountries();
-}
-
-void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
-                            const Fwg::Gfx::Image &inputImage) {
-  // generate country data
-  if (factory != nullptr) {
-    Arda::Countries::loadCountries(ardaConfig.generationAge, factory,
-                                   ardaRegions, countries, civData, nData,
-                                   inputImage);
-  }
-  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
-                                             countries);
-  mapCountries();
-  evaluateCountries();
-}
-
 void ArdaGen::mapContinents() {
   Logging::logLine("Mapping Continents");
   ardaContinents.clear();
@@ -205,7 +153,7 @@ void ArdaGen::applyRegionInput() {
           // get the predefined population
           ardaRegion->totalPopulation =
               stoi(regionInputMap[ardaRegion->colour][4]);
-        } catch (std::exception& e) {
+        } catch (std::exception &e) {
           Fwg::Utils::Logging::logLine(
               "ERROR: Some of the tokens can't be turned into a population "
               "number. The faulty token is ",
@@ -353,6 +301,7 @@ Fwg::Gfx::Image ArdaGen::mapTerrain() {
 }
 
 void ArdaGen::genNaturalFeatures() {
+  Fwg::Utils::Randomisation::resetRandomisation();
   // detect marshes
   // Arda::NaturalFeatures::detectMarshes(terrainData, climateData,
   //                                     ardaData.civLayer,
@@ -380,6 +329,7 @@ bool ArdaGen::loadDevelopment(Fwg::Cfg &config, const std::string &path) {
   return true;
 }
 bool ArdaGen::genDevelopment(Fwg::Cfg &config) {
+  Fwg::Utils::Randomisation::resetRandomisation();
   Civilization::generateDevelopment(ardaProvinces, ardaRegions, ardaContinents);
   gatherStatistics();
   return true;
@@ -395,6 +345,7 @@ bool ArdaGen::loadPopulation(Fwg::Cfg &config,
   return true;
 }
 bool ArdaGen::genPopulation(Fwg::Cfg &config) {
+  Fwg::Utils::Randomisation::resetRandomisation();
   ardaConfig.calculateTargetWorldPopulation();
   Civilization::generatePopulation(civData, ardaProvinces, ardaRegions,
                                    ardaContinents,
@@ -404,6 +355,7 @@ bool ArdaGen::genPopulation(Fwg::Cfg &config) {
   return true;
 }
 void ArdaGen::genEconomyData() {
+  Fwg::Utils::Randomisation::resetRandomisation();
   ardaConfig.calculateTargetWorldGdp();
   Arda::Civilization::generateEconomyData(civData, ardaProvinces, ardaRegions,
                                           ardaContinents,
@@ -412,12 +364,14 @@ void ArdaGen::genEconomyData() {
 }
 
 void ArdaGen::genCultureData() {
+  Fwg::Utils::Randomisation::resetRandomisation();
   Arda::Civilization::generateCultureData(civData, ardaProvinces, ardaRegions,
                                           ardaContinents, superRegions);
   gatherStatistics();
 }
 
 void ArdaGen::genCivilisationData() {
+  Fwg::Utils::Randomisation::resetRandomisation();
   genNaturalFeatures();
   ardaConfig.calculateTargetWorldPopulation();
   ardaConfig.calculateTargetWorldGdp();
@@ -434,19 +388,21 @@ void ArdaGen::clearLocations() {
 }
 
 void ArdaGen::genLocations() {
+  Fwg::Utils::Randomisation::resetRandomisation();
   locationMap.clear();
   Fwg::Civilization::Locations::generateLocations(
       areaData.regions, terrainData, climateData, provinceMap, areaData,
       ardaConfig.locationConfig);
   locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   Fwg::Gfx::Png::save(locationMap,
-                      Fwg::Cfg::Values().mapsPath + "//world//locations.png");
+                      Fwg::Cfg::Values().mapsPath + "/world/locations.png");
   Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
                                                   ardaProvinces);
   mapTerrain();
 }
 
 void ArdaGen::genLocationType(const Fwg::Civilization::LocationType &type) {
+  Fwg::Utils::Randomisation::resetRandomisation();
   using namespace Arda::Civilization;
   using namespace Fwg::Civilization;
   // Mapping from location types to topography types
@@ -463,7 +419,7 @@ void ArdaGen::genLocationType(const Fwg::Civilization::LocationType &type) {
       ardaConfig.locationConfig, type);
   locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   Fwg::Gfx::Png::save(locationMap,
-                      Fwg::Cfg::Values().mapsPath + "//world//locations.png");
+                      Fwg::Cfg::Values().mapsPath + "/world/locations.png");
   Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
                                                   ardaProvinces);
 }
@@ -485,8 +441,8 @@ void ArdaGen::detectLocationType(const Fwg::Civilization::LocationType &type) {
   Fwg::Civilization::Locations::detectLocationsFromPixels(
       ardaData.civLayer.getAll(topotype), provinceMap, areaData,
       areaData.regions, type);
-  //Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
-  //                                                ardaProvinces);
+  // Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
+  //                                                 ardaProvinces);
   mapTerrain();
 }
 
@@ -497,18 +453,72 @@ void ArdaGen::loadLocations(const Fwg::Gfx::Image &inputImage) {
   detectLocationType(Fwg::Civilization::LocationType::Farm);
   detectLocationType(Fwg::Civilization::LocationType::City);
   detectLocationType(Fwg::Civilization::LocationType::Port);
-  //detectLocationType(Fwg::Civilization::LocationType::Mine);
-  //detectLocationType(Fwg::Civilization::LocationType::Forest);
+  // detectLocationType(Fwg::Civilization::LocationType::Mine);
+  // detectLocationType(Fwg::Civilization::LocationType::Forest);
   Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
                                                   ardaProvinces);
   locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   mapTerrain();
 }
 
+void ArdaGen::generateCountries(
+    std::function<std::shared_ptr<Country>()> factory) {
+  Fwg::Utils::Randomisation::resetRandomisation();
+
+  std::filesystem::create_directory(Fwg::Cfg::Values().mapsPath + "/countries");
+  // generate country data
+  if (factory != nullptr) {
+    Arda::Countries::generateCountries(
+        ardaConfig.generationAge, factory, ardaConfig.numCountries, ardaRegions,
+        countries, ardaProvinces, civData, nData);
+  }
+  //  first gather generic neighbours, they will be mapped to hoi4 countries
+  //  in mapCountries
+  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
+                                             countries);
+  Fwg::Utils::Logging::logLine("Visualising Countries");
+  visualiseCountries(countryMap, worldMap);
+  Fwg::Gfx::Png::save(countryMap,
+                      Fwg::Cfg::Values().mapsPath + "countries/countries.png");
+  mapCountries();
+  evaluateCountries();
+  Arda::Countries::saveCountries(countries,
+                                 Fwg::Cfg::Values().mapsPath + "/countries/");
+}
+
+void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
+                            const std::string &path) {
+  // generate country data
+  if (factory != nullptr) {
+    Arda::Countries::loadCountriesFromText(ardaConfig.generationAge, factory,
+                                           ardaRegions, countries, civData,
+                                           nData, Fwg::Parsing::readFile(path));
+  }
+  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
+                                             countries);
+  mapCountries();
+  evaluateCountries();
+}
+
+void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
+                            const Fwg::Gfx::Image &inputImage) {
+  // generate country data
+  if (factory != nullptr) {
+    Arda::Countries::loadCountries(ardaConfig.generationAge, factory,
+                                   ardaRegions, countries, civData, nData,
+                                   inputImage);
+  }
+  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
+                                             countries);
+  mapCountries();
+  evaluateCountries();
+}
+
 void ArdaGen::genNavmesh(
     const std::vector<Fwg::Civilization::Locations::AreaLocationSet> &inputSet,
     const std::vector<std::shared_ptr<Fwg::Areas::Area>>
         &inputNavigationAreas) {
+  Fwg::Utils::Randomisation::resetRandomisation();
   // no input means we default to all locations in a region
   if (inputSet.size() == 0) {
     std::vector<Fwg::Civilization::Locations::AreaLocationSet> defaultInputSet;
@@ -542,6 +552,7 @@ bool ArdaGen::genWastelands(Fwg::Cfg &config) {
 
 void ArdaGen::generateStrategicRegions(
     std::function<std::shared_ptr<SuperRegion>()> factory) {
+  Fwg::Utils::Randomisation::resetRandomisation();
   Arda::Areas::generateStrategicRegions(factory, superRegions, ardaRegions,
                                         ardaConfig.superRegionFactor);
   Civilization::nameSuperRegions(superRegions, ardaRegions);
@@ -559,8 +570,9 @@ void ArdaGen::loadStrategicRegions(
 }
 
 void ArdaGen::generateStateSpecifics() {
+  Fwg::Utils::Randomisation::resetRandomisation();
   Arda::Areas::saveRegions(ardaRegions,
-                           Fwg::Cfg::Values().mapsPath + "//areas//",
+                           Fwg::Cfg::Values().mapsPath + "/areas/",
                            Arda::Gfx::visualiseRegions(ardaRegions));
 }
 

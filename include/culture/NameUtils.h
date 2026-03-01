@@ -14,6 +14,7 @@ struct NameData {
   std::set<std::string> tags;
   std::map<Arda::Utils::Ideology, std::vector<std::string>> ideologyNames;
   std::map<Arda::Utils::Ideology, std::vector<std::string>> factionNames;
+  std::set<std::string> originalDisallowedTokens;
   std::set<std::string> disallowedTokens;
 };
 std::string generateTag(const std::string name,

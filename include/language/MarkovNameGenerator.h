@@ -6,7 +6,7 @@
 
 class MarkovNameGenerator {
 public:
-  MarkovNameGenerator(int order = 2);
+  MarkovNameGenerator(int order = 2, int seed = 0);
   void train(const std::vector<std::string> &names);
   std::string generate(int minLength = 4, int maxLength = 10);
 

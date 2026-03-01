@@ -26,6 +26,8 @@ void generateCountries(
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
     Civilization::CivilizationData &civData, Arda::Names::NameData &nData) {
   countries.clear();
+  // return state of disallowed tokens to original, as we might have modified it
+  nData.disallowedTokens = nData.originalDisallowedTokens;
   for (auto &region : ardaRegions) {
     region->assigned = false;
     region->owner = nullptr;
@@ -217,7 +219,8 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
                    const Fwg::Gfx::Image &inputImage) {
   int counter = 0;
   countries.clear();
-
+  // return state of disallowed tokens to original, as we might have modified it
+  nData.disallowedTokens = nData.originalDisallowedTokens;
   Fwg::Utils::ColourTMap<std::vector<std::shared_ptr<Arda::ArdaRegion>>>
       mapOfRegions;
   for (auto &region : ardaRegions) {
@@ -306,6 +309,11 @@ void generateCountrySpecifics(
   for (int countryID = 0; auto &countryEntry : countries) {
     auto &country = countryEntry.second;
     country->ID = countryID++;
+
+    // sort owned regions by ID
+    std::sort(country->ownedRegions.begin(), country->ownedRegions.end(),
+              [](const auto &a, const auto &b) { return a->ID < b->ID; });
+
     // military focus: first gather info about position of the country, taking
     // coastline into account
     auto coastalRegions = 0.0;

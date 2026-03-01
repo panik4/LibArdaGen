@@ -1,6 +1,6 @@
 #include "language/Language.h"
 namespace Arda {
-void Language::train() {
+void Language::train(int seed) {
   markovGeneratorsByVocabulary.clear();
 
   for (const auto &[vocabKey, words] : reducedDataset.vocabulary) {
@@ -8,7 +8,7 @@ void Language::train() {
       continue;
 
     MarkovNameGenerator generator(
-        /*order=*/2);
+        /*order=*/2, seed);
     generator.train(words);
     markovGeneratorsByVocabulary[vocabKey] = std::move(generator);
   }
@@ -29,7 +29,7 @@ void Language::generateVocabulary() {
       count = 1000;
     }
 
-    std::unordered_set<std::string> uniqueWords; // avoid duplicates
+    std::set<std::string> uniqueWords; // avoid duplicates
     int attempts = 0;
     while (uniqueWords.size() < static_cast<size_t>(count) &&
            attempts++ < 100) {
@@ -110,7 +110,7 @@ void Language::fillAllLists() {
   //   articlesUsed = true;
   // }
   std::string prefixSeparator = " ";
-  if (rand() % 3 == 0) {
+  if (RandNum::getRandom<int>() % 3 == 0) {
     prefixSeparator = "-";
   }
   for (auto &cityPrefix : cityPrefixes) {
@@ -121,11 +121,11 @@ void Language::fillAllLists() {
   }
   port = generateGenericCapitalizedWord();
 
-  std::unordered_set<std::string> usedCoreNames;
+  std::set<std::string> usedCoreNames;
   for (int i = 0; i < 4000; i++) {
     std::string cityName;
-    if (rand() % 3 == 0) {
-      if (articlesUsed && rand() % 2 == 0) {
+    if (RandNum::getRandom<int>() % 3 == 0) {
+      if (articlesUsed && RandNum::getRandom<int>() % 2 == 0) {
         cityName += Fwg::Utils::selectRandom(articles);
         cityName += " ";
       } else {
@@ -138,9 +138,9 @@ void Language::fillAllLists() {
       coreName = generateGenericLowercaseWord();
     }
     cityName += coreName;
-    if (rand() % 3 == 0) {
+    if (RandNum::getRandom<int>() % 3 == 0) {
       auto suffix = Fwg::Utils::selectRandom(citySuffixes);
-      if (rand() % 3 == 0) {
+      if (RandNum::getRandom<int>() % 3 == 0) {
         cityName += " ";
         suffix[0] = toupper(suffix[0]);
       }
@@ -150,7 +150,7 @@ void Language::fillAllLists() {
     cityNames.push_back(cityName);
   }
 
-  std::unordered_set<std::string> usedMaleNames;
+  std::set<std::string> usedMaleNames;
   for (int i = 0; i < 1000; i++) {
     std::string firstName = getRandomCapitalisedWordFromVocabulary("MaleNames");
     if (usedMaleNames.find(firstName) == usedMaleNames.end()) {
@@ -158,7 +158,7 @@ void Language::fillAllLists() {
       usedMaleNames.insert(firstName);
     }
   }
-  std::unordered_set<std::string> usedFemaleNames;
+  std::set<std::string> usedFemaleNames;
   for (int i = 0; i < 1000; i++) {
     std::string firstName =
         getRandomCapitalisedWordFromVocabulary("FemaleNames");
@@ -168,7 +168,7 @@ void Language::fillAllLists() {
       usedFemaleNames.insert(firstName);
     }
   }
-  std::unordered_set<std::string> usedLastNames;
+  std::set<std::string> usedLastNames;
   for (int i = 0; i < 1000; i++) {
     std::string lastName = generateGenericCapitalizedWord();
     if (usedLastNames.find(lastName) == usedLastNames.end() &&
@@ -178,7 +178,7 @@ void Language::fillAllLists() {
       usedLastNames.insert(lastName);
     }
   }
-  std::unordered_set<std::string> usedNames;
+  std::set<std::string> usedNames;
   for (int i = 0; i < 1000; i++) {
     std::string shipName = generateGenericCapitalizedWord();
     if (usedNames.find(shipName) == usedNames.end()) {
@@ -196,17 +196,18 @@ void Language::fillAllLists() {
 std::string
 Language::getRandomCapitalisedWordFromVocabulary(const std::string &category) {
   return capitalisedWord(
-      vocabulary.at(category)[rand() % vocabulary.at(category).size()]);
+      vocabulary.at(category)[RandNum::getRandom(vocabulary.at(category).size())]);
 }
 
 std::string
 Language::getRandomLowercaseWordFromVocabulary(const std::string &category) {
-  return capitalisedWord(
-      vocabulary.at(category)[rand() % vocabulary.at(category).size()]);
+  return capitalisedWord(vocabulary.at(
+      category)[RandNum::getRandom(vocabulary.at(category).size())]);
 }
 
 std::string Language::getRandomWordFromVocabulary(const std::string &category) {
-  return vocabulary.at(category)[rand() % vocabulary.at(category).size()];
+  return vocabulary.at(
+      category)[RandNum::getRandom(vocabulary.at(category).size())];
 }
 
 std::string Language::generateGenericWord() {
