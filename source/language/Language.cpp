@@ -21,9 +21,9 @@ void Language::generateVocabulary() {
     std::vector<std::string> generatedWords;
 
     // Determine how many words to generate
-    int count = 10;
+    int count = 100;
     if (key == "MaleNames" || key == "FemaleNames" || key == "Surnames") {
-      count = 100;
+      count = 300;
     }
     if (key == "GenericWords") {
       count = 1000;
@@ -126,10 +126,10 @@ void Language::fillAllLists() {
     std::string cityName;
     if (RandNum::getRandom<int>() % 3 == 0) {
       if (articlesUsed && RandNum::getRandom<int>() % 2 == 0) {
-        cityName += Fwg::Utils::selectRandom(articles);
+        cityName += Fwg::Utils::Random::selectRandom(articles);
         cityName += " ";
       } else {
-        cityName += Fwg::Utils::selectRandom(cityPrefixes);
+        cityName += Fwg::Utils::Random::selectRandom(cityPrefixes);
         cityName += prefixSeparator;
       }
     }
@@ -139,7 +139,7 @@ void Language::fillAllLists() {
     }
     cityName += coreName;
     if (RandNum::getRandom<int>() % 3 == 0) {
-      auto suffix = Fwg::Utils::selectRandom(citySuffixes);
+      auto suffix = Fwg::Utils::Random::selectRandom(citySuffixes);
       if (RandNum::getRandom<int>() % 3 == 0) {
         cityName += " ";
         suffix[0] = toupper(suffix[0]);
@@ -222,7 +222,7 @@ std::string Language::generateGenericCapitalizedWord() {
   return capitalisedWord(word);
 }
 std::string Arda::Language::getAdjectiveForm(const std::string &word) {
-  return word /* + Fwg::Utils::selectRandom(adjectiveEndings)*/;
+  return word /* + Fwg::Utils::Random::selectRandom(adjectiveEndings)*/;
 }
 std::string Arda::Language::generateAreaName(const std::string &trait) {
   auto name = generateGenericCapitalizedWord();

@@ -272,7 +272,7 @@ void generateReligions(
     std::transform(r.name.begin(), r.name.end(), r.name.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     do {
-      r.centerOfReligion = Fwg::Utils::selectRandom(ardaProvinces)->ID;
+      r.centerOfReligion = Fwg::Utils::Random::selectRandom(ardaProvinces)->ID;
     } while (!ardaProvinces[r.centerOfReligion]->isLand());
     r.colour.randomize();
     civData.religions.push_back(std::make_shared<Religion>(r));
@@ -288,7 +288,7 @@ void generateReligions(
       auto religionCenter = ardaProvinces[religion->centerOfReligion];
       auto nDistance = Fwg::getPositionDistance(
           religionCenter->position, ardaProvince->position, config.width);
-      if (Fwg::Utils::switchIfComparator(nDistance, distance, std::less())) {
+      if (Fwg::Utils::Math::switchIfComparator(nDistance, distance, std::less())) {
         closestReligion = x;
       }
     }
@@ -327,7 +327,7 @@ void generateCultures(
     CultureGroup group{"", colour};
 
     // random center province
-    auto center = Fwg::Utils::selectRandom(ardaProvinces);
+    auto center = Fwg::Utils::Random::selectRandom(ardaProvinces);
     group.setCenter(center);
 
     auto groupPtr = std::make_shared<CultureGroup>(group);
@@ -340,7 +340,7 @@ void generateCultures(
   // -------------------------------------------------------------------------
   for (int i = 0; i < numCultures; i++) {
 
-    auto centerProv = Fwg::Utils::selectRandom(ardaProvinces);
+    auto centerProv = Fwg::Utils::Random::selectRandom(ardaProvinces);
 
     auto cult = std::make_shared<Culture>();
     cult->colour.randomize();

@@ -58,7 +58,7 @@ detectWastelands(Fwg::Terrain::TerrainData &terrainData,
   //   wastelandMap[i] += (1.0f - climateData.habitabilities[i]);
   // }
   //// normalize the wasteland map
-  //// Fwg::Utils::normalizeVector(wastelandMap, 0.0f, 1.0f);
+  //// Fwg::Utils::Containers::normalizeVector(wastelandMap, 0.0f, 1.0f);
 
   //// visualize wasteland map
   // if (config.debugLevel > 1) {

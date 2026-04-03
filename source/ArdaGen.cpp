@@ -171,7 +171,7 @@ void ArdaGen::applyRegionInput() {
         if (ardaRegion->isSea()) {
           regionMap.setColourAtIndex(pix, Fwg::Cfg::Values().colours.at("sea"));
 
-        } else if (ardaRegion->coastal && !ardaRegion->isSea()) {
+        } else if (ardaRegion->isCoastalToOcean() && !ardaRegion->isSea()) {
           regionMap.setColourAtIndex(pix,
                                      Fwg::Cfg::Values().colours.at("ores"));
 
@@ -183,7 +183,7 @@ void ArdaGen::applyRegionInput() {
         else {
           regionMap.setColourAtIndex(pix,
                                      Fwg::Cfg::Values().colours.at("land"));
-          if (gameProv->coastal) {
+          if (gameProv->isCoastalToOcean()) {
             regionMap.setColourAtIndex(
                 pix, Fwg::Cfg::Values().colours.at("autumnForest"));
           }
@@ -200,32 +200,10 @@ void ArdaGen::applyCountryInput() {}
 void ArdaGen::mapProvinces() {
   ardaProvinces.clear();
   for (auto &prov : this->areaData.provinces) {
-    // edit coastal status: lakes are not coasts!
-    if (prov->coastal && prov->isLake())
-      prov->coastal = false;
-    // if it is a land province, check that a neighbour is an ocean, otherwise
-    // this isn't coastal in this scenario definition
-    else if (prov->coastal) {
-      bool foundTrueCoast = false;
-      for (auto &neighbour : prov->neighbours) {
-        if (neighbour->isSea()) {
-          foundTrueCoast = true;
-        }
-      }
-      prov->coastal = foundTrueCoast;
-    }
-
     // now create ardaProvinces from FastWorldGen provinces
     auto gP = std::dynamic_pointer_cast<Arda::ArdaProvince>(prov);
-    // also copy neighbours
-    // for (auto &baseProvinceNeighbour : gP->neighbours)
-    //  gP->neighbours.push_back(baseProvinceNeighbour);
     ardaProvinces.push_back(gP);
   }
-
-  //// sort by Arda::ArdaProvince ID
-  // std::sort(ardaProvinces.begin(), ardaProvinces.end(),
-  //           [](auto l, auto r) { return *l < *r; });
 }
 
 Fwg::Gfx::Image ArdaGen::mapTerrain() {
@@ -571,8 +549,7 @@ void ArdaGen::loadStrategicRegions(
 
 void ArdaGen::generateStateSpecifics() {
   Fwg::Utils::Randomisation::resetRandomisation();
-  Arda::Areas::saveRegions(ardaRegions,
-                           Fwg::Cfg::Values().mapsPath + "/areas/",
+  Arda::Areas::saveRegions(ardaRegions, Fwg::Cfg::Values().mapsPath + "/areas/",
                            Arda::Gfx::visualiseRegions(ardaRegions));
 }
 

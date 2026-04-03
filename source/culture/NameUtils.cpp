@@ -14,10 +14,10 @@ std::string generateTag(const std::string name,
     tag = name.substr(0, std::min<int>(3, name.size()));
     std::transform(tag.begin(), tag.end(), tag.begin(), ::toupper);
     if (tag.size() < 3)
-      tag += Fwg::Utils::selectRandom(letters)[0];
+      tag += Fwg::Utils::Random::selectRandom(letters)[0];
     // if we have a retry, simply replace one of the letters with a random one
     if (retries > 0)
-      tag[RandNum::getRandom(0, 2)] = Fwg::Utils::selectRandom(letters)[0];
+      tag[RandNum::getRandom(0, 2)] = Fwg::Utils::Random::selectRandom(letters)[0];
   } while (disallowedTokens.find(tag) !=
                disallowedTokens.end() &&
            retries++ < 10);
@@ -25,7 +25,7 @@ std::string generateTag(const std::string name,
     do {
       // add a random letter to the tag
       tag.resize(3);
-      tag[2] = Fwg::Utils::selectRandom(letters)[0];
+      tag[2] = Fwg::Utils::Random::selectRandom(letters)[0];
     } while (disallowedTokens.find(tag) !=
                  disallowedTokens.end() &&
              retries++ < 20);

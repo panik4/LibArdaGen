@@ -84,7 +84,7 @@ bool Arda::SuperRegion::checkPosition(
       //    // Compare the two weighted centers
       //    Fwg::Utils::Logging::logLine(
       //        "Distance between centers: ",
-      //        Fwg::Utils::getDistance(this->position.weightedCenter,
+      //        Fwg::Utils::Math::getDistance(this->position.weightedCenter,
       //                                superReg->position.weightedCenter,
       //                                Fwg::Cfg::Values().width));
       //  }

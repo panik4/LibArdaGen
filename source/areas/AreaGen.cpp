@@ -72,13 +72,13 @@ void generateSuperRegionVoronoi(
     // and islands together. MixedLand is landArea sum up all the province
     // pixels of the region in one vector
     region->pixels = region->gatherPixels();
-    if (region->type == Arda::ArdaRegion::RegionType::Ocean ||
-        region->type == Arda::ArdaRegion::RegionType::OceanCoastal ||
-        region->type == Arda::ArdaRegion::RegionType::OceanIslandCoastal ||
-        region->type == Arda::ArdaRegion::RegionType::OceanMixedCoastal ||
-        region->type == Arda::ArdaRegion::RegionType::CoastalIsland ||
-        region->type == Arda::ArdaRegion::RegionType::Island ||
-        region->type == Arda::ArdaRegion::RegionType::IslandLake) {
+    if (region->areaSubType == Fwg::Areas::AreaSubType::Ocean ||
+        region->areaSubType == Fwg::Areas::AreaSubType::OceanCoastal ||
+        region->areaSubType == Fwg::Areas::AreaSubType::OceanIslandCoastal ||
+        region->areaSubType == Fwg::Areas::AreaSubType::OceanMixedCoastal ||
+        region->areaSubType == Fwg::Areas::AreaSubType::CoastalIsland ||
+        region->areaSubType == Fwg::Areas::AreaSubType::Island ||
+        region->areaSubType == Fwg::Areas::AreaSubType::IslandEncompassingLake) {
       waterAreaPixels.insert(waterAreaPixels.end(), region->pixels.begin(),
                              region->pixels.end());
     } else {
@@ -111,20 +111,22 @@ void generateSuperRegionVoronoi(
   int waterSuperRegions =
       static_cast<int>(waterShare * 110.0 * 3.0 * superRegionFactor);
 
-  int landMinDist = Fwg::Utils::computePoissonMinDistFromArea(
+  int landMinDist = Fwg::Utils::Random::computePoissonMinDistFromArea(
       landAreaPixels.size(), landSuperRegions, config.width, 8.0);
-  int waterMinDist = Fwg::Utils::computePoissonMinDistFromArea(
+  int waterMinDist = Fwg::Utils::Random::computePoissonMinDistFromArea(
       waterAreaPixels.size(), waterSuperRegions, config.width, 8.0);
 
   // Launch parallel Poisson disk generation
   auto waterFuture = std::async(std::launch::async, [&]() {
-    return Fwg::Utils::generatePoissonDiskPoints(
-        waterAreaPixels, config.width, waterSuperRegions, waterMinDist, config.mapSeed);
+    return Fwg::Utils::Random::generatePoissonDiskPoints(
+        waterAreaPixels, config.width, waterSuperRegions, waterMinDist,
+        config.mapSeed);
   });
 
   auto landFuture = std::async(std::launch::async, [&]() {
-    return Fwg::Utils::generatePoissonDiskPoints(landAreaPixels, config.width,
-                                                 landSuperRegions, landMinDist, config.mapSeed);
+    return Fwg::Utils::Random::generatePoissonDiskPoints(
+        landAreaPixels, config.width, landSuperRegions, landMinDist,
+        config.mapSeed);
   });
 
   // Wait and retrieve the results
@@ -132,11 +134,11 @@ void generateSuperRegionVoronoi(
   auto landPoints = landFuture.get();
   // ========== LLOYD'S RELAXATION ==========
   const int lloydIterations = 3; // Number of relaxation iterations
-  Fwg::Utils::Logging::logLine("Applying Lloyd's relaxation with ", 
+  Fwg::Utils::Logging::logLine("Applying Lloyd's relaxation with ",
                                lloydIterations, " iterations...");
 
   // Helper lambda to perform one iteration of Lloyd's relaxation
-  auto performLloydRelaxation = [&](std::vector<int> &points, 
+  auto performLloydRelaxation = [&](std::vector<int> &points,
                                     const std::vector<int> &validPixels) {
     // Generate Voronoi diagram with current points
     std::vector<int> validSeeds;
@@ -149,7 +151,8 @@ void generateSuperRegionVoronoi(
     newPoints.reserve(voronoiCells.size());
 
     for (const auto &cell : voronoiCells) {
-      if (cell.empty()) continue;
+      if (cell.empty())
+        continue;
 
       // Calculate centroid (average position) of all pixels in this cell
       long long sumX = 0;
@@ -167,7 +170,7 @@ void generateSuperRegionVoronoi(
       int centroidPixel = centroidY * config.width + centroidX;
 
       // Verify centroid is within valid pixels
-      bool centroidValid = std::find(validPixels.begin(), validPixels.end(), 
+      bool centroidValid = std::find(validPixels.begin(), validPixels.end(),
                                      centroidPixel) != validPixels.end();
 
       if (centroidValid) {
@@ -178,8 +181,8 @@ void generateSuperRegionVoronoi(
         double minDist = std::numeric_limits<double>::max();
 
         for (const auto &candidatePixel : cell) {
-          double dist = Fwg::Utils::getDistance(centroidPixel, candidatePixel, 
-                                               config.width);
+          double dist = Fwg::Utils::Math::getDistance(
+              centroidPixel, candidatePixel, config.width);
           if (dist < minDist) {
             minDist = dist;
             nearestPixel = candidatePixel;
@@ -195,7 +198,7 @@ void generateSuperRegionVoronoi(
   // Apply Lloyd's relaxation to land points
   Fwg::Utils::Logging::logLine("Relaxing land Voronoi cells...");
   for (int iter = 0; iter < lloydIterations; ++iter) {
-    Fwg::Utils::Logging::logLineLevel(7, "  Land iteration ", iter + 1, "/", 
+    Fwg::Utils::Logging::logLineLevel(7, "  Land iteration ", iter + 1, "/",
                                       lloydIterations);
     performLloydRelaxation(landPoints, landAreaPixels);
   }
@@ -203,7 +206,7 @@ void generateSuperRegionVoronoi(
   // Apply Lloyd's relaxation to water points
   Fwg::Utils::Logging::logLine("Relaxing water Voronoi cells...");
   for (int iter = 0; iter < lloydIterations; ++iter) {
-    Fwg::Utils::Logging::logLineLevel(7, "  Water iteration ", iter + 1, "/", 
+    Fwg::Utils::Logging::logLineLevel(7, "  Water iteration ", iter + 1, "/",
                                       lloydIterations);
     performLloydRelaxation(waterPoints, waterAreaPixels);
   }
@@ -456,7 +459,7 @@ void postProcessStrategicRegions(
               regionAreaTypeMap.at(region->ID) &&
           assignedToIDs.count(neighbourRegion->ID)) {
         // calculate the distance between the two regions
-        auto distance = Fwg::Utils::getDistance(
+        auto distance = Fwg::Utils::Math::getDistance(
             region->position.weightedCenter,
             neighbourRegion->position.weightedCenter, config.width);
         regionDistances[neighbour->ID] = distance;
@@ -617,7 +620,7 @@ void postProcessStrategicRegions(
     // Sort regions by distance from current center (furthest first)
     std::vector<std::pair<std::shared_ptr<ArdaRegion>, double>> regionDistances;
     for (auto &region : problematicSuperRegion->ardaRegions) {
-      double distance = Fwg::Utils::getDistance(
+      double distance = Fwg::Utils::Math::getDistance(
           region->position.weightedCenter,
           problematicSuperRegion->position.weightedCenter, config.width);
       regionDistances.push_back({region, distance});
@@ -725,7 +728,7 @@ void postProcessStrategicRegions(
           }
 
           if (!alreadyCandidate) {
-            double distance = Fwg::Utils::getDistance(
+            double distance = Fwg::Utils::Math::getDistance(
                 regionToReassign->position.weightedCenter,
                 candidateSuperRegion->position.weightedCenter, config.width);
             candidates.push_back({candidateSuperRegion, distance});
@@ -932,7 +935,7 @@ void postProcessStrategicRegions(
     for (auto &neighbour : superRegion->neighbourSuperRegions) {
       debugOutput += std::to_string(neighbour->ID + 1) + ",";
       debugOutput += std::to_string(neighbour->position.weightedCenter) + ",";
-      debugOutput += std::to_string(Fwg::Utils::getDistance(
+      debugOutput += std::to_string(Fwg::Utils::Math::getDistance(
           superRegion->position.weightedCenter,
           neighbour->position.weightedCenter, config.width));
       debugOutput += std::to_string(neighbour->position.widthCenter) + ",";
@@ -958,7 +961,7 @@ void loadStrategicRegions(
   std::vector<std::vector<int>> landVoronois;
   std::vector<std::vector<int>> waterVoronois;
   for (auto &inputArea : inputAreas) {
-    inputArea.calculateTerrainType(terrainData);
+    inputArea.calculateAreaType(terrainData.landFormIds);
     if (inputArea.areaType == Fwg::Areas::AreaType::Land) {
       landVoronois.push_back(inputArea.pixels);
     } else {

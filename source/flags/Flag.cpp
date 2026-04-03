@@ -183,7 +183,7 @@ Flag::Flag(const int width, const int height) : width(width), height(height) {
 Flag::~Flag() {}
 
 void Flag::setPixel(const Fwg::Gfx::Colour colour, const int x, const int y) {
-  if (Utils::inRange(0, width * height * 4 + 3, (x * width + y) * 4 + 3)) {
+  if (Utils::Math::inRange(0, width * height * 4 + 3, (x * width + y) * 4 + 3)) {
     for (auto i = 0; i < 3; i++)
       image[(x * width + y) * 4 + i] = colour.getBGR()[i];
     image[(x * width + y) * 4 + 3] = 255;
@@ -191,7 +191,7 @@ void Flag::setPixel(const Fwg::Gfx::Colour colour, const int x, const int y) {
 }
 
 void Flag::setPixel(const Fwg::Gfx::Colour colour, const int index) {
-  if (Utils::inRange(0, width * height * 4 + 3, index)) {
+  if (Utils::Math::inRange(0, width * height * 4 + 3, index)) {
     for (auto i = 0; i < 3; i++)
       image[index + i] = colour.getBGR()[i];
     image[index + 3] = 255;

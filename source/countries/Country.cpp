@@ -43,7 +43,7 @@ void Country::assignRegions(
       continue;
 
     // Pick a random neighbour
-    auto nextRegion = Fwg::Utils::selectRandom(ardaRegion->neighbourRegions);
+    auto nextRegion = Fwg::Utils::Random::selectRandom(ardaRegion->neighbourRegions);
 
     // Safety check: index is valid in ardaRegions
     if (nextRegion != nullptr) {
@@ -156,7 +156,7 @@ void Country::evaluateProperties() {
   // first check if we are landlocked
   landlocked = true;
   for (const auto &region : ownedRegions) {
-    if (region->coastal) {
+    if (region->isCoastalToOcean()) {
       landlocked = false;
       break;
     }

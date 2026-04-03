@@ -14,7 +14,7 @@ findStartRegion(std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   if (freeRegions.size() == 0)
     return ardaRegions[0];
 
-  const auto &startRegion = Fwg::Utils::selectRandom(freeRegions);
+  const auto &startRegion = Fwg::Utils::Random::selectRandom(freeRegions);
   return ardaRegions[startRegion->ID];
 }
 
@@ -98,7 +98,7 @@ void distributeCountries(
           !ardaRegion->isLake() &&
           !ardaRegion->topographyTypes.count(
               Arda::Civilization::TopographyType::WASTELAND)) {
-        auto gR = Fwg::Utils::getNearestAssignedLand(
+        auto gR = Fwg::Utils::Proc::getNearestAssignedLand(
             ardaRegions, ardaRegion, config.width, config.height);
         gR->owner->addRegion(ardaRegion);
         ardaRegion->owner = gR->owner;
@@ -318,7 +318,7 @@ void generateCountrySpecifics(
     // coastline into account
     auto coastalRegions = 0.0;
     for (auto &region : country->ownedRegions) {
-      if (region->coastal) {
+      if (region->isCoastalToOcean()) {
         coastalRegions++;
       }
     }
