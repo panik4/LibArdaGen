@@ -336,7 +336,8 @@ void postProcessStrategicRegions(
     }
 
     // let's find the weighted centre of the strat region
-    superRegion->position.calcWeightedCenter(superRegion->pixels);
+    auto &config = Fwg::Cfg::Values();
+    superRegion->position.calcWeightedCenter(superRegion->pixels, config.width, config.height);
 
     // now get all clusters
     superRegion->regionClusters = superRegion->getClusters(ardaRegions);
@@ -661,7 +662,7 @@ void postProcessStrategicRegions(
       }
 
       problematicSuperRegion->position.calcWeightedCenter(
-          problematicSuperRegion->pixels);
+          problematicSuperRegion->pixels, config.width, config.height);
 
       // Check if center is now inside
       if (problematicSuperRegion->position.centerPresent(
@@ -680,7 +681,7 @@ void postProcessStrategicRegions(
         regionsToReassign.push_back(candidateRegion);
       }
     }
-
+    
     // If we couldn't fix it by removal, restore original and try different
     // strategy
     if (!fixedByRemoval && !regionsToReassign.empty()) {
@@ -689,7 +690,7 @@ void postProcessStrategicRegions(
       problematicSuperRegion->ardaRegions = originalRegions;
       problematicSuperRegion->pixels = originalPixels;
       problematicSuperRegion->position.calcWeightedCenter(
-          problematicSuperRegion->pixels);
+          problematicSuperRegion->pixels, config.width, config.height);
       regionsToReassign.clear();
     }
 
@@ -749,7 +750,7 @@ void postProcessStrategicRegions(
                             regionToReassign->pixels.end());
 
           Fwg::Position testPosition;
-          testPosition.calcWeightedCenter(testPixels);
+          testPosition.calcWeightedCenter(testPixels, config.width, config.height);
 
           if (testPosition.centerPresent(testPixels)) {
             // Safe to add
@@ -782,7 +783,7 @@ void postProcessStrategicRegions(
 
           // Calculate pixels and center for new super region
           newSuperRegion->pixels = regionToReassign->pixels;
-          newSuperRegion->position.calcWeightedCenter(newSuperRegion->pixels);
+          newSuperRegion->position.calcWeightedCenter(newSuperRegion->pixels, config.width, config.height);
 
           newSuperRegion->colour = Fwg::Gfx::generateUniqueColour(
               newSuperRegion->ID,

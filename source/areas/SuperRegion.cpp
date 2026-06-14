@@ -51,7 +51,8 @@ bool Arda::SuperRegion::checkPosition(
         }
       }
     }
-    this->position.calcWeightedCenter(pixels);
+    auto &config = Fwg::Cfg::Values();
+    this->position.calcWeightedCenter(pixels, config.width, config.height);
     if (!this->position.centerPresent(pixels)) {
       Fwg::Utils::Logging::logLine("Warning: Weighted center not inside the "
                                    "pixels of the super region with ID: ",
