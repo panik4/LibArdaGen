@@ -5,13 +5,13 @@
 #include "utils/ArdaUtils.h"
 #include <map>
 namespace Arda::Areas {
-void loadStrategicRegions(
+bool loadStrategicRegions(
     const Fwg::Gfx::Image &inputImage,
     std::function<std::shared_ptr<SuperRegion>()> factory,
     std::vector<std::shared_ptr<SuperRegion>> &superRegions,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     const Fwg::Terrain::TerrainData &terrainData);
-void generateStrategicRegions(
+bool generateStrategicRegions(
     std::function<std::shared_ptr<SuperRegion>()> factory,
     std::vector<std::shared_ptr<SuperRegion>> &superRegions,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,

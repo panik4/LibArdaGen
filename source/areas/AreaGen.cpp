@@ -60,6 +60,240 @@ void freeSmallerClustersFromSuperRegion(
       superRegion->regionClusters.end());
 }
 
+std::vector<std::shared_ptr<SuperRegion>> collectRegionsNeedingCenterFix(
+    const std::vector<std::shared_ptr<SuperRegion>> &superRegions) {
+  std::vector<std::shared_ptr<SuperRegion>> regionsNeedingFix;
+  for (auto &superRegion : superRegions) {
+    if (superRegion->centerOutsidePixels) {
+      regionsNeedingFix.push_back(superRegion);
+      Fwg::Utils::Logging::logLine("Strategic region ", superRegion->ID + 1,
+                                   " needs fixing (center outside pixels)");
+    }
+  }
+  return regionsNeedingFix;
+}
+
+std::shared_ptr<ArdaRegion> findRegionContainingCenter(
+    const std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    const std::shared_ptr<SuperRegion> &problematicSuperRegion, int centerPixel,
+    std::shared_ptr<SuperRegion> &targetSuperRegionForCenter) {
+  for (auto &superReg : superRegions) {
+    if (superReg->ID == problematicSuperRegion->ID) {
+      continue;
+    }
+
+    for (auto &reg : superReg->ardaRegions) {
+      for (const auto pix : reg->getNonOwningPixelView()) {
+        if (pix == centerPixel) {
+          targetSuperRegionForCenter = superReg;
+          return reg;
+        }
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+void recalculateSuperRegionPixels(
+    const std::shared_ptr<SuperRegion> &superRegion,
+    const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    const Fwg::Cfg &config) {
+  superRegion->pixels.clear();
+  for (auto &ardaRegion : superRegion->ardaRegions) {
+    superRegion->pixels.insert(superRegion->pixels.end(),
+                               ardaRegion->pixels.begin(),
+                               ardaRegion->pixels.end());
+  }
+
+  superRegion->position.calcWeightedCenter(superRegion->pixels, config.width,
+                                           config.height);
+}
+
+enum class CenterFixRemovalResult { Fixed, RolledBack, NotNeeded };
+
+CenterFixRemovalResult attemptIterativeCenterFixRemoval(
+    const std::function<std::shared_ptr<SuperRegion>()> &factory,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    const std::shared_ptr<SuperRegion> &problematicSuperRegion,
+    const Fwg::Cfg &config,
+    std::vector<std::shared_ptr<ArdaRegion>> &regionsToReassign) {
+  auto originalRegions = problematicSuperRegion->ardaRegions;
+  auto originalPixels = problematicSuperRegion->pixels;
+
+  int centerPixel = problematicSuperRegion->position.weightedCenter;
+  std::shared_ptr<SuperRegion> targetSuperRegionForCenter = nullptr;
+  auto regionContainingCenter =
+      findRegionContainingCenter(superRegions, problematicSuperRegion,
+                                 centerPixel, targetSuperRegionForCenter);
+
+  if (regionContainingCenter) {
+    Fwg::Utils::Logging::logLine(
+        "Center is in Region ", regionContainingCenter->ID + 1,
+        " (part of Strategic Region ", targetSuperRegionForCenter->ID + 1, ")");
+  }
+
+  std::vector<std::pair<std::shared_ptr<ArdaRegion>, double>> regionDistances;
+  for (auto &region : problematicSuperRegion->ardaRegions) {
+    double distance = Fwg::Utils::Math::getDistance(
+        region->position.weightedCenter,
+        problematicSuperRegion->position.weightedCenter, config.width);
+    regionDistances.push_back({region, distance});
+  }
+
+  std::sort(regionDistances.begin(), regionDistances.end(),
+            [](const auto &a, const auto &b) { return a.second > b.second; });
+
+  Fwg::Utils::Logging::logLine(
+      "Attempting iterative removal (furthest regions first)...");
+
+  bool fixedByRemoval = false;
+  for (auto &[candidateRegion, distance] : regionDistances) {
+    if (problematicSuperRegion->ardaRegions.size() <= 1) {
+      Fwg::Utils::Logging::logLine(
+          "Cannot remove more regions (only 1 remaining)");
+      break;
+    }
+
+    auto it =
+        std::find(problematicSuperRegion->ardaRegions.begin(),
+                  problematicSuperRegion->ardaRegions.end(), candidateRegion);
+    if (it == problematicSuperRegion->ardaRegions.end()) {
+      continue;
+    }
+
+    problematicSuperRegion->ardaRegions.erase(it);
+    recalculateSuperRegionPixels(problematicSuperRegion, ardaRegions, config);
+
+    if (problematicSuperRegion->position.centerPresent(
+            problematicSuperRegion->pixels)) {
+      Fwg::Utils::Logging::logLine(
+          "Success! Removed Region ", candidateRegion->ID + 1,
+          " (distance: ", distance, ") - center now inside");
+      regionsToReassign.push_back(candidateRegion);
+      fixedByRemoval = true;
+      break;
+    }
+
+    Fwg::Utils::Logging::logLine("Removed Region ", candidateRegion->ID + 1,
+                                 " but center still outside, continuing...");
+    regionsToReassign.push_back(candidateRegion);
+  }
+
+  if (!fixedByRemoval && !regionsToReassign.empty()) {
+    Fwg::Utils::Logging::logLine(
+        "Could not fix by removal alone. Reverting changes.");
+    problematicSuperRegion->ardaRegions = originalRegions;
+    problematicSuperRegion->pixels = originalPixels;
+    problematicSuperRegion->position.calcWeightedCenter(
+        problematicSuperRegion->pixels, config.width, config.height);
+    regionsToReassign.clear();
+    return CenterFixRemovalResult::RolledBack;
+  }
+
+  return fixedByRemoval ? CenterFixRemovalResult::Fixed
+                        : CenterFixRemovalResult::NotNeeded;
+}
+
+void reassignRemovedCenterFixRegions(
+    const std::function<std::shared_ptr<SuperRegion>()> &factory,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    const std::shared_ptr<SuperRegion> &problematicSuperRegion,
+    const Fwg::Cfg &config,
+    std::vector<std::shared_ptr<ArdaRegion>> &regionsToReassign) {
+  if (regionsToReassign.empty()) {
+    return;
+  }
+
+  Fwg::Utils::Logging::logLine("Attempting to reassign ",
+                               regionsToReassign.size(), " removed regions...");
+
+  for (auto &regionToReassign : regionsToReassign) {
+    std::vector<std::pair<std::shared_ptr<SuperRegion>, double>> candidates;
+
+    for (auto &neighbour : regionToReassign->neighbours) {
+      auto neighbourRegion = ardaRegions[neighbour->ID];
+      if (neighbourRegion->superRegionID == problematicSuperRegion->ID) {
+        continue;
+      }
+
+      auto candidateSuperRegion = superRegions[neighbourRegion->superRegionID];
+      if (candidateSuperRegion->areaType != problematicSuperRegion->areaType) {
+        continue;
+      }
+
+      bool alreadyCandidate = false;
+      for (auto &[candSR, dist] : candidates) {
+        if (candSR->ID == candidateSuperRegion->ID) {
+          alreadyCandidate = true;
+          break;
+        }
+      }
+
+      if (!alreadyCandidate) {
+        double distance = Fwg::Utils::Math::getDistance(
+            regionToReassign->position.weightedCenter,
+            candidateSuperRegion->position.weightedCenter, config.width);
+        candidates.push_back({candidateSuperRegion, distance});
+      }
+    }
+
+    std::sort(candidates.begin(), candidates.end(),
+              [](const auto &a, const auto &b) { return a.second < b.second; });
+
+    bool reassigned = false;
+    for (auto &[candidateSuperRegion, distance] : candidates) {
+      auto testPixels = candidateSuperRegion->pixels;
+      testPixels.insert(testPixels.end(), regionToReassign->pixels.begin(),
+                        regionToReassign->pixels.end());
+
+      Fwg::Position testPosition;
+      testPosition.calcWeightedCenter(testPixels, config.width, config.height);
+
+      if (testPosition.centerPresent(testPixels)) {
+        Fwg::Utils::Logging::logLine(
+            "Reassigning Region ", regionToReassign->ID + 1,
+            " to Strategic Region ", candidateSuperRegion->ID + 1);
+
+        candidateSuperRegion->addRegion(regionToReassign);
+        candidateSuperRegion->pixels = testPixels;
+        candidateSuperRegion->position = testPosition;
+        reassigned = true;
+        break;
+      }
+
+      Fwg::Utils::Logging::logLine("Cannot reassign to Strategic Region ",
+                                   candidateSuperRegion->ID + 1,
+                                   " (would move its center outside)");
+    }
+
+    if (!reassigned) {
+      Fwg::Utils::Logging::logLine(
+          "Creating new Strategic Region for orphaned Region ",
+          regionToReassign->ID + 1);
+
+      auto newSuperRegion = factory();
+      newSuperRegion->ID = superRegions.size();
+      newSuperRegion->areaType = problematicSuperRegion->areaType;
+      newSuperRegion->addRegion(regionToReassign);
+      newSuperRegion->pixels = regionToReassign->pixels;
+      newSuperRegion->position.calcWeightedCenter(newSuperRegion->pixels,
+                                                  config.width, config.height);
+      newSuperRegion->colour = Fwg::Gfx::generateUniqueColour(
+          newSuperRegion->ID,
+          newSuperRegion->areaType == Fwg::Areas::AreaType::Sea);
+      newSuperRegion->name = std::to_string(newSuperRegion->ID + 1);
+
+      superRegions.push_back(newSuperRegion);
+
+      Fwg::Utils::Logging::logLine("Created new Strategic Region ",
+                                   newSuperRegion->ID + 1);
+    }
+  }
+}
+
 void generateSuperRegionVoronoi(
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     const float &superRegionFactor, std::vector<std::vector<int>> &landVoronois,
@@ -78,7 +312,8 @@ void generateSuperRegionVoronoi(
         region->areaSubType == Fwg::Areas::AreaSubType::OceanMixedCoastal ||
         region->areaSubType == Fwg::Areas::AreaSubType::CoastalIsland ||
         region->areaSubType == Fwg::Areas::AreaSubType::Island ||
-        region->areaSubType == Fwg::Areas::AreaSubType::IslandEncompassingLake) {
+        region->areaSubType ==
+            Fwg::Areas::AreaSubType::IslandEncompassingLake) {
       waterAreaPixels.insert(waterAreaPixels.end(), region->pixels.begin(),
                              region->pixels.end());
     } else {
@@ -238,7 +473,7 @@ void generateSuperRegionVoronoi(
       }
     }
     Fwg::Gfx::Png::save(landVoronoiBmp,
-                        config.mapsPath + "debug//landVoronoi.png", false);
+                        config.mapsPath + "debug/landVoronoi.png", false);
     //  debug visualise waterVoronoi
     Fwg::Gfx::Image waterVoronoiBmp(config.width, config.height, 24);
     for (auto &watervor : waterVoronois) {
@@ -249,7 +484,7 @@ void generateSuperRegionVoronoi(
       }
     }
     Fwg::Gfx::Png::save(waterVoronoiBmp,
-                        config.mapsPath + "debug//waterVoronoi.png", false);
+                        config.mapsPath + "debug/waterVoronoi.png", false);
   }
 }
 
@@ -312,179 +547,176 @@ void assignStrategicRegionsFromClusters(
   }
 }
 
-void postProcessStrategicRegions(
-    std::function<std::shared_ptr<SuperRegion>()> factory,
+// Assign colors, aggregate pixels, compute centers, and build initial region
+// clusters.
+void initialiseStrategicRegions(
     std::vector<std::shared_ptr<SuperRegion>> &superRegions,
-    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
-    const std::map<int, Fwg::Areas::AreaType> &regionAreaTypeMap) {
-
-  const auto &config = Fwg::Cfg::Values();
-  // to track which regions should be reassigned later after evaluation of
-  // some metrics
-  std::queue<std::shared_ptr<Arda::ArdaRegion>> regionsToBeReassigned;
-
-  // postprocess stratregions
+    const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   for (auto &superRegion : superRegions) {
     superRegion->colour = Fwg::Gfx::generateUniqueColour(
         superRegion->ID, superRegion->areaType == Fwg::Areas::AreaType::Sea);
 
-    // lets sum up all the pixels of the strategic region
     for (auto &ardaRegion : superRegion->ardaRegions) {
       superRegion->pixels.insert(superRegion->pixels.end(),
                                  ardaRegion->pixels.begin(),
                                  ardaRegion->pixels.end());
     }
 
-    // let's find the weighted centre of the strat region
-    auto &config = Fwg::Cfg::Values();
-    superRegion->position.calcWeightedCenter(superRegion->pixels, config.width, config.height);
+    const auto &config = Fwg::Cfg::Values();
+    superRegion->position.calcWeightedCenter(superRegion->pixels, config.width,
+                                             config.height);
 
-    // now get all clusters
     superRegion->regionClusters = superRegion->getClusters(ardaRegions);
     if (superRegion->regionClusters.size() > 1) {
       Fwg::Utils::Logging::logLineLevel(
           9, "Strategic region with ID: ", superRegion->ID,
           " has multiple clusters: ", superRegion->regionClusters.size());
     }
+  }
+}
 
-    // now if the strategic region is of AreaType sea, free the smaller
-    // clusters, add their regions to the regionsToBeReassigned vector
-    if (superRegion->areaType == Fwg::Areas::AreaType::Sea) {
-      // Use the modular function to free smaller clusters
-      freeSmallerClustersFromSuperRegion(superRegion, ardaRegions,
-                                         regionsToBeReassigned);
+// Split disjunct sea regions by freeing smaller clusters and queueing their
+// regions for reassignment.
+void freeDisjunctSeaClusters(
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    std::queue<std::shared_ptr<Arda::ArdaRegion>> &regionsToBeReassigned) {
+  const auto &config = Fwg::Cfg::Values();
 
-      // Additionally check if a sea region is NOT contiguous at the pixel level
-      // This catches cases where regionClusters might not detect disjunction
-      if (!Fwg::Areas::isAreaContiguous(superRegion->pixels, config.width)) {
+  for (auto &superRegion : superRegions) {
+    if (superRegion->areaType != Fwg::Areas::AreaType::Sea) {
+      continue;
+    }
+
+    freeSmallerClustersFromSuperRegion(superRegion, ardaRegions,
+                                       regionsToBeReassigned);
+
+    if (!Fwg::Areas::isAreaContiguous(superRegion->pixels, config.width)) {
+      Fwg::Utils::Logging::logLineLevel(
+          9, "Warning: Strategic sea region with ID: ", superRegion->ID,
+          " is still NOT contiguous (disjunct) after cluster freeing!");
+
+      auto pixelClusters = Fwg::Areas::groupContiguousAreas(
+          superRegion->pixels, config.width, config.height);
+
+      if (pixelClusters.size() > 1) {
         Fwg::Utils::Logging::logLineLevel(
-            9, "Warning: Strategic sea region with ID: ", superRegion->ID,
-            " is still NOT contiguous (disjunct) after cluster freeing!");
+            9, "Found ", pixelClusters.size(),
+            " disconnected pixel clusters in sea region ", superRegion->ID);
 
-        // Detect pixel-level clusters
-        auto pixelClusters = Fwg::Areas::groupContiguousAreas(
-            superRegion->pixels, config.width, config.height);
+        auto largestCluster = std::max_element(
+            pixelClusters.begin(), pixelClusters.end(),
+            [](const std::vector<int> &a, const std::vector<int> &b) {
+              return a.size() < b.size();
+            });
 
-        if (pixelClusters.size() > 1) {
-          Fwg::Utils::Logging::logLineLevel(
-              9, "Found ", pixelClusters.size(),
-              " disconnected pixel clusters in sea region ", superRegion->ID);
-
-          // Find the largest pixel cluster
-          auto largestCluster = std::max_element(
-              pixelClusters.begin(), pixelClusters.end(),
-              [](const std::vector<int> &a, const std::vector<int> &b) {
-                return a.size() < b.size();
-              });
-
-          // Create a set of pixels in small clusters for fast lookup
-          std::unordered_set<int> smallClusterPixels;
-          for (auto &cluster : pixelClusters) {
-            if (&cluster != &(*largestCluster)) {
-              smallClusterPixels.insert(cluster.begin(), cluster.end());
-            }
+        std::unordered_set<int> smallClusterPixels;
+        for (auto &cluster : pixelClusters) {
+          if (&cluster != &(*largestCluster)) {
+            smallClusterPixels.insert(cluster.begin(), cluster.end());
           }
-
-          // Free regions that have majority of pixels in smaller clusters
-          for (auto it = superRegion->ardaRegions.begin();
-               it != superRegion->ardaRegions.end();) {
-            auto &region = *it;
-
-            // Count how many pixels of this region are in small clusters
-            int overlapCount = 0;
-            for (const auto &pix : region->pixels) {
-              if (smallClusterPixels.count(pix)) {
-                overlapCount++;
-              }
-            }
-
-            // If majority of region is in small clusters, free it
-            if (overlapCount > region->pixels.size() / 2) {
-              Fwg::Utils::Logging::logLine(
-                  "Freeing region with ID: ", region->ID,
-                  " from strategic region with ID: ", superRegion->ID, " (",
-                  overlapCount, " pixels in disjunct cluster)");
-              regionsToBeReassigned.push(region);
-              it = superRegion->ardaRegions.erase(it);
-            } else {
-              ++it;
-            }
-          }
-
-          // Update the superRegion's pixels to only contain remaining regions
-          superRegion->pixels.clear();
-          for (auto &ardaRegion : superRegion->ardaRegions) {
-            superRegion->pixels.insert(superRegion->pixels.end(),
-                                       ardaRegion->pixels.begin(),
-                                       ardaRegion->pixels.end());
-          }
-
-          // Recalculate region clusters after freeing regions
-          superRegion->regionClusters = superRegion->getClusters(ardaRegions);
         }
+
+        for (auto it = superRegion->ardaRegions.begin();
+             it != superRegion->ardaRegions.end();) {
+          auto &region = *it;
+
+          int overlapCount = 0;
+          for (const auto &pix : region->pixels) {
+            if (smallClusterPixels.count(pix)) {
+              overlapCount++;
+            }
+          }
+
+          if (overlapCount > region->pixels.size() / 2) {
+            Fwg::Utils::Logging::logLine(
+                "Freeing region with ID: ", region->ID,
+                " from strategic region with ID: ", superRegion->ID, " (",
+                overlapCount, " pixels in disjunct cluster)");
+            regionsToBeReassigned.push(region);
+            it = superRegion->ardaRegions.erase(it);
+          } else {
+            ++it;
+          }
+        }
+
+        superRegion->pixels.clear();
+        for (auto &ardaRegion : superRegion->ardaRegions) {
+          superRegion->pixels.insert(superRegion->pixels.end(),
+                                     ardaRegion->pixels.begin(),
+                                     ardaRegion->pixels.end());
+        }
+
+        superRegion->regionClusters = superRegion->getClusters(ardaRegions);
       }
     }
   }
+}
 
-  // create a buffer to map which region is assigned to which strategic region
+// Build a lookup of region ID to the strategic region it is currently assigned
+// to.
+std::map<int, int> buildRegionAssignmentMap(
+    const std::vector<std::shared_ptr<SuperRegion>> &superRegions) {
   std::map<int, int> assignedToIDs;
   for (auto &superRegion : superRegions) {
-    // assign the regions to the strategic region
     for (auto &region : superRegion->ardaRegions) {
-      // check for duplicate regions
       if (assignedToIDs.count(region->ID)) {
         Fwg::Utils::Logging::logLine(
             "Warning: Region with ID: ", region->ID,
             " is already assigned to strategic region with ID: ",
             assignedToIDs[region->ID]);
-        continue; // skip this region, it is already assigned
+        continue;
       }
 
       assignedToIDs[region->ID] = superRegion->ID;
     }
   }
+  return assignedToIDs;
+}
 
-  // now we reassign the regions to the strategic regions
-  // take from queue regionsToBeReassigned, and assign all of them until none
-  // are left. We assign by taking all neighbours of the same AreaType, and
-  // determining which one of those is closest to us using the position
+// Reassign queued regions to nearby same-type strategic regions or queue them
+// again if no match is found.
+void reassignOrphanedRegions(
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    const std::map<int, Fwg::Areas::AreaType> &regionAreaTypeMap,
+    std::queue<std::shared_ptr<Arda::ArdaRegion>> &regionsToBeReassigned,
+    std::map<int, int> &assignedToIDs) {
+  const auto &config = Fwg::Cfg::Values();
+
   while (!regionsToBeReassigned.empty()) {
     auto region = regionsToBeReassigned.front();
     regionsToBeReassigned.pop();
+
     std::map<int, int> regionDistances;
     for (auto &neighbour : region->neighbours) {
       auto &neighbourRegion = ardaRegions[neighbour->ID];
-      // if the neighbour region is of the same area type, we can consider
-      // that ones distance, and it must already be assigned
       if (regionAreaTypeMap.at(neighbourRegion->ID) ==
               regionAreaTypeMap.at(region->ID) &&
           assignedToIDs.count(neighbourRegion->ID)) {
-        // calculate the distance between the two regions
         auto distance = Fwg::Utils::Math::getDistance(
             region->position.weightedCenter,
             neighbourRegion->position.weightedCenter, config.width);
         regionDistances[neighbour->ID] = distance;
       }
     }
-    // now find the closest neighbour region
+
     if (regionDistances.empty()) {
       Fwg::Utils::Logging::logLine("Warning: No neighbours of the same area "
                                    "type found for region with "
                                    "ID: ",
                                    region->ID);
-      continue; // no neighbours of the same area type, skip
+      continue;
     }
+
     auto closestNeighbourIt = std::min_element(
         regionDistances.begin(), regionDistances.end(),
         [](const std::pair<int, int> &a, const std::pair<int, int> &b) {
           return a.second < b.second;
         });
     auto closestNeighbourID = closestNeighbourIt->first;
-    auto closestNeighbourRegion = ardaRegions[closestNeighbourID];
-    // check if the closest neighbour region is already assigned to a
-    // strategic region
+
     if (assignedToIDs.find(closestNeighbourID) != assignedToIDs.end()) {
-      // if it is, assign the region to the same strategic region
       auto superRegionID = assignedToIDs[closestNeighbourID];
       Fwg::Utils::Logging::logLine(
           "Reassigning region with ID: ", region->ID,
@@ -492,20 +724,24 @@ void postProcessStrategicRegions(
       superRegions[superRegionID]->addRegion(region);
       assignedToIDs[region->ID] = superRegionID;
     } else {
-      // if it is not, put it back on the queue to be reassigned
       Fwg::Utils::Logging::logLine(
           "No strategic region found for region with ID: ", region->ID,
           " closest neighbour is: ", closestNeighbourID);
       regionsToBeReassigned.push(region);
     }
   }
+}
 
-  // safety check to see if all regions are assigned to some region
+// Ensure every region has a strategic region assignment, falling back to the
+// first region if needed.
+void ensureAllRegionsAssigned(
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    std::map<int, int> &assignedToIDs) {
   for (const auto &region : ardaRegions) {
     if (assignedToIDs.find(region->ID) == assignedToIDs.end()) {
       Fwg::Utils::Logging::logLine("Warning: Region with ID: ", region->ID,
                                    " is not assigned to any strategic region");
-      // assign it to the first strategic region
       if (!superRegions.empty()) {
         superRegions[0]->addRegion(region);
         assignedToIDs[region->ID] = superRegions[0]->ID;
@@ -517,54 +753,83 @@ void postProcessStrategicRegions(
       }
     }
   }
-  // delete all empty strategic regions
+}
+
+// Remove empty strategic regions and renumber the remaining ones to keep IDs
+// consistent.
+void cleanupAndRenumberSuperRegions(
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions) {
   superRegions.erase(
       std::remove_if(superRegions.begin(), superRegions.end(),
                      [](const std::shared_ptr<Arda::SuperRegion> &superRegion) {
                        return superRegion->ardaRegions.empty();
                      }),
       superRegions.end());
-  // fix IDs of strategic regions
+
   for (size_t i = 0; i < superRegions.size(); ++i) {
     superRegions[i]->ID = i;
     for (auto &region : superRegions[i]->ardaRegions) {
-      // set the super region ID for the region
       region->superRegionID = i;
     }
-    // also set the name of the strategic region
     superRegions[i]->name = std::to_string(i + 1);
   }
+}
 
-  Fwg::Utils::Logging::logLine(
-      "Scenario: Done Dividing world into strategic regions");
+// Recompute whether each strategic region's center lies inside its pixels.
+void updateCenterOutsideFlags(
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions) {
   for (auto &superRegion : superRegions) {
     superRegion->centerOutsidePixels = superRegion->checkPosition(superRegions);
     superRegion->name = std::to_string(superRegion->ID + 1);
   }
+}
 
-  // now let's try to split the strategic regions which have
-  // superRegion->centerOutsidePixels = true. For this, we need to somehow
-  // evaluate which region(s) need(s) to be removed to land inside the center.
-  // We also need to check, in case we have multiple candidates, which the best
-  // candidate for removal is. A removed region needs to be either assigned to
-  // another strategic region of the same time, that is adjacent to the removed
-  // region, and does not move the center of the other strategic region outside
-  // of its own pixels. If there is no assignment to another strategic region
-  // possible, we need to split of the strategic region and simply make it
-  // separate
+// Rebuild strategic-region neighbour links from the underlying region
+// adjacency graph.
+void rebuildSuperRegionNeighbours(
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
+  for (auto &superRegion : superRegions) {
+    superRegion->neighbourSuperRegions.clear();
+    superRegion->neighbours.clear();
+
+    for (auto &region : superRegion->ardaRegions) {
+      for (auto &neighbour : region->neighbours) {
+        auto neighbourRegion = ardaRegions[neighbour->ID];
+        if (neighbourRegion->superRegionID != superRegion->ID) {
+          bool alreadyNeighbour = false;
+          for (auto &neighbourSuperRegion :
+               superRegion->neighbourSuperRegions) {
+            if (neighbourSuperRegion->ID == neighbourRegion->superRegionID) {
+              alreadyNeighbour = true;
+              break;
+            }
+          }
+
+          if (!alreadyNeighbour) {
+            superRegion->neighbours.push_back(
+                superRegions.at(neighbourRegion->superRegionID));
+            superRegion->neighbourSuperRegions.push_back(
+                superRegions.at(neighbourRegion->superRegionID));
+          }
+        }
+      }
+    }
+  }
+}
+
+// Try to fix strategic regions whose weighted center falls outside their owned
+// pixels.
+void fixSuperRegionCenters(
+    std::function<std::shared_ptr<SuperRegion>()> factory,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
+  const auto &config = Fwg::Cfg::Values();
 
   Fwg::Utils::Logging::logLine(
       "=== Processing Strategic Regions with Centers Outside Pixels ===");
 
-  // Collect all strategic regions that need fixing
-  std::vector<std::shared_ptr<SuperRegion>> regionsNeedingFix;
-  for (auto &superRegion : superRegions) {
-    if (superRegion->centerOutsidePixels) {
-      regionsNeedingFix.push_back(superRegion);
-      Fwg::Utils::Logging::logLine("Strategic region ", superRegion->ID + 1,
-                                   " needs fixing (center outside pixels)");
-    }
-  }
+  auto regionsNeedingFix = collectRegionsNeedingCenterFix(superRegions);
 
   if (regionsNeedingFix.empty()) {
     Fwg::Utils::Logging::logLine("No strategic regions need center fixing");
@@ -573,233 +838,25 @@ void postProcessStrategicRegions(
                                  " strategic regions with misplaced centers");
   }
 
-  // Process each problematic strategic region
   for (auto &problematicSuperRegion : regionsNeedingFix) {
     Fwg::Utils::Logging::logLine("--- Attempting to fix Strategic Region ",
                                  problematicSuperRegion->ID + 1, " ---");
 
-    // Store original state for potential rollback
-    auto originalRegions = problematicSuperRegion->ardaRegions;
-    auto originalPixels = problematicSuperRegion->pixels;
-    auto originalCenter = problematicSuperRegion->position.weightedCenter;
-
-    // Identify which region the center currently falls into
-    int centerPixel = problematicSuperRegion->position.weightedCenter;
-    std::shared_ptr<ArdaRegion> regionContainingCenter = nullptr;
-    std::shared_ptr<SuperRegion> targetSuperRegionForCenter = nullptr;
-
-    for (auto &superReg : superRegions) {
-      if (superReg->ID == problematicSuperRegion->ID)
-        continue;
-
-      for (auto &reg : superReg->ardaRegions) {
-        for (const auto pix : reg->getNonOwningPixelView()) {
-          if (pix == centerPixel) {
-            regionContainingCenter = reg;
-            targetSuperRegionForCenter = superReg;
-            break;
-          }
-        }
-        if (regionContainingCenter)
-          break;
-      }
-      if (regionContainingCenter)
-        break;
-    }
-
-    if (regionContainingCenter) {
-      Fwg::Utils::Logging::logLine("Center is in Region ",
-                                   regionContainingCenter->ID + 1,
-                                   " (part of Strategic Region ",
-                                   targetSuperRegionForCenter->ID + 1, ")");
-    }
-
-    // Strategy 1: Try to remove regions iteratively until center is inside
-    bool fixedByRemoval = false;
     std::vector<std::shared_ptr<ArdaRegion>> regionsToReassign;
+    auto removalResult = attemptIterativeCenterFixRemoval(
+        factory, superRegions, ardaRegions, problematicSuperRegion, config,
+        regionsToReassign);
 
-    // Sort regions by distance from current center (furthest first)
-    std::vector<std::pair<std::shared_ptr<ArdaRegion>, double>> regionDistances;
-    for (auto &region : problematicSuperRegion->ardaRegions) {
-      double distance = Fwg::Utils::Math::getDistance(
-          region->position.weightedCenter,
-          problematicSuperRegion->position.weightedCenter, config.width);
-      regionDistances.push_back({region, distance});
+    if (removalResult == CenterFixRemovalResult::RolledBack) {
+      continue;
     }
 
-    std::sort(regionDistances.begin(), regionDistances.end(),
-              [](const auto &a, const auto &b) {
-                return a.second > b.second; // Sort descending by distance
-              });
-
-    Fwg::Utils::Logging::logLine(
-        "Attempting iterative removal (furthest regions first)...");
-
-    // Try removing regions one by one, starting with the furthest
-    for (auto &[candidateRegion, distance] : regionDistances) {
-      // Don't remove the last region
-      if (problematicSuperRegion->ardaRegions.size() <= 1) {
-        Fwg::Utils::Logging::logLine(
-            "Cannot remove more regions (only 1 remaining)");
-        break;
-      }
-
-      // Temporarily remove this region
-      auto it =
-          std::find(problematicSuperRegion->ardaRegions.begin(),
-                    problematicSuperRegion->ardaRegions.end(), candidateRegion);
-      if (it == problematicSuperRegion->ardaRegions.end())
-        continue;
-
-      problematicSuperRegion->ardaRegions.erase(it);
-
-      // Recalculate pixels and center
-      problematicSuperRegion->pixels.clear();
-      for (auto &ardaRegion : problematicSuperRegion->ardaRegions) {
-        problematicSuperRegion->pixels.insert(
-            problematicSuperRegion->pixels.end(), ardaRegion->pixels.begin(),
-            ardaRegion->pixels.end());
-      }
-
-      problematicSuperRegion->position.calcWeightedCenter(
-          problematicSuperRegion->pixels, config.width, config.height);
-
-      // Check if center is now inside
-      if (problematicSuperRegion->position.centerPresent(
-              problematicSuperRegion->pixels)) {
-        Fwg::Utils::Logging::logLine(
-            "Success! Removed Region ", candidateRegion->ID + 1,
-            " (distance: ", distance, ") - center now inside");
-        regionsToReassign.push_back(candidateRegion);
-        fixedByRemoval = true;
-        break;
-      } else {
-        // Still outside, continue removing
-        Fwg::Utils::Logging::logLine(
-            "Removed Region ", candidateRegion->ID + 1,
-            " but center still outside, continuing...");
-        regionsToReassign.push_back(candidateRegion);
-      }
-    }
-    
-    // If we couldn't fix it by removal, restore original and try different
-    // strategy
-    if (!fixedByRemoval && !regionsToReassign.empty()) {
-      Fwg::Utils::Logging::logLine(
-          "Could not fix by removal alone. Reverting changes.");
-      problematicSuperRegion->ardaRegions = originalRegions;
-      problematicSuperRegion->pixels = originalPixels;
-      problematicSuperRegion->position.calcWeightedCenter(
-          problematicSuperRegion->pixels, config.width, config.height);
-      regionsToReassign.clear();
+    if (removalResult == CenterFixRemovalResult::Fixed) {
+      reassignRemovedCenterFixRegions(factory, superRegions, ardaRegions,
+                                      problematicSuperRegion, config,
+                                      regionsToReassign);
     }
 
-    // Strategy 2: If we successfully removed regions, try to reassign them
-    if (fixedByRemoval && !regionsToReassign.empty()) {
-      Fwg::Utils::Logging::logLine("Attempting to reassign ",
-                                   regionsToReassign.size(),
-                                   " removed regions...");
-
-      for (auto &regionToReassign : regionsToReassign) {
-        // Find adjacent strategic regions of the same type
-        std::vector<std::pair<std::shared_ptr<SuperRegion>, double>> candidates;
-
-        for (auto &neighbour : regionToReassign->neighbours) {
-          auto neighbourRegion = ardaRegions[neighbour->ID];
-          if (neighbourRegion->superRegionID == problematicSuperRegion->ID) {
-            continue; // Skip regions still in the problematic strategic region
-          }
-
-          auto candidateSuperRegion =
-              superRegions[neighbourRegion->superRegionID];
-
-          // Must be same area type
-          if (candidateSuperRegion->areaType !=
-              problematicSuperRegion->areaType) {
-            continue;
-          }
-
-          // Check if already in candidates
-          bool alreadyCandidate = false;
-          for (auto &[candSR, dist] : candidates) {
-            if (candSR->ID == candidateSuperRegion->ID) {
-              alreadyCandidate = true;
-              break;
-            }
-          }
-
-          if (!alreadyCandidate) {
-            double distance = Fwg::Utils::Math::getDistance(
-                regionToReassign->position.weightedCenter,
-                candidateSuperRegion->position.weightedCenter, config.width);
-            candidates.push_back({candidateSuperRegion, distance});
-          }
-        }
-
-        // Sort by distance (closest first)
-        std::sort(
-            candidates.begin(), candidates.end(),
-            [](const auto &a, const auto &b) { return a.second < b.second; });
-
-        // Try each candidate
-        bool reassigned = false;
-        for (auto &[candidateSuperRegion, distance] : candidates) {
-          // Test if adding this region would break the candidate's center
-          auto testPixels = candidateSuperRegion->pixels;
-          testPixels.insert(testPixels.end(), regionToReassign->pixels.begin(),
-                            regionToReassign->pixels.end());
-
-          Fwg::Position testPosition;
-          testPosition.calcWeightedCenter(testPixels, config.width, config.height);
-
-          if (testPosition.centerPresent(testPixels)) {
-            // Safe to add
-            Fwg::Utils::Logging::logLine(
-                "Reassigning Region ", regionToReassign->ID + 1,
-                " to Strategic Region ", candidateSuperRegion->ID + 1);
-
-            candidateSuperRegion->addRegion(regionToReassign);
-            candidateSuperRegion->pixels = testPixels;
-            candidateSuperRegion->position = testPosition;
-            reassigned = true;
-            break;
-          } else {
-            Fwg::Utils::Logging::logLine("Cannot reassign to Strategic Region ",
-                                         candidateSuperRegion->ID + 1,
-                                         " (would move its center outside)");
-          }
-        }
-
-        // If we couldn't reassign, create a new strategic region
-        if (!reassigned) {
-          Fwg::Utils::Logging::logLine(
-              "Creating new Strategic Region for orphaned Region ",
-              regionToReassign->ID + 1);
-
-          auto newSuperRegion = factory();
-          newSuperRegion->ID = superRegions.size();
-          newSuperRegion->areaType = problematicSuperRegion->areaType;
-          newSuperRegion->addRegion(regionToReassign);
-
-          // Calculate pixels and center for new super region
-          newSuperRegion->pixels = regionToReassign->pixels;
-          newSuperRegion->position.calcWeightedCenter(newSuperRegion->pixels, config.width, config.height);
-
-          newSuperRegion->colour = Fwg::Gfx::generateUniqueColour(
-              newSuperRegion->ID,
-              newSuperRegion->areaType == Fwg::Areas::AreaType::Sea);
-
-          newSuperRegion->name = std::to_string(newSuperRegion->ID + 1);
-
-          superRegions.push_back(newSuperRegion);
-
-          Fwg::Utils::Logging::logLine("Created new Strategic Region ",
-                                       newSuperRegion->ID + 1);
-        }
-      }
-    }
-
-    // Final verification
     if (problematicSuperRegion->position.centerPresent(
             problematicSuperRegion->pixels)) {
       Fwg::Utils::Logging::logLine("Strategic Region ",
@@ -813,44 +870,17 @@ void postProcessStrategicRegions(
     }
   }
 
-  // Recalculate all strategic region IDs and relationships after changes
   Fwg::Utils::Logging::logLine(
       "Recalculating strategic region IDs and relationships...");
-  for (size_t i = 0; i < superRegions.size(); ++i) {
-    superRegions[i]->ID = i;
-    superRegions[i]->name = std::to_string(i + 1);
-    for (auto &region : superRegions[i]->ardaRegions) {
-      region->superRegionID = i;
-    }
-  }
+  cleanupAndRenumberSuperRegions(superRegions);
+  rebuildSuperRegionNeighbours(superRegions, ardaRegions);
+}
 
-  // Rebuild neighbor relationships
-  for (auto &superRegion : superRegions) {
-    superRegion->neighbourSuperRegions.clear();
-    for (auto &region : superRegion->ardaRegions) {
-      for (auto &neighbour : region->neighbours) {
-        auto neighbourRegion = ardaRegions[neighbour->ID];
-        if (neighbourRegion->superRegionID != superRegion->ID) {
-          bool alreadyNeighbour = false;
-          for (auto &neighbourSuperRegion :
-               superRegion->neighbourSuperRegions) {
-            if (neighbourSuperRegion->ID == neighbourRegion->superRegionID) {
-              alreadyNeighbour = true;
-              break;
-            }
-          }
-          if (!alreadyNeighbour) {
-            superRegion->neighbourSuperRegions.push_back(
-                superRegions.at(neighbourRegion->superRegionID));
-          }
-        }
-      }
-    }
-  }
-
-  Fwg::Utils::Logging::logLine(
-      "=== Finished Processing Centers Outside Pixels ===");
-
+// Log warnings for duplicate strategic centers and mismatches with regions or
+// provinces.
+void validateStrategicRegionCenters(
+    const std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
   std::set<int> centers;
   for (auto &superRegion : superRegions) {
     if (centers.count(superRegion->position.weightedCenter) > 0) {
@@ -862,9 +892,7 @@ void postProcessStrategicRegions(
       centers.insert(superRegion->position.weightedCenter);
     }
   }
-  // now let's check if any of the strategic regions has a center that is
-  // exactly on a region center, where that region does NOT belong to the same
-  // strategic region
+
   for (auto &superRegion : superRegions) {
     for (auto &region : ardaRegions) {
       if (region->position.weightedCenter ==
@@ -877,7 +905,7 @@ void postProcessStrategicRegions(
       }
     }
   }
-  // now let's do the same for provinces
+
   for (auto &superRegion : superRegions) {
     for (auto &region : ardaRegions) {
       for (auto &province : region->provinces) {
@@ -892,35 +920,65 @@ void postProcessStrategicRegions(
       }
     }
   }
+}
 
-  // let's now find all superregion neighbours
-  for (auto &superRegion : superRegions) {
-    superRegion->neighbours.clear();
-    for (auto &region : superRegion->ardaRegions) {
-      for (auto &neighbour : region->neighbours) {
-        auto neighbourRegion = ardaRegions[neighbour->ID];
-        if (neighbourRegion->superRegionID != superRegion->ID) {
-          // check if the neighbour super region is already in the neighbours
-          // vector
-          bool alreadyNeighbour = false;
-          for (auto &neighbourSuperRegion :
-               superRegion->neighbourSuperRegions) {
-            if (neighbourSuperRegion->ID == neighbourRegion->superRegionID) {
-              alreadyNeighbour = true;
-              break;
-            }
-          }
-          if (!alreadyNeighbour) {
-            superRegion->neighbourSuperRegions.push_back(
-                superRegions.at(neighbourRegion->superRegionID));
-          }
+// Final validation pass for super regions after all post-processing is done.
+bool validateFinalSuperRegions(
+    const std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    const std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
+  const auto &config = Fwg::Cfg::Values();
+  bool success = true;
+
+  for (const auto &superRegion : superRegions) {
+    superRegion->regionClusters = superRegion->getClusters(ardaRegions);
+    if (superRegion->areaType == Fwg::Areas::AreaType::Sea) {
+
+      if (superRegion->regionClusters.size() > 1) {
+        Fwg::Utils::Logging::logLine(
+            "Warning: Sea super region with ID: ", superRegion->ID,
+            " still has disjoint region clusters: ",
+            superRegion->regionClusters.size());
+        success = false;
+      }
+
+      if (!Fwg::Areas::isAreaContiguous(superRegion->pixels, config.width)) {
+        Fwg::Utils::Logging::logLine(
+            "Warning: Sea super region with ID: ", superRegion->ID,
+            " is not contiguous at pixel level");
+        success = false;
+      }
+
+      for (const auto &region : superRegion->ardaRegions) {
+        if (region->areaSubType == Fwg::Areas::AreaSubType::Mainland) {
+          Fwg::Utils::Logging::logLine(
+              "Warning: Sea super region with ID: ", superRegion->ID,
+              " contains mainland region with ID: ", region->ID);
+          success = false;
+        }
+      }
+    } else {
+      // for land super regions, we check if we contain any ocean regions
+      for (const auto &region : superRegion->ardaRegions) {
+        if (region->areaSubType == Fwg::Areas::AreaSubType::Ocean ||
+            region->areaSubType == Fwg::Areas::AreaSubType::OceanCoastal ||
+            region->areaSubType ==
+                Fwg::Areas::AreaSubType::OceanIslandCoastal ||
+            region->areaSubType == Fwg::Areas::AreaSubType::OceanMixedCoastal) {
+          Fwg::Utils::Logging::logLine(
+              "Warning: Land super region with ID: ", superRegion->ID,
+              " contains ocean region with ID: ", region->ID);
         }
       }
     }
   }
-  // now let's debug dump the strategic regions into a file, with center
-  // positions, and neighbour strategic regions, their positions, and the
-  // distance to them
+  return success;
+}
+
+// Write a debug text dump of strategic-region centers and neighbor distances.
+void dumpStrategicRegionDebugInfo(
+    const std::vector<std::shared_ptr<SuperRegion>> &superRegions) {
+  const auto &config = Fwg::Cfg::Values();
+
   std::string debugOutput = "ID;Name;ColourAreaType;Center;CenterX;\n";
   std::string header = "ID;Center;Distance;WidthCenter;HeightCenter\n";
   for (auto &superRegion : superRegions) {
@@ -949,12 +1007,45 @@ void postProcessStrategicRegions(
                           debugOutput);
 }
 
-void loadStrategicRegions(
+void postProcessStrategicRegions(
+    std::function<std::shared_ptr<SuperRegion>()> factory,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    const std::map<int, Fwg::Areas::AreaType> &regionAreaTypeMap) {
+  std::queue<std::shared_ptr<Arda::ArdaRegion>> regionsToBeReassigned;
+
+  initialiseStrategicRegions(superRegions, ardaRegions);
+  freeDisjunctSeaClusters(superRegions, ardaRegions, regionsToBeReassigned);
+
+  auto assignedToIDs = buildRegionAssignmentMap(superRegions);
+  reassignOrphanedRegions(superRegions, ardaRegions, regionAreaTypeMap,
+                          regionsToBeReassigned, assignedToIDs);
+  ensureAllRegionsAssigned(superRegions, ardaRegions, assignedToIDs);
+
+  cleanupAndRenumberSuperRegions(superRegions);
+
+  Fwg::Utils::Logging::logLine(
+      "Scenario: Done Dividing world into strategic regions");
+  updateCenterOutsideFlags(superRegions);
+
+  fixSuperRegionCenters(factory, superRegions, ardaRegions);
+
+  Fwg::Utils::Logging::logLine(
+      "=== Finished Processing Centers Outside Pixels ===");
+
+  validateStrategicRegionCenters(superRegions, ardaRegions);
+  dumpStrategicRegionDebugInfo(superRegions);
+}
+
+bool loadStrategicRegions(
     const Fwg::Gfx::Image &inputImage,
     std::function<std::shared_ptr<SuperRegion>()> factory,
     std::vector<std::shared_ptr<SuperRegion>> &superRegions,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     const Fwg::Terrain::TerrainData &terrainData) {
+  if (inputImage.size() == 0) {
+    return false;
+  }
   Fwg::Utils::Logging::logLine("Arda::Areas: Loading superregions regions");
   superRegions.clear();
   // detect areas from inputImage
@@ -978,9 +1069,35 @@ void loadStrategicRegions(
                                      waterVoronois);
   postProcessStrategicRegions(factory, superRegions, ardaRegions,
                               regionAreaTypeMap);
+  if (!validateFinalSuperRegions(superRegions, ardaRegions)) {
+    Fwg::Utils::Logging::logLine("Error: Final super region validation failed");
+    return false;
+  }
+  return true;
 }
 
-void generateStrategicRegions(
+void validateStrategicRegions(
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions) {
+  Fwg::Utils::Logging::logLine("Arda::Areas: Validating super regions");
+  for (auto &superRegion : superRegions) {
+    if (superRegion->ardaRegions.empty()) {
+      Fwg::Utils::Logging::logLine(
+          "Warning: Super region with ID: ", superRegion->ID,
+          " has no arda regions assigned to it");
+    }
+    for (auto &region : superRegion->ardaRegions) {
+      if (region->superRegionID != superRegion->ID) {
+        Fwg::Utils::Logging::logLine(
+            "Warning: Region with ID: ", region->ID,
+            " is assigned to super region with ID: ", region->superRegionID,
+            " but is actually in super region with ID: ", superRegion->ID);
+      }
+    }
+  }
+}
+
+bool generateStrategicRegions(
     std::function<std::shared_ptr<SuperRegion>()> factory,
     std::vector<std::shared_ptr<SuperRegion>> &superRegions,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
@@ -1002,8 +1119,11 @@ void generateStrategicRegions(
                                      waterVoronois);
   postProcessStrategicRegions(factory, superRegions, ardaRegions,
                               regionAreaTypeMap);
-
-  return;
+  if (!validateFinalSuperRegions(superRegions, ardaRegions)) {
+    Fwg::Utils::Logging::logLine("Error: Final super region validation failed");
+    return false;
+  }
+  return true;
 }
 
 void saveRegions(std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
@@ -1014,8 +1134,8 @@ void saveRegions(std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
     fileContent += region->exportLine();
     fileContent += "\n";
   }
-  Fwg::Parsing::writeFile(mappingPath + "//stateInputs.txt", fileContent);
-  Fwg::Gfx::Png::save(regionImage, mappingPath + "//states.png");
+  Fwg::Parsing::writeFile(mappingPath + "/stateInputs.txt", fileContent);
+  Fwg::Gfx::Png::save(regionImage, mappingPath + "/states.png");
 }
 
 } // namespace Arda::Areas

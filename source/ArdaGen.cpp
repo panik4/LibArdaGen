@@ -528,23 +528,29 @@ bool ArdaGen::genWastelands(Fwg::Cfg &config) {
   return true;
 }
 
-void ArdaGen::generateStrategicRegions(
+bool ArdaGen::generateStrategicRegions(
     std::function<std::shared_ptr<SuperRegion>()> factory) {
   Fwg::Utils::Randomisation::resetRandomisation();
-  Arda::Areas::generateStrategicRegions(factory, superRegions, ardaRegions,
-                                        ardaConfig.superRegionFactor);
+  if (!Arda::Areas::generateStrategicRegions(factory, superRegions, ardaRegions,
+                                             ardaConfig.superRegionFactor)) {
+    superRegions.clear();
+    return false;
+  }
   Civilization::nameSuperRegions(superRegions, ardaRegions);
+  return true;
 }
 
-void ArdaGen::loadStrategicRegions(
+bool ArdaGen::loadStrategicRegions(
     std::function<std::shared_ptr<SuperRegion>()> factory,
     const Fwg::Gfx::Image &inputImage) {
   Fwg::Utils::Logging::logLine("Loading Strategic Regions from Image");
-  Fwg::Utils::Logging::logLine("Nothing happens...");
-  Arda::Areas::loadStrategicRegions(inputImage, factory, superRegions,
-                                    ardaRegions, terrainData);
-  // Civilization::nameSuperRegions(superRegions, ardaRegions);
+  if (!Arda::Areas::loadStrategicRegions(inputImage, factory, superRegions,
+                                         ardaRegions, terrainData)) {
+    superRegions.clear();
+    return false;
+  }
   Civilization::nameSuperRegions(superRegions, ardaRegions);
+  return true;
 }
 
 void ArdaGen::generateStateSpecifics() {

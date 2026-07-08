@@ -94,7 +94,7 @@ bool Arda::SuperRegion::checkPosition(
   }
   return false;
 }
-std::vector<Cluster> Arda::SuperRegion::getClusters(
+std::vector<Cluster> Arda::SuperRegion::getClusters(const 
     std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   std::vector<Cluster> clusters;
 

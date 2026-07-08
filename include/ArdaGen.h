@@ -120,9 +120,9 @@ public:
                  &inputNavigationAreas);
 
   bool genWastelands(Fwg::Cfg &config);
-  void generateStrategicRegions(
+  bool generateStrategicRegions(
       std::function<std::shared_ptr<SuperRegion>()> factory);
-  void
+  bool
   loadStrategicRegions(std::function<std::shared_ptr<SuperRegion>()> factory,
                        const Fwg::Gfx::Image &inputImage);
   virtual void generateStateSpecifics();

@@ -25,6 +25,6 @@ public:
   virtual bool
   checkPosition(const std::vector<std::shared_ptr<SuperRegion>> &superRegions);
   std::vector<Cluster>
-  getClusters(std::vector<std::shared_ptr<ArdaRegion>> &regions);
+  getClusters(const std::vector<std::shared_ptr<ArdaRegion>> &regions);
 };
 } // namespace Arda
