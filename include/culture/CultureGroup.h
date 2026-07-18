@@ -3,6 +3,7 @@
 #include "culture/Culture.h"
 #include "entities/Colour.h"
 #include "language/LanguageGroup.h"
+#include "utils/Archive.h"
 #include <string>
 namespace Arda {
 
@@ -16,8 +17,12 @@ class CultureGroup {
 public:
   std::string name;
   // Constructor
+  CultureGroup() = default;
   CultureGroup(const std::string &name, const Fwg::Gfx::Colour &colour)
       : name(name), colour(colour) {}
+
+  void serialise(Fwg::Utils::Serialisation::Archive &ar);
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) { serialise(ar); }
 
   // Method to add a culture
   void addCulture(const std::shared_ptr<Culture> &culture) {

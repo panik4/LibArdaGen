@@ -2,6 +2,11 @@
 #include "areas/ArdaProvince.h"
 #include "areas/ArdaRegion.h"
 #include "areas/Continent.h"
+
+namespace Fwg::Utils::Serialisation {
+class Archive;
+}
+
 namespace Arda {
 class ArdaContinent : public Fwg::Areas::Continent {
 
@@ -17,6 +22,12 @@ public:
   std::vector<std::shared_ptr<Arda::ArdaRegion>> ardaRegions;
 
   ArdaContinent(const Continent &continent);
+  ArdaContinent() = default;
   ~ArdaContinent();
+
+  // serialisation
+  void serialise(Fwg::Utils::Serialisation::Archive &ar) override;
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) override;
+  uint32_t typeTag() const override;
 };
 } // namespace Arda

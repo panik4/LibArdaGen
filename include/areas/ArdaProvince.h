@@ -4,6 +4,8 @@
 #include "culture/Culture.h"
 #include "culture/Religion.h"
 #include "generic/VictoryPoint.h"
+#include "utils/Archive.h"
+
 namespace Arda {
 enum class PositionType {
   Standstill,
@@ -22,6 +24,13 @@ struct ScenarioPosition {
   Fwg::Position position;
   PositionType type;
   int typeIndex;
+
+  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
+    position.serialise(ar);
+    ar.serialiseEnum(type);
+    ar &typeIndex;
+  }
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) { serialise(ar); }
 };
 class ArdaProvince : public Fwg::Areas::Province {
 public:
@@ -47,6 +56,11 @@ public:
   ArdaProvince(std::shared_ptr<Fwg::Areas::Province> province);
   ArdaProvince();
   ~ArdaProvince();
+
+  // serialisation
+  void serialise(Fwg::Utils::Serialisation::Archive &ar) override;
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) override;
+  uint32_t typeTag() const override;
   // operators
   bool operator==(const Arda::ArdaProvince &right) const {
     return ID == right.ID;

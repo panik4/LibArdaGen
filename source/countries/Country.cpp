@@ -1,4 +1,5 @@
 #include "countries/Country.h"
+#include "utils/Archive.h"
 namespace Arda {
 Country::Country() {
   colour = {static_cast<unsigned char>(RandNum::getRandom(0, 255)),
@@ -198,4 +199,31 @@ std::string Country::exportLine() const {
 
   return line;
 }
+
+void Country::serialise(Fwg::Utils::Serialisation::Archive &ar) {
+  Area::serialise(ar);
+  ar &tag &name &adjective;
+  ar &capitalRegionID &capitalProvinceID;
+  ar &technologyLevel &gdp &landlocked;
+  ar.serialiseEnum(ideology);
+  ar.serialiseEnum(rank);
+  ar &importanceScore &relativeScore;
+  ar &cultures;
+  flag.serialise(ar);
+  ar &characters;
+  ar &navalFocus &airFocus &landFocus;
+  ar.polymorphicPtrVector(ownedRegions);
+  ar.polymorphicPtrVector(ownedProvinces);
+  ar &neighbourCountries;
+}
+
+void Country::deserialise(Fwg::Utils::Serialisation::Archive &ar) {
+  serialise(ar);
+}
+
+uint32_t Country::typeTag() const {
+  return Fwg::Utils::Serialisation::TypeRegistry::hashString(
+      "Arda::Country");
+}
+
 } // namespace Arda

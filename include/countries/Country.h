@@ -6,6 +6,7 @@
 #include "culture/Culture.h"
 #include "flags/Flag.h"
 #include "utils/ArdaUtils.h"
+#include "utils/Archive.h"
 #include <string>
 #include <vector>
 namespace Arda {
@@ -88,5 +89,10 @@ public:
   virtual std::shared_ptr<Culture> getPrimaryCulture() const;
 
   virtual std::string exportLine() const;
+
+  // serialisation
+  void serialise(Fwg::Utils::Serialisation::Archive &ar) override;
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) override;
+  uint32_t typeTag() const override;
 };
 } // namespace Arda

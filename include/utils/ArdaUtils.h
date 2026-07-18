@@ -1,5 +1,6 @@
 #pragma once
 #include "FastWorldGenerator.h"
+#include "utils/Archive.h"
 #include <string>
 #include <vector>
 namespace Arda::Utils {
@@ -66,19 +67,41 @@ struct Resource {
   std::string name;
   bool capped;
   double amount;
+
+  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
+    ar &name &capped &amount;
+  }
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
+    serialise(ar);
+  }
 };
 
 struct Coordinate {
   int x, z;
   double y, rotation;
+
+  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
+    ar &x &z &y &rotation;
+  }
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
+    serialise(ar);
+  }
 };
 
 struct Building {
   std::string name;
   Coordinate position;
-  // sometimes necessary for special building types
   int relativeID;
   int provinceID;
+
+  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
+    ar &name;
+    position.serialise(ar);
+    ar &relativeID &provinceID;
+  }
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
+    serialise(ar);
+  }
 };
 
 struct UnitStack {
@@ -89,6 +112,14 @@ struct UnitStack {
 struct WeatherPosition {
   std::string effectSize;
   Coordinate position;
+
+  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
+    ar &effectSize;
+    position.serialise(ar);
+  }
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
+    serialise(ar);
+  }
 };
 Coordinate strToPos(const std::vector<std::string> &tokens,
                     const std::vector<int> positions);

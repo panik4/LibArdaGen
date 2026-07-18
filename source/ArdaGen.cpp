@@ -1,7 +1,21 @@
 #include "ArdaGen.h"
+#include "utils/Archive.h"
 namespace Logging = Fwg::Utils::Logging;
 namespace Arda {
 using namespace Fwg::Gfx;
+
+namespace {
+void registerArdaTypes() {
+  auto &reg = Fwg::Utils::Serialisation::TypeRegistry::instance();
+  reg.registerType<Fwg::Areas::Province, Arda::ArdaProvince>(
+      "Arda::ArdaProvince");
+  reg.registerType<Fwg::Areas::Region, Arda::ArdaRegion>("Arda::ArdaRegion");
+  reg.registerType<Fwg::Areas::Continent, Arda::ArdaContinent>(
+      "Arda::ArdaContinent");
+  reg.registerType<Fwg::Areas::Area, Arda::SuperRegion>("Arda::SuperRegion");
+  reg.registerType<Fwg::Areas::Area, Arda::Country>("Arda::Country");
+}
+} // namespace
 ArdaGen::ArdaGen() {
   factories.provinceFactory = []() {
     return std::make_shared<Arda::ArdaProvince>();
@@ -19,6 +33,7 @@ ArdaGen::ArdaGen() {
   ardaFactories.countryFactory = []() -> std::shared_ptr<Arda::Country> {
     return std::make_shared<Arda::Country>();
   };
+  registerArdaTypes();
 }
 
 ArdaGen::ArdaGen(const std::string &configSubFolder)
@@ -45,6 +60,7 @@ ArdaGen::ArdaGen(const std::string &configSubFolder)
   ardaFactories.countryFactory = []() -> std::shared_ptr<Arda::Country> {
     return std::make_shared<Arda::Country>();
   };
+  registerArdaTypes();
   Fwg::Utils::Logging::logLine("ArdaGen::ArdaGen Done");
 }
 
@@ -65,6 +81,7 @@ ArdaGen::ArdaGen(Fwg::FastWorldGenerator &fwg) : FastWorldGenerator(fwg) {
   ardaFactories.countryFactory = []() -> std::shared_ptr<Arda::Country> {
     return std::make_shared<Arda::Country>();
   };
+  registerArdaTypes();
 }
 
 ArdaGen::~ArdaGen() {}
@@ -694,4 +711,68 @@ void ArdaGen::printStatistics() {
 void ArdaGen::writeTextFiles() {}
 void ArdaGen::writeLocalisation() {}
 void ArdaGen::writeImages() {}
+
+void ArdaGen::save(const std::string &path) {
+  std::ofstream file(path, std::ios::binary);
+  Fwg::Utils::Serialisation::Archive ar(file);
+  ar.writeVersion();
+  areaData.serialise(ar);
+  terrainData.serialise(ar);
+  climateData.serialise(ar);
+  climateMap.serialise(ar);
+  worldMap.serialise(ar);
+  segmentMap.serialise(ar);
+  provinceMap.serialise(ar);
+  regionMap.serialise(ar);
+  locationMap.serialise(ar);
+  navmeshMap.serialise(ar);
+  errorMap.serialise(ar);
+  ar &preModifyHeightMap &preModifyHumidityMap;
+  // Arda-specific data
+  ar.polymorphicPtrVector(ardaContinents);
+  ar.polymorphicPtrVector(ardaRegions);
+  ar.polymorphicPtrVector(ardaProvinces);
+  ar.polymorphicPtrVector(superRegions);
+  ar &countries;
+  civData.serialise(ar);
+  nData.serialise(ar);
+  typeMap.serialise(ar);
+  countryMap.serialise(ar);
+  superRegionMap.serialise(ar);
+}
+
+void ArdaGen::load(const std::string &path) {
+  std::ifstream file(path, std::ios::binary);
+  Fwg::Utils::Serialisation::Archive ar(file);
+  resetData();
+  ar.readVersion();
+  areaData.deserialise(ar);
+  terrainData.deserialise(ar);
+  climateData.deserialise(ar);
+  climateMap.deserialise(ar);
+  worldMap.deserialise(ar);
+  segmentMap.deserialise(ar);
+  provinceMap.deserialise(ar);
+  regionMap.deserialise(ar);
+  locationMap.deserialise(ar);
+  navmeshMap.deserialise(ar);
+  errorMap.deserialise(ar);
+  ar &preModifyHeightMap &preModifyHumidityMap;
+  // Arda-specific data
+  ar.polymorphicPtrVector(ardaContinents);
+  ar.polymorphicPtrVector(ardaRegions);
+  ar.polymorphicPtrVector(ardaProvinces);
+  ar.polymorphicPtrVector(superRegions);
+  ar &countries;
+  civData.deserialise(ar);
+  nData.deserialise(ar);
+  typeMap.deserialise(ar);
+  countryMap.deserialise(ar);
+  superRegionMap.deserialise(ar);
+  // Rebuild derived Arda vectors from base data
+  mapProvinces();
+  mapRegions();
+  mapContinents();
+}
+
 } // namespace Arda

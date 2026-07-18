@@ -1,7 +1,8 @@
 #pragma once
 #include "FastWorldGenerator.h"
-#include "parsing/ArdaParserUtils.h"
 #include "io/Textures.h"
+#include "parsing/ArdaParserUtils.h"
+#include "utils/Archive.h"
 
 namespace Arda::Gfx {
 struct FlagInfo {
@@ -55,6 +56,23 @@ public:
   static void readFlagTypes();
   static void readFlagTemplates();
   static void readSymbolTemplates();
-  
+
+  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
+    ar & width & height;
+    ar & image;
+    if (ar.isWriting()) {
+      uint64_t sz = colours.size();
+      ar & sz;
+      for (auto &c : colours)
+        c.serialise(ar);
+    } else {
+      uint64_t sz;
+      ar & sz;
+      colours.resize(static_cast<size_t>(sz));
+      for (auto &c : colours)
+        c.deserialise(ar);
+    }
+  }
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) { serialise(ar); };
 };
 } // namespace Arda::Gfx

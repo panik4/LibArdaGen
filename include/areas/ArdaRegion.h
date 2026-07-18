@@ -5,6 +5,11 @@
 #include "culture/Religion.h"
 #include "utils/ArdaUtils.h"
 #include <map>
+
+namespace Fwg::Utils::Serialisation {
+class Archive;
+}
+
 namespace Arda {
 class Country;
 enum class LocatorType { NONE, CITY, FARM, MINE, PORT, WOOD };
@@ -62,5 +67,10 @@ public:
   std::string exportLine() const;
   std::map<std::shared_ptr<Arda::Culture>, double> gatherCultures() const;
   std::map<std::shared_ptr<Arda::Religion>, double> gatherReligions() const;
+
+  // serialisation
+  void serialise(Fwg::Utils::Serialisation::Archive &ar) override;
+  void deserialise(Fwg::Utils::Serialisation::Archive &ar) override;
+  uint32_t typeTag() const override;
 };
 } // namespace Arda

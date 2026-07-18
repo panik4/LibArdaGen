@@ -183,7 +183,8 @@ Flag::Flag(const int width, const int height) : width(width), height(height) {
 Flag::~Flag() {}
 
 void Flag::setPixel(const Fwg::Gfx::Colour colour, const int x, const int y) {
-  if (Utils::Math::inRange(0, width * height * 4 + 3, (x * width + y) * 4 + 3)) {
+  if (Utils::Math::inRange(0, width * height * 4 + 3,
+                           (x * width + y) * 4 + 3)) {
     for (auto i = 0; i < 3; i++)
       image[(x * width + y) * 4 + i] = colour.getBGR()[i];
     image[(x * width + y) * 4 + 3] = 255;
@@ -202,6 +203,9 @@ std::vector<unsigned char> Flag::getFlag() const { return image; }
 
 std::vector<uint8_t> Flag::resize(const int width, const int height) const {
   auto resized = std::vector<unsigned char>(width * height * 4, 0);
+  if (!width || !height || image.empty()) {
+    return resized;
+  }
   const auto factor = this->width / width;
   for (auto h = 0; h < height; h++) {
     for (auto w = 0; w < width; w++) {
@@ -286,7 +290,7 @@ void Flag::readColourGroups() {
 
 void Flag::readFlagTypes() {
   auto lines =
-      PU::getLines(Fwg::Cfg::Values().resourcePath + "flags//flag_types.txt");
+      PU::getLines(Fwg::Cfg::Values().resourcePath + "flags/flag_types.txt");
   for (const auto &line : lines) {
     if (!line.size())
       continue;
@@ -311,14 +315,14 @@ void Flag::readFlagTypes() {
 void Flag::readFlagTemplates() {
   for (auto i = 0; i < 100; i++) {
     if (std::filesystem::exists(Fwg::Cfg::Values().resourcePath +
-                                "flags//flag_presets//" + std::to_string(i) +
+                                "flags/flag_presets/" + std::to_string(i) +
                                 ".tga")) {
       flagTemplates.push_back(Gfx::Textures::readTGA(
-          Fwg::Cfg::Values().resourcePath + "flags//flag_presets//" +
+          Fwg::Cfg::Values().resourcePath + "flags/flag_presets/" +
           std::to_string(i) + ".tga"));
       // get line and immediately tokenize it
       auto tokens = PU::getTokens(PU::getLines(Fwg::Cfg::Values().resourcePath +
-                                               "flags//flag_presets//" +
+                                               "flags/flag_presets/" +
                                                std::to_string(i) + ".txt")[0],
                                   ';');
       bool applySymbol = tokens[2] == "true";
@@ -331,14 +335,14 @@ void Flag::readFlagTemplates() {
 void Flag::readSymbolTemplates() {
   for (int i = 0; i < 100; i++) {
     if (std::filesystem::exists(Fwg::Cfg::Values().resourcePath +
-                                "flags//symbol_presets//" + std::to_string(i) +
+                                "flags/symbol_presets/" + std::to_string(i) +
                                 ".tga")) {
       symbolTemplates.push_back(Gfx::Textures::readTGA(
-          Fwg::Cfg::Values().resourcePath + "flags//symbol_presets//" +
+          Fwg::Cfg::Values().resourcePath + "flags/symbol_presets/" +
           std::to_string(i) + ".tga"));
       // get line and immediately tokenize it
       auto tokens = PU::getTokens(PU::getLines(Fwg::Cfg::Values().resourcePath +
-                                               "flags//symbol_presets//" +
+                                               "flags/symbol_presets/" +
                                                std::to_string(i) + ".txt")[0],
                                   ';');
       symbolMetadata.push_back({tokens[0] == "true"});

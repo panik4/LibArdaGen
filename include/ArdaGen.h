@@ -161,5 +161,9 @@ public:
   virtual void writeLocalisation();
   virtual void writeImages();
 
+  // Serialisation
+  void save(const std::string &path) override;
+  void load(const std::string &path) override;
+
 }; // namespace Arda
 } // namespace Arda

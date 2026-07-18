@@ -1,4 +1,5 @@
 #include "areas/SuperRegion.h"
+#include "utils/Archive.h"
 namespace Arda {
 SuperRegion::SuperRegion() {}
 void SuperRegion::addRegion(std::shared_ptr<ArdaRegion> region) {
@@ -145,4 +146,36 @@ std::vector<Cluster> Arda::SuperRegion::getClusters(const
 
   return clusters;
 }
+
+void SuperRegion::serialise(Fwg::Utils::Serialisation::Archive &ar) {
+  Area::serialise(ar);
+  ar &name;
+  ar.polymorphicPtrVector(ardaRegions);
+  // Manual loop for regionClusters (vector<Cluster>) since has_serialise trait
+  // may not detect inherited virtual serialise through SFINAE
+  if (ar.isWriting()) {
+    uint64_t sz = regionClusters.size();
+    ar &sz;
+    for (auto &c : regionClusters)
+      c.serialise(ar);
+  } else {
+    uint64_t sz;
+    ar &sz;
+    regionClusters.resize(static_cast<size_t>(sz));
+    for (auto &c : regionClusters)
+      c.deserialise(ar);
+  }
+  ar.polymorphicPtrVector(neighbourSuperRegions);
+  ar &centerOutsidePixels;
+}
+
+void SuperRegion::deserialise(Fwg::Utils::Serialisation::Archive &ar) {
+  serialise(ar);
+}
+
+uint32_t SuperRegion::typeTag() const {
+  return Fwg::Utils::Serialisation::TypeRegistry::hashString(
+      "Arda::SuperRegion");
+}
+
 } // namespace Arda

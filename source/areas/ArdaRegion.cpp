@@ -1,4 +1,6 @@
 #include "areas/ArdaRegion.h"
+#include "countries/Country.h"
+#include "utils/Archive.h"
 namespace Arda {
 ArdaRegion::ArdaRegion() {}
 
@@ -103,4 +105,44 @@ ArdaRegion::gatherReligions() const {
   }
   return religions;
 }
+
+void ArdaRegion::serialise(Fwg::Utils::Serialisation::Archive &ar) {
+  Region::serialise(ar);
+  ar &cores;
+  ar.polymorphicPtr(owner);
+  ar &superRegionID;
+  ar &resources;
+  ar &worldPopulationShare &averageDevelopment &importanceScore;
+  ar &relativeImportance &totalPopulation &gdp &worldEconomicActivityShare;
+  ar &assigned;
+  // topographyTypes is a set of enum
+  if (ar.isWriting()) {
+    std::vector<int> types;
+    for (auto t : topographyTypes)
+      types.push_back(static_cast<int>(t));
+    ar &types;
+  } else {
+    std::vector<int> types;
+    ar &types;
+    topographyTypes.clear();
+    for (int t : types)
+      topographyTypes.insert(
+          static_cast<Arda::Civilization::TopographyType>(t));
+  }
+  ar &snowChance &lightRainChance &heavyRainChance;
+  ar &blizzardChance &mudChance &sandStormChance;
+  ar.polymorphicPtrVector(ardaProvinces);
+  ar &temperatureRange &dateRange;
+  ar.polymorphicPtrVector(significantLocations);
+}
+
+void ArdaRegion::deserialise(Fwg::Utils::Serialisation::Archive &ar) {
+  serialise(ar);
+}
+
+uint32_t ArdaRegion::typeTag() const {
+  return Fwg::Utils::Serialisation::TypeRegistry::hashString(
+      "Arda::ArdaRegion");
+}
+
 } // namespace Arda
