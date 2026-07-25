@@ -75,7 +75,7 @@ Fwg::Gfx::Image displayCultureGroups(
   }
 
   Fwg::Gfx::Png::save(cultureMap,
-                      Fwg::Cfg::Values().mapsPath + "/world/cultureGroups.png");
+                      Fwg::Cfg::Values().mapsPath + "world/cultureGroups.png");
   return cultureMap;
 }
 
@@ -95,7 +95,7 @@ Fwg::Gfx::Image displayCultures(
   }
 
   Fwg::Gfx::Png::save(cultureMap,
-                      Fwg::Cfg::Values().mapsPath + "/world/cultures.png");
+                      Fwg::Cfg::Values().mapsPath + "world/cultures.png");
   return cultureMap;
 }
 
@@ -115,7 +115,7 @@ Fwg::Gfx::Image displayReligions(
   }
 
   Fwg::Gfx::Png::save(religionMap,
-                      Fwg::Cfg::Values().mapsPath + "/world/religions.png");
+                      Fwg::Cfg::Values().mapsPath + "world/religions.png");
   return religionMap;
 }
 

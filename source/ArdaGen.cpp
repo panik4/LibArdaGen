@@ -374,7 +374,7 @@ void ArdaGen::genLocations() {
       ardaConfig.locationConfig);
   locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   Fwg::Gfx::Png::save(locationMap,
-                      Fwg::Cfg::Values().mapsPath + "/world/locations.png");
+                      Fwg::Cfg::Values().mapsPath + "world/locations.png");
   Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
                                                   ardaProvinces);
   mapTerrain();
@@ -398,7 +398,7 @@ void ArdaGen::genLocationType(const Fwg::Civilization::LocationType &type) {
       ardaConfig.locationConfig, type);
   locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   Fwg::Gfx::Png::save(locationMap,
-                      Fwg::Cfg::Values().mapsPath + "/world/locations.png");
+                      Fwg::Cfg::Values().mapsPath + "world/locations.png");
   Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
                                                   ardaProvinces);
 }
@@ -444,7 +444,7 @@ void ArdaGen::generateCountries(
     std::function<std::shared_ptr<Country>()> factory) {
   Fwg::Utils::Randomisation::resetRandomisation();
 
-  std::filesystem::create_directory(Fwg::Cfg::Values().mapsPath + "/countries");
+  std::filesystem::create_directory(Fwg::Cfg::Values().mapsPath + "countries");
   // generate country data
   if (factory != nullptr) {
     Arda::Countries::generateCountries(
@@ -462,7 +462,7 @@ void ArdaGen::generateCountries(
   mapCountries();
   evaluateCountries();
   Arda::Countries::saveCountries(countries,
-                                 Fwg::Cfg::Values().mapsPath + "/countries/");
+                                 Fwg::Cfg::Values().mapsPath + "countries/");
 }
 
 void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
@@ -556,7 +556,7 @@ bool ArdaGen::loadStrategicRegions(
 
 void ArdaGen::generateStateSpecifics() {
   Fwg::Utils::Randomisation::resetRandomisation();
-  Arda::Areas::saveRegions(ardaRegions, Fwg::Cfg::Values().mapsPath + "/areas/",
+  Arda::Areas::saveRegions(ardaRegions, Fwg::Cfg::Values().mapsPath + "areas/",
                            Arda::Gfx::visualiseRegions(ardaRegions));
 }
 

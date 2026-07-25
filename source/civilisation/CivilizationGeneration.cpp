@@ -25,7 +25,7 @@ void generateCultureData(
   distributeLanguages(civData);
   nameRegions(regions);
   nameContinents(continents, regions);
-  Arda::Areas::saveRegions(regions, Fwg::Cfg::Values().mapsPath + "/areas/",
+  Arda::Areas::saveRegions(regions, Fwg::Cfg::Values().mapsPath + "areas/",
                            Arda::Gfx::visualiseRegions(regions));
 }
 
