@@ -1,5 +1,4 @@
 #include "areas/SuperRegion.h"
-#include "utils/Archive.h"
 namespace Arda {
 SuperRegion::SuperRegion() {}
 void SuperRegion::addRegion(std::shared_ptr<ArdaRegion> region) {
@@ -64,7 +63,7 @@ bool Arda::SuperRegion::checkPosition(
                                    this->position);
       return true;
       // now we check the type of the super region our center is actually in
-      //for (auto &superReg : superRegions) {
+      // for (auto &superReg : superRegions) {
       //  std::unordered_set<int> othersPixels;
       //  for (auto &reg : superReg->ardaRegions) {
       //    for (auto &prov : reg->provinces) {
@@ -95,8 +94,8 @@ bool Arda::SuperRegion::checkPosition(
   }
   return false;
 }
-std::vector<Cluster> Arda::SuperRegion::getClusters(const 
-    std::vector<std::shared_ptr<ArdaRegion>> &regions) {
+std::vector<Cluster> Arda::SuperRegion::getClusters(
+    const std::vector<std::shared_ptr<ArdaRegion>> &regions) {
   std::vector<Cluster> clusters;
 
   // Mark all regions in this superregion as unvisited
@@ -147,35 +146,20 @@ std::vector<Cluster> Arda::SuperRegion::getClusters(const
   return clusters;
 }
 
-void SuperRegion::serialise(Fwg::Utils::Serialisation::Archive &ar) {
-  Area::serialise(ar);
-  ar &name;
-  ar.polymorphicPtrVector(ardaRegions);
-  // Manual loop for regionClusters (vector<Cluster>) since has_serialise trait
-  // may not detect inherited virtual serialise through SFINAE
-  if (ar.isWriting()) {
-    uint64_t sz = regionClusters.size();
-    ar &sz;
-    for (auto &c : regionClusters)
-      c.serialise(ar);
-  } else {
-    uint64_t sz;
-    ar &sz;
-    regionClusters.resize(static_cast<size_t>(sz));
-    for (auto &c : regionClusters)
-      c.deserialise(ar);
-  }
-  ar.polymorphicPtrVector(neighbourSuperRegions);
-  ar &centerOutsidePixels;
-}
-
-void SuperRegion::deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-  serialise(ar);
-}
-
-uint32_t SuperRegion::typeTag() const {
-  return Fwg::Utils::Serialisation::TypeRegistry::hashString(
-      "Arda::SuperRegion");
+template <class Archive>
+void SuperRegion::serialize(Archive &ar, const unsigned int /*version*/) {
+  ar &boost::serialization::base_object<Fwg::Areas::Area>(*this);
+  ar & name;
+  ar & ardaRegions;
+  ar & regionClusters;
+  //ar & neighbourSuperRegions;
+  ar & centerOutsidePixels;
 }
 
 } // namespace Arda
+
+BOOST_CLASS_EXPORT_IMPLEMENT(Arda::SuperRegion)
+template void Arda::SuperRegion::serialize(boost::archive::binary_oarchive &,
+                                           unsigned int);
+template void Arda::SuperRegion::serialize(boost::archive::binary_iarchive &,
+                                           unsigned int);

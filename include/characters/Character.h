@@ -1,6 +1,6 @@
 #pragma once
 #include "utils/ArdaUtils.h"
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 #include <string>
 #include <vector>
 namespace Arda {
@@ -30,13 +30,9 @@ public:
   Type type;
   std::vector<std::string> traits;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
-    ar &name &surname &portraitPath;
-    ar.serialiseEnum(gender);
-    ar.serialiseEnum(ideology);
-    ar.serialiseEnum(type);
-    ar &traits;
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar &name &surname &portraitPath &gender &ideology &type &traits;
   }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) { serialise(ar); }
 };
 } // namespace Arda

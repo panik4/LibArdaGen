@@ -2,7 +2,7 @@
 #include "language/Language.h"
 #include "entities/Colour.h"
 #include "areas/Area.h"
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 #include <string>
 namespace Arda {
 class CultureGroup;
@@ -21,8 +21,8 @@ public:
   std::shared_ptr<CultureGroup> cultureGroup;
   VisualType visualType;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar);
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) { serialise(ar); }
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/);
 };
 
 } // namespace Arda

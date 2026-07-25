@@ -2,7 +2,7 @@
 #include "RandNum.h"
 #include "language/Dataset.h"
 #include "language/MarkovNameGenerator.h"
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 #include "utils/Utils.h"
 #include <string>
 #include <vector>
@@ -51,32 +51,14 @@ public:
   std::vector<std::string> shipNames;
   std::vector<std::string> airplaneNames;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
     ar & name & port & articles & adjectiveEndings & cityPrefixes &
         citySuffixes;
     ar & cityNames & portNames & maleNames & femaleNames & surnames & names;
     ar & shipNames & airplaneNames;
-    // vocabulary is map<string, vector<string>> - serialise manually
-    if (ar.isWriting()) {
-      uint64_t sz = vocabulary.size();
-      ar &sz;
-      for (auto &[k, v] : vocabulary) {
-        ar &k;
-        ar &v;
-      }
-    } else {
-      uint64_t sz;
-      ar &sz;
-      vocabulary.clear();
-      for (uint64_t i = 0; i < sz; ++i) {
-        std::string k;
-        std::vector<std::string> v;
-        ar &k &v;
-        vocabulary.emplace(std::move(k), std::move(v));
-      }
-    }
+    ar & vocabulary;
   }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) { serialise(ar); }
 
   void fillAllLists();
 

@@ -2,6 +2,7 @@
 #include "areas/ArdaProvince.h"
 #include "areas/ArdaRegion.h"
 #include "areas/Continent.h"
+#include "utils/SerialisationFwd.h"
 
 namespace Fwg::Utils::Serialisation {
 class Archive;
@@ -26,8 +27,10 @@ public:
   ~ArdaContinent();
 
   // serialisation
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) override;
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) override;
-  uint32_t typeTag() const override;
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/);
 };
 } // namespace Arda
+
+BOOST_CLASS_EXPORT_KEY(Arda::ArdaContinent)
+

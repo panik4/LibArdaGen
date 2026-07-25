@@ -1,6 +1,5 @@
 #include "areas/ArdaRegion.h"
 #include "countries/Country.h"
-#include "utils/Archive.h"
 namespace Arda {
 ArdaRegion::ArdaRegion() {}
 
@@ -106,43 +105,40 @@ ArdaRegion::gatherReligions() const {
   return religions;
 }
 
-void ArdaRegion::serialise(Fwg::Utils::Serialisation::Archive &ar) {
-  Region::serialise(ar);
-  ar &cores;
-  ar.polymorphicPtr(owner);
-  ar &superRegionID;
-  ar &resources;
-  ar &worldPopulationShare &averageDevelopment &importanceScore;
-  ar &relativeImportance &totalPopulation &gdp &worldEconomicActivityShare;
-  ar &assigned;
-  // topographyTypes is a set of enum
-  if (ar.isWriting()) {
+template <class Archive>
+void ArdaRegion::serialize(Archive &ar, const unsigned int /*version*/) {
+  ar &boost::serialization::base_object<Fwg::Areas::Region>(*this);
+  ar & cores;
+  ar & owner;
+  ar & superRegionID;
+  ar & resources;
+  ar & worldPopulationShare & averageDevelopment & importanceScore;
+  ar & relativeImportance & totalPopulation & gdp & worldEconomicActivityShare;
+  ar & assigned;
+  if constexpr (Archive::is_saving::value) {
     std::vector<int> types;
     for (auto t : topographyTypes)
       types.push_back(static_cast<int>(t));
-    ar &types;
+    ar & types;
   } else {
     std::vector<int> types;
-    ar &types;
+    ar & types;
     topographyTypes.clear();
     for (int t : types)
       topographyTypes.insert(
           static_cast<Arda::Civilization::TopographyType>(t));
   }
-  ar &snowChance &lightRainChance &heavyRainChance;
-  ar &blizzardChance &mudChance &sandStormChance;
-  ar.polymorphicPtrVector(ardaProvinces);
-  ar &temperatureRange &dateRange;
-  ar.polymorphicPtrVector(significantLocations);
-}
-
-void ArdaRegion::deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-  serialise(ar);
-}
-
-uint32_t ArdaRegion::typeTag() const {
-  return Fwg::Utils::Serialisation::TypeRegistry::hashString(
-      "Arda::ArdaRegion");
+  ar & snowChance & lightRainChance & heavyRainChance;
+  ar & blizzardChance & mudChance & sandStormChance;
+  ar & ardaProvinces;
+  ar & temperatureRange & dateRange;
+  ar & significantLocations;
 }
 
 } // namespace Arda
+
+BOOST_CLASS_EXPORT_IMPLEMENT(Arda::ArdaRegion)
+template void Arda::ArdaRegion::serialize(boost::archive::binary_oarchive &,
+                                          unsigned int);
+template void Arda::ArdaRegion::serialize(boost::archive::binary_iarchive &,
+                                          unsigned int);

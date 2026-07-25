@@ -1,5 +1,5 @@
 #pragma once
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 
 namespace Arda {
 struct VictoryPoint {
@@ -7,13 +7,9 @@ struct VictoryPoint {
   Fwg::Position position;
   std::string name;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
-    ar &amount;
-    position.serialise(ar);
-    ar &name;
-  }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-    serialise(ar);
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar &amount &position &name;
   }
 };
 } // namespace Arda

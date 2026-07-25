@@ -1,14 +1,13 @@
 #include "culture/Culture.h"
 #include "culture/CultureGroup.h"
-#include "utils/Archive.h"
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
 
 namespace Arda {
-void Culture::serialise(Fwg::Utils::Serialisation::Archive &ar) {
-  ar &name &adjective;
-  ar.polymorphicPtr(centerOfCulture);
-  colour.serialise(ar);
-  ar &language;
-  ar &cultureGroup;
-  ar.serialiseEnum(visualType);
+template<class Archive>
+void Culture::serialize(Archive &ar, const unsigned int /*version*/) {
+  ar & name & adjective & centerOfCulture & colour & language & cultureGroup & visualType;
 }
+template void Culture::serialize(boost::archive::binary_oarchive&, unsigned int);
+template void Culture::serialize(boost::archive::binary_iarchive&, unsigned int);
 } // namespace Arda

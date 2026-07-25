@@ -1,6 +1,6 @@
 #pragma once
+#include "utils/SerialisationFwd.h"
 #include "entities/Colour.h"
-#include "utils/Archive.h"
 #include <string>
 namespace Arda {
 class Religion {
@@ -8,15 +8,12 @@ class Religion {
 public:
   std::string name;
   // ID of the province that is the center
-int centerOfReligion;
+  int centerOfReligion;
   Fwg::Gfx::Colour colour;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
-    ar &name &centerOfReligion;
-    colour.serialise(ar);
-  }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-    serialise(ar);
+  template <class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar & name & centerOfReligion & colour;
   }
 };
 

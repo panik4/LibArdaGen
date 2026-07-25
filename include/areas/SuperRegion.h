@@ -1,19 +1,17 @@
 #pragma once
 #include "FastWorldGenerator.h"
 #include "areas/ArdaRegion.h"
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 #include <map>
 
 namespace Arda {
 struct Cluster : Fwg::Areas::Area {
   std::vector<std::shared_ptr<ArdaRegion>> regions;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
-    Area::serialise(ar);
-    ar.polymorphicPtrVector(regions);
-  }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-    serialise(ar);
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar & boost::serialization::base_object<Fwg::Areas::Area>(*this);
+    ar & regions;
   }
 };
 class SuperRegion : public Fwg::Areas::Area {
@@ -38,8 +36,10 @@ public:
   getClusters(const std::vector<std::shared_ptr<ArdaRegion>> &regions);
 
   // serialisation
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) override;
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) override;
-  uint32_t typeTag() const override;
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/);
 };
 } // namespace Arda
+
+BOOST_CLASS_EXPORT_KEY(Arda::SuperRegion)
+

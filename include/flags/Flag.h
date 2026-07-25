@@ -2,7 +2,7 @@
 #include "FastWorldGenerator.h"
 #include "io/Textures.h"
 #include "parsing/ArdaParserUtils.h"
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 
 namespace Arda::Gfx {
 struct FlagInfo {
@@ -57,22 +57,9 @@ public:
   static void readFlagTemplates();
   static void readSymbolTemplates();
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
-    ar & width & height;
-    ar & image;
-    if (ar.isWriting()) {
-      uint64_t sz = colours.size();
-      ar & sz;
-      for (auto &c : colours)
-        c.serialise(ar);
-    } else {
-      uint64_t sz;
-      ar & sz;
-      colours.resize(static_cast<size_t>(sz));
-      for (auto &c : colours)
-        c.deserialise(ar);
-    }
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar & width & height & image & colours;
   }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) { serialise(ar); };
 };
 } // namespace Arda::Gfx

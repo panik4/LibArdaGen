@@ -4,7 +4,7 @@
 #include "culture/Culture.h"
 #include "culture/Religion.h"
 #include "generic/VictoryPoint.h"
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 
 namespace Arda {
 enum class PositionType {
@@ -25,12 +25,10 @@ struct ScenarioPosition {
   PositionType type;
   int typeIndex;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
-    position.serialise(ar);
-    ar.serialiseEnum(type);
-    ar &typeIndex;
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar & position & type & typeIndex;
   }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) { serialise(ar); }
 };
 class ArdaProvince : public Fwg::Areas::Province {
 public:
@@ -58,9 +56,8 @@ public:
   ~ArdaProvince();
 
   // serialisation
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) override;
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) override;
-  uint32_t typeTag() const override;
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/);
   // operators
   bool operator==(const Arda::ArdaProvince &right) const {
     return ID == right.ID;
@@ -71,3 +68,7 @@ public:
   std::string toHexString(bool prefix, bool uppercase);
 };
 } // namespace Arda
+
+BOOST_CLASS_EXPORT_KEY(Arda::ArdaProvince)
+
+

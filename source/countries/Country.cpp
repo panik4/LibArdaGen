@@ -1,5 +1,4 @@
 #include "countries/Country.h"
-#include "utils/Archive.h"
 namespace Arda {
 Country::Country() {
   colour = {static_cast<unsigned char>(RandNum::getRandom(0, 255)),
@@ -44,7 +43,8 @@ void Country::assignRegions(
       continue;
 
     // Pick a random neighbour
-    auto nextRegion = Fwg::Utils::Random::selectRandom(ardaRegion->neighbourRegions);
+    auto nextRegion =
+        Fwg::Utils::Random::selectRandom(ardaRegion->neighbourRegions);
 
     // Safety check: index is valid in ardaRegions
     if (nextRegion != nullptr) {
@@ -200,30 +200,28 @@ std::string Country::exportLine() const {
   return line;
 }
 
-void Country::serialise(Fwg::Utils::Serialisation::Archive &ar) {
-  Area::serialise(ar);
-  ar &tag &name &adjective;
-  ar &capitalRegionID &capitalProvinceID;
-  ar &technologyLevel &gdp &landlocked;
-  ar.serialiseEnum(ideology);
-  ar.serialiseEnum(rank);
-  ar &importanceScore &relativeScore;
-  ar &cultures;
-  flag.serialise(ar);
-  ar &characters;
-  ar &navalFocus &airFocus &landFocus;
-  ar.polymorphicPtrVector(ownedRegions);
-  ar.polymorphicPtrVector(ownedProvinces);
-  ar &neighbourCountries;
-}
-
-void Country::deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-  serialise(ar);
-}
-
-uint32_t Country::typeTag() const {
-  return Fwg::Utils::Serialisation::TypeRegistry::hashString(
-      "Arda::Country");
+template <class Archive>
+void Country::serialize(Archive &ar, const unsigned int /*version*/) {
+  ar &boost::serialization::base_object<Fwg::Areas::Area>(*this);
+  ar & tag & name & adjective;
+  ar & capitalRegionID & capitalProvinceID;
+  ar & technologyLevel & gdp & landlocked;
+  ar & ideology;
+  ar & rank;
+  ar & importanceScore & relativeScore;
+  ar & cultures;
+  ar & flag;
+  ar & characters;
+  ar & navalFocus & airFocus & landFocus;
+  ar & ownedRegions;
+  ar & ownedProvinces;
+  ar & neighbourCountries;
 }
 
 } // namespace Arda
+
+BOOST_CLASS_EXPORT_IMPLEMENT(Arda::Country)
+template void Arda::Country::serialize(boost::archive::binary_oarchive &,
+                                       unsigned int);
+template void Arda::Country::serialize(boost::archive::binary_iarchive &,
+                                       unsigned int);

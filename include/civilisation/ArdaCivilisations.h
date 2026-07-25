@@ -4,7 +4,7 @@
 #include "areas/ArdaContinent.h"
 #include "culture/CultureGroup.h"
 #include "culture/Religion.h"
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 
 namespace Arda::Civilization {
 struct CivilizationData {
@@ -17,16 +17,11 @@ struct CivilizationData {
   double worldPopulationFactorSum = 0.0;
   double worldEconomicActivitySum = 0.0;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
-    ar.ptrVector(religions);
-    ar.ptrVector(cultures);
-    ar.ptrVector(cultureGroups);
-    ar.ptrVector(languageGroups);
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar &religions &cultures &cultureGroups &languageGroups;
     ar &languages;
     ar &worldPopulationFactorSum &worldEconomicActivitySum;
-  }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-    serialise(ar);
   }
 };
 

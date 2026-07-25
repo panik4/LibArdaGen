@@ -6,7 +6,7 @@
 #include "culture/Culture.h"
 #include "flags/Flag.h"
 #include "utils/ArdaUtils.h"
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 #include <string>
 #include <vector>
 namespace Arda {
@@ -91,8 +91,10 @@ public:
   virtual std::string exportLine() const;
 
   // serialisation
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) override;
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) override;
-  uint32_t typeTag() const override;
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/);
 };
 } // namespace Arda
+
+BOOST_CLASS_EXPORT_KEY(Arda::Country)
+

@@ -1,6 +1,6 @@
 #pragma once
 #include "language/Language.h"
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 #include <algorithm>
 #include <filesystem>
 namespace Arda {
@@ -12,12 +12,9 @@ public:
   Dataset mergedDataset;
   void generate(int languageAmount, const Dataset &dataset, int seed);
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
-    ar &name;
-    ar.ptrVector(languages);
-  }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-    serialise(ar);
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar &name &languages;
   }
 };
 } // namespace Arda

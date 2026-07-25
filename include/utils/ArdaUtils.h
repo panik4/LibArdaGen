@@ -1,6 +1,6 @@
 #pragma once
 #include "FastWorldGenerator.h"
-#include "utils/Archive.h"
+#include "utils/SerialisationFwd.h"
 #include <string>
 #include <vector>
 namespace Arda::Utils {
@@ -68,11 +68,9 @@ struct Resource {
   bool capped;
   double amount;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
     ar &name &capped &amount;
-  }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-    serialise(ar);
   }
 };
 
@@ -80,11 +78,9 @@ struct Coordinate {
   int x, z;
   double y, rotation;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
     ar &x &z &y &rotation;
-  }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-    serialise(ar);
   }
 };
 
@@ -94,13 +90,9 @@ struct Building {
   int relativeID;
   int provinceID;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
-    ar &name;
-    position.serialise(ar);
-    ar &relativeID &provinceID;
-  }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-    serialise(ar);
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar &name &position &relativeID &provinceID;
   }
 };
 
@@ -113,12 +105,9 @@ struct WeatherPosition {
   std::string effectSize;
   Coordinate position;
 
-  void serialise(Fwg::Utils::Serialisation::Archive &ar) {
-    ar &effectSize;
-    position.serialise(ar);
-  }
-  void deserialise(Fwg::Utils::Serialisation::Archive &ar) {
-    serialise(ar);
+  template<class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar &effectSize &position;
   }
 };
 Coordinate strToPos(const std::vector<std::string> &tokens,
