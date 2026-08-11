@@ -419,13 +419,13 @@ void generateLanguageGroup(std::shared_ptr<CultureGroup> &cultureGroup) {
   // cultureGroup->getLanguageGroup()->generate(cultureGroup->getCultures().size(),
   //                                            Fwg::Cfg::Values().resourcePath
   //                                            +
-  //                                                "//names//languageGroups//");
+  //                                                "/names/languageGroups/");
   //  languageGroup->generate(cultureGroup->getCultures().size());
 }
 
 void distributeLanguages(CivilizationData &civData) {
   LanguageGenerator languageGenerator(Fwg::Cfg::Values().resourcePath +
-                                      "//names//languageGroups//");
+                                      "/names/languageGroups/");
   civData.languageGroups.clear();
   Fwg::Utils::Randomisation::resetRandomisation();
   // assign a language group to each culture group

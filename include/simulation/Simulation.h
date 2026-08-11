@@ -1,0 +1,242 @@
+#pragma once
+
+#include "areas/ArdaContinent.h"
+#include "climate/ClimateData.h"
+#include "entities/Colour.h"
+#include "terrain/TerrainData.h"
+#include <cstdint>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace Arda::Simulation {
+
+using Year = int;
+using ProvinceId = int;
+using RegionId = int;
+using PolityId = int;
+using CultureId = int;
+using ReligionId = int;
+using SuperRegionId = int;
+
+inline constexpr Year StartYear = -4000;
+inline constexpr Year RegionOwnershipYear = 1836;
+inline constexpr Year TargetYear = 1936;
+inline constexpr PolityId NoPolity = -1;
+inline constexpr ReligionId NoReligion = -1;
+
+// The global RandNum sequence controls reproducibility. This primitive model is
+// intentionally independent of Country, Culture, CultureGroup, and Religion;
+// consumers materialize those domain objects from a reconstructed State.
+struct Configuration {
+  Year startYear = StartYear;
+  Year regionOwnershipYear = RegionOwnershipYear;
+  Year targetYear = TargetYear;
+  int ancientStepYears = 100;
+  int classicalStepYears = 50;
+  int medievalStepYears = 20;
+  int modernStepYears = 5;
+  Year classicalStartYear = -500;
+  Year medievalStartYear = 500;
+  Year modernStartYear = 1700;
+  Year renaissanceStartYear = 1450;
+  Year industrialRevolutionStartYear = 1760;
+  int targetEndPolityCount = 100;
+  int targetDevelopmentSuperRegionCount = 10;
+  int superRegionCycleYears = 500;
+  Year persistentDevelopmentStartYear = 1000;
+  Year colonizationStartYear = 1500;
+  double superRegionNeighbourInfluence = 0.35;
+  double culturalIntegrationRatePerCentury = 0.01;
+  double colonialSettlementRatePerCentury = 0.03;
+  double populationGrowthPerCentury = 0.06;
+  double developmentGrowthPerCentury = 0.01;
+  int regionPhaseDurationYears = 300;
+  Year longDistanceMigrationStartYear = 1500;
+  double ancientCapacityGrowthPerCentury = 0.005;
+  double renaissanceCapacityGrowthPerCentury = 0.015;
+  double industrialCapacityGrowthPerCentury = 0.08;
+  double migrationRatePerCentury = 0.04;
+  double longDistanceMigrationRatePerCentury = 0.01;
+  double expansionChance = 0.30;
+  double fragmentationChance = 0.04;
+  double religionEmergenceChance = 0.03;
+  double religionSpreadChance = 0.10;
+  double religionSplitChance = 0.01;
+  double cultureAssimilationChance = 0.03;
+  double cultureSplitChance = 0.01;
+  double minimumPopulation = 1.0;
+  double defaultPopulation = 100.0;
+  double defaultDevelopment = 0.01;
+};
+
+struct ArtifactPaths {
+  std::filesystem::path eventLog;
+  std::vector<std::filesystem::path> ownershipMaps;
+  std::filesystem::path developmentLog;
+  std::vector<std::filesystem::path> developmentMaps;
+  std::filesystem::path populationLog;
+  std::vector<std::filesystem::path> populationMaps;
+  std::filesystem::path cultureLog;
+  std::vector<std::filesystem::path> cultureMaps;
+  std::filesystem::path religionLog;
+  std::vector<std::filesystem::path> religionMaps;
+  std::filesystem::path superRegionLog;
+};
+
+struct Input {
+  std::vector<std::shared_ptr<ArdaContinent>> continents;
+  const Fwg::Climate::ClimateData *climateData = nullptr;
+  const Fwg::Terrain::TerrainData *terrainData = nullptr;
+};
+
+enum class RegionalPhase { Bust = -1, Neutral = 0, Boom = 1 };
+
+enum class SuperRegionPhase { Lagging = -1, Neutral = 0, Booming = 1 };
+
+enum class EventType {
+  InitializeProvince,
+  CreatePolity,
+  TransferProvince,
+  DissolvePolity,
+  CreateCulture,
+  SetCulture,
+  CreateReligion,
+  SetReligion,
+  UpdatePopulation,
+  UpdateDevelopment,
+  UpdateCarryingCapacity,
+  MigratePopulation,
+  SetRegionalPhase,
+  SetSuperRegion,
+  CreateSuperRegion,
+  SetSuperRegionPhase,
+  MigrateCulturePopulation,
+  ConvertCulturePopulation,
+  ColonizeProvince,
+  ConsolidateRegion
+};
+
+struct Event {
+  Year year = StartYear;
+  EventType type = EventType::InitializeProvince;
+  ProvinceId provinceId = -1;
+  RegionId regionId = -1;
+  PolityId polityId = NoPolity;
+  PolityId previousPolityId = NoPolity;
+  CultureId cultureId = -1;
+  ReligionId religionId = NoReligion;
+  double value = 0.0;
+  double secondaryValue = 0.0;
+  std::string description;
+  int parentId = -1;
+  Fwg::Gfx::Colour colour;
+};
+
+struct Polity {
+  PolityId id = NoPolity;
+  Year foundedYear = StartYear;
+  std::optional<Year> dissolvedYear;
+  bool isTribe = true;
+  Fwg::Gfx::Colour colour;
+};
+
+struct CultureLineage {
+  CultureId id = -1;
+  ProvinceId originProvinceId = -1;
+  Year foundedYear = StartYear;
+  std::optional<CultureId> parentId;
+  Fwg::Gfx::Colour colour;
+};
+
+struct ReligionLineage {
+  ReligionId id = NoReligion;
+  ProvinceId originProvinceId = -1;
+  Year foundedYear = StartYear;
+  std::optional<ReligionId> parentId;
+  Fwg::Gfx::Colour colour;
+};
+
+struct ProvinceState {
+  PolityId owner = NoPolity;
+  CultureId culture = -1;
+  ReligionId religion = NoReligion;
+  double population = 0.0;
+  double development = 0.0;
+  double carryingCapacity = 0.0;
+  std::map<CultureId, double> culturePopulations;
+};
+
+struct DevelopmentSuperRegion {
+  SuperRegionId id = -1;
+  int continentId = -1;
+  std::vector<RegionId> regions;
+  SuperRegionPhase phase = SuperRegionPhase::Neutral;
+  double development = 0.0;
+  std::vector<SuperRegionId> neighbours;
+};
+
+struct PolityStrength {
+  double population = 0.0;
+  double development = 0.0;
+  double score = 0.0;
+};
+
+struct State {
+  Year year = StartYear;
+  std::map<ProvinceId, ProvinceState> provinces;
+  std::map<PolityId, Polity> polities;
+  std::map<CultureId, CultureLineage> cultures;
+  std::map<ReligionId, ReligionLineage> religions;
+  std::map<RegionId, RegionalPhase> regionalPhases;
+  std::map<RegionId, SuperRegionId> regionSuperRegions;
+  std::map<SuperRegionId, DevelopmentSuperRegion> superRegions;
+  std::map<PolityId, PolityStrength> polityStrengths;
+
+  [[nodiscard]] const ProvinceState *findProvince(ProvinceId provinceId) const;
+  [[nodiscard]] std::vector<ProvinceId> territoryOf(PolityId polityId) const;
+  [[nodiscard]] CultureId dominantCultureOf(ProvinceId provinceId) const;
+};
+
+struct ValidationError {
+  Year year = StartYear;
+  std::string message;
+  std::optional<ProvinceId> provinceId;
+  std::optional<RegionId> regionId;
+};
+
+struct Result {
+  std::vector<Event> events;
+  std::vector<ValidationError> errors;
+  State finalState;
+
+  [[nodiscard]] bool succeeded() const { return errors.empty(); }
+};
+
+// Events are an in-memory format; introduce an explicit version before
+// persisting them across application versions.
+class HistorySimulation {
+public:
+  explicit HistorySimulation(Configuration configuration = {});
+
+  [[nodiscard]] Result run(const Input &input);
+  [[nodiscard]] State reconstruct(const std::vector<Event> &events,
+                                  Year year) const;
+  [[nodiscard]] std::vector<ValidationError>
+  validate(const State &state, Year year, bool requireWholeRegions) const;
+  [[nodiscard]] std::optional<ArtifactPaths>
+  writeArtifacts(const Input &input, const Result &result,
+                 const Fwg::Gfx::Image &baseMap,
+                 const std::filesystem::path &outputDirectory,
+                 std::vector<ValidationError> &errors) const;
+
+private:
+  Configuration configuration;
+  std::map<ProvinceId, RegionId> provinceRegions;
+  std::map<ProvinceId, std::vector<ProvinceId>> provinceNeighbours;
+};
+
+} // namespace Arda::Simulation

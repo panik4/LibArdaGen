@@ -299,7 +299,7 @@ void saveCountries(std::map<std::string, std::shared_ptr<Country>> &countries,
     fileContent += country.second->exportLine();
     fileContent += "\n";
   }
-  Fwg::Parsing::writeFile(mappingPath + "//countryMappings.txt", fileContent);
+  Fwg::Parsing::writeFile(mappingPath + "/countryMappings.txt", fileContent);
 }
 
 void generateCountrySpecifics(
