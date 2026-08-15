@@ -1,4 +1,5 @@
 #include "ArdaGen.h"
+#include "simulation/SimulationExporter.h"
 namespace Logging = Fwg::Utils::Logging;
 namespace Arda {
 using namespace Fwg::Gfx;
@@ -313,6 +314,14 @@ bool ArdaGen::genDevelopment(Fwg::Cfg &config) {
   gatherStatistics();
   return true;
 }
+bool ArdaGen::deriveDevelopment(Fwg::Cfg &config) {
+  Fwg::Utils::Randomisation::resetRandomisation();
+  Civilization::deriveDevelopment(ardaData.simulationExport, ardaProvinces,
+                                  ardaRegions, ardaContinents);
+  gatherStatistics();
+  return true;
+}
+
 bool ArdaGen::loadPopulation(Fwg::Cfg &config,
                              const Fwg::Gfx::Image &inputPop) {
   ardaConfig.calculateTargetWorldPopulation();
@@ -333,6 +342,14 @@ bool ArdaGen::genPopulation(Fwg::Cfg &config) {
 
   return true;
 }
+bool ArdaGen::derivePopulation(Fwg::Cfg &config) {
+  Fwg::Utils::Randomisation::resetRandomisation();
+  Civilization::derivePopulation(ardaData.simulationExport, civData, ardaProvinces,
+                                 ardaRegions, ardaContinents, ardaConfig.targetWorldPopulation);
+  gatherStatistics();
+  return true;
+}
+
 void ArdaGen::genEconomyData() {
   Fwg::Utils::Randomisation::resetRandomisation();
   ardaConfig.calculateTargetWorldGdp();
@@ -349,14 +366,36 @@ void ArdaGen::genCultureData() {
   gatherStatistics();
 }
 
+void ArdaGen::deriveCultureData() {
+  Fwg::Utils::Randomisation::resetRandomisation();
+  Arda::Civilization::deriveCultureData(ardaData.simulationExport, civData,
+                                        ardaProvinces, ardaRegions,
+                                        ardaContinents, superRegions);
+  gatherStatistics();
+}
+
 void ArdaGen::genCivilisationData() {
   Fwg::Utils::Randomisation::resetRandomisation();
   genNaturalFeatures();
   ardaConfig.calculateTargetWorldPopulation();
   ardaConfig.calculateTargetWorldGdp();
+
+  Arda::Simulation::HistorySimulation simulation;
+  const Arda::Simulation::Input input{ardaContinents, &climateData,
+                                      &terrainData};
+  const auto result = simulation.run(input);
+  std::map<Arda::Simulation::ProvinceId, size_t> provinceAreas;
+  for (const auto &province : ardaProvinces)
+    provinceAreas.emplace(province->ID, province->pixels.size());
+  ardaData.simulationExport =
+      Arda::Simulation::SimulationExporter::exportFinalState(
+          result.finalState, simulation.getProvinceRegions(), result.events,
+          provinceAreas);
+
   Arda::Civilization::generateFullCivilisationData(
-      ardaRegions, ardaProvinces, civData, ardaContinents, superRegions,
-      ardaConfig.targetWorldPopulation, ardaConfig.targetWorldGdp);
+      ardaData.simulationExport, ardaRegions, ardaProvinces, civData,
+      ardaContinents, superRegions, ardaConfig.targetWorldPopulation,
+      ardaConfig.targetWorldGdp);
   genLocations();
   gatherStatistics();
 }
@@ -447,9 +486,14 @@ void ArdaGen::generateCountries(
   std::filesystem::create_directory(Fwg::Cfg::Values().mapsPath + "countries");
   // generate country data
   if (factory != nullptr) {
-    Arda::Countries::generateCountries(
-        ardaConfig.generationAge, factory, ardaConfig.numCountries, ardaRegions,
-        countries, ardaProvinces, civData, nData);
+    // Arda::Countries::generateCountries(
+    //     ardaConfig.generationAge, factory, ardaConfig.numCountries,
+    //     ardaRegions, countries, ardaProvinces, civData, nData);
+
+    Arda::Countries::deriveCountries(ardaData.simulationExport,
+                                     ardaConfig.generationAge, factory,
+                                     ardaConfig.numCountries, ardaRegions,
+                                     countries, ardaProvinces, civData, nData);
   }
   //  first gather generic neighbours, they will be mapped to hoi4 countries
   //  in mapCountries
@@ -486,6 +530,20 @@ void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
     Arda::Countries::loadCountries(ardaConfig.generationAge, factory,
                                    ardaRegions, countries, civData, nData,
                                    inputImage);
+  }
+  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
+                                             countries);
+  mapCountries();
+  evaluateCountries();
+}
+void ArdaGen::deriveCountries(
+    std::function<std::shared_ptr<Country>()> factory) {
+  // generate country data
+  if (factory != nullptr) {
+    Arda::Countries::deriveCountries(ardaData.simulationExport,
+                                     ardaConfig.generationAge, factory,
+                                     ardaConfig.numCountries, ardaRegions,
+                                     countries, ardaProvinces, civData, nData);
   }
   Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
                                              countries);

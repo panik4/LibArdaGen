@@ -9,6 +9,7 @@
 #include "culture/Religion.h"
 #include "language/LanguageGenerator.h"
 #include "rendering/ArdaVisualisation.h"
+#include "simulation/Simulation.h"
 namespace Arda::Civilization {
 // generic preparations. However, if desired, there are necessary preparations
 // for every game such as reading in the existing worldmap, states, regions,
@@ -26,7 +27,14 @@ void generateCultureData(
     std::vector<std::shared_ptr<Arda::ArdaRegion>> &regions,
     std::vector<std::shared_ptr<ArdaContinent>> &continents,
     std::vector<std::shared_ptr<SuperRegion>> &superRegions);
+void deriveCultureData(
+    Simulation::SimulationExport &simulationExport, CivilizationData &civData,
+    std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
+    std::vector<std::shared_ptr<Arda::ArdaRegion>> &regions,
+    std::vector<std::shared_ptr<ArdaContinent>> &continents,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions);
 void generateFullCivilisationData(
+    Simulation::SimulationExport &simulationExport,
     std::vector<std::shared_ptr<ArdaRegion>> &regions,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
     CivilizationData &civData,
@@ -52,6 +60,11 @@ void generateDevelopment(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
     const std::vector<std::shared_ptr<ArdaContinent>> &continents);
+void deriveDevelopment(
+    Simulation::SimulationExport simulationExport,
+    const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
+    const std::vector<std::shared_ptr<ArdaRegion>> &regions,
+    const std::vector<std::shared_ptr<ArdaContinent>> &continents);
 void loadPopulation(
     const Fwg::Gfx::Image &populationMap,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
@@ -65,7 +78,12 @@ void generatePopulation(
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
     const std::vector<std::shared_ptr<ArdaContinent>> &continents,
     double targetWorldPopulation);
-
+void derivePopulation(
+    Simulation::SimulationExport simulationExport, CivilizationData &civData,
+    const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
+    const std::vector<std::shared_ptr<ArdaRegion>> &regions,
+    const std::vector<std::shared_ptr<ArdaContinent>> &continents,
+    double targetWorldPopulation);
 void generateEconomicActivity(
     CivilizationData &civData,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
@@ -85,8 +103,6 @@ void nameContinents(std::vector<std::shared_ptr<ArdaContinent>> &continents,
 void applyCivilisationTopography(
     Arda::Civilization::CivilizationLayer &civLayer,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces);
-
-
 
 bool sanityChecks(const CivilizationData &civData);
 

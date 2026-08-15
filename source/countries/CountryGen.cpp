@@ -168,7 +168,7 @@ void loadCountriesFromText(
                                      std::stoi(tokens[2]));
       inputCountryMap.setValue(colour, tokens);
     }
-  } catch (std::exception& e) {
+  } catch (std::exception &e) {
     Fwg::Utils::Logging::logLine(
         "Exception while parsing country input, ", e.what(),
         " continuing with randomly generated countries");
@@ -290,6 +290,112 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
     }
     generateCountrySpecifics(generationAge, countries);
   }
+}
+
+void deriveCountries(
+    Simulation::SimulationExport &simulationExport,
+    const Arda::Utils::GenerationAge &generationAge,
+    std::function<std::shared_ptr<Country>()> factory, int numCountries,
+    std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
+    std::map<std::string, std::shared_ptr<Country>> &countries,
+    std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
+    Civilization::CivilizationData &civData, Arda::Names::NameData &nData) {
+  (void)numCountries;
+  (void)civData;
+  countries.clear();
+  nData.disallowedTokens = nData.originalDisallowedTokens;
+  for (const auto &region : ardaRegions) {
+    if (!region)
+      continue;
+    region->assigned = false;
+    region->owner = nullptr;
+  }
+
+  std::map<int, std::shared_ptr<Arda::ArdaProvince>> provincesById;
+  for (const auto &province : ardaProvinces)
+    if (province)
+      provincesById.emplace(province->ID, province);
+
+  std::map<int, std::shared_ptr<ArdaRegion>> regionsById;
+  for (const auto &region : ardaRegions)
+    if (region)
+      regionsById.emplace(region->ID, region);
+
+  std::map<int, std::shared_ptr<Country>> countriesByPolity;
+  for (const auto &[polityId, polityExport] : simulationExport.polities) {
+    auto country = factory();
+    country->ID = polityId;
+    country->tag = "P" + std::to_string(polityId);
+    country->name = "Polity " + std::to_string(polityId);
+    country->adjective = country->name;
+    country->flag = Gfx::Flag(82, 52);
+    country->colour = polityExport.polity.colour;
+    countriesByPolity.emplace(polityId, country);
+    countries.emplace(country->tag, country);
+  }
+
+  for (const auto &[provinceId, provinceExport] : simulationExport.provinces) {
+    const auto province = provincesById.find(provinceId);
+    if (province == provincesById.end())
+      continue;
+    province->second->owner = "P" + std::to_string(provinceExport.polityId);
+    const auto country = countriesByPolity.find(provinceExport.polityId);
+    if (country != countriesByPolity.end())
+      country->second->ownedProvinces.push_back(province->second);
+  }
+
+  for (const auto &[polityId, polityExport] : simulationExport.polities) {
+    const auto country = countriesByPolity.find(polityId);
+    if (country == countriesByPolity.end())
+      continue;
+    for (const auto regionId : polityExport.regionIds) {
+      const auto region = regionsById.find(regionId);
+      if (region == regionsById.end())
+        continue;
+      country->second->ownedRegions.push_back(region->second);
+      region->second->owner = country->second;
+      region->second->assigned = true;
+    }
+  }
+
+  for (auto &[polityId, country] : countriesByPolity) {
+    std::sort(country->ownedProvinces.begin(), country->ownedProvinces.end(),
+              [](const auto &left, const auto &right) {
+                return left->ID < right->ID;
+              });
+    std::sort(country->ownedRegions.begin(), country->ownedRegions.end(),
+              [](const auto &left, const auto &right) {
+                return left->ID < right->ID;
+              });
+    country->gatherCultureShares();
+    std::shared_ptr<ArdaRegion> historicalNameRegion;
+    const auto peak = simulationExport.historicalPolityPeaks.find(polityId);
+    for (const auto regionId :
+         peak == simulationExport.historicalPolityPeaks.end()
+             ? std::vector<Simulation::RegionId>{}
+             : peak->second.regionIds) {
+      const auto region = regionsById.find(regionId);
+      if (region != regionsById.end() && !region->second->name.empty() &&
+          (!historicalNameRegion || region->second->totalPopulation >
+                                        historicalNameRegion->totalPopulation))
+        historicalNameRegion = region->second;
+    }
+    if (historicalNameRegion)
+      country->name = historicalNameRegion->name;
+    else if (const auto culture = country->getPrimaryCulture())
+      country->name = culture->language->generateGenericCapitalizedWord();
+    if (const auto culture = country->getPrimaryCulture())
+      country->adjective = culture->language->getAdjectiveForm(country->name);
+    country->tag =
+        Arda::Names::generateTag(country->name, nData.disallowedTokens);
+    countries.erase("P" + std::to_string(polityId));
+    countries[country->tag] = country;
+
+    for (const auto &province : country->ownedProvinces)
+      province->owner = country->tag;
+  }
+
+  generateCountrySpecifics(generationAge, countries);
 }
 
 void saveCountries(std::map<std::string, std::shared_ptr<Country>> &countries,

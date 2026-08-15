@@ -6,7 +6,9 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
+#include <limits>
 #include <numeric>
 #include <set>
 #include <sstream>
@@ -24,16 +26,85 @@ struct NormalizedInput {
     bool coastal = false;
     size_t area = 0;
   };
+
   std::map<ProvinceId, std::shared_ptr<ArdaProvince>> provinces;
   std::map<ProvinceId, RegionId> provinceRegions;
   std::map<RegionId, std::vector<ProvinceId>> regions;
   std::map<ProvinceId, std::vector<ProvinceId>> neighbours;
   std::map<ProvinceId, int> provinceContinents;
+  std::set<ProvinceId> coastalProvinces;
+  std::set<ProvinceId> islandProvinces;
+  std::map<std::pair<ProvinceId, ProvinceId>, double> seaDistances;
   std::map<RegionId, int> regionContinents;
   std::map<RegionId, std::vector<RegionId>> regionNeighbours;
   std::map<ProvinceId, Environment> environments;
   std::vector<ValidationError> errors;
 };
+
+std::vector<PolityId> contiguousSuccessorAssignments(
+    const std::vector<ProvinceId> &provinceIds, size_t successorCount,
+    const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours) {
+  std::vector<PolityId> assignments(provinceIds.size(), -1);
+  std::map<ProvinceId, size_t> indices;
+  for (size_t index = 0; index < provinceIds.size(); ++index)
+    indices.emplace(provinceIds[index], index);
+
+  std::vector<std::vector<size_t>> frontiers(successorCount);
+  std::set<size_t> unassigned;
+  for (size_t index = 0; index < provinceIds.size(); ++index)
+    unassigned.insert(index);
+  for (size_t successor = 0; successor < successorCount; ++successor) {
+    const auto seed =
+        provinceIds[(successor * provinceIds.size()) / successorCount];
+    const auto seedIndex = indices.at(seed);
+    assignments[seedIndex] = static_cast<PolityId>(successor);
+    unassigned.erase(seedIndex);
+    frontiers[successor].push_back(seedIndex);
+  }
+
+  while (!unassigned.empty()) {
+    bool assigned = false;
+    for (size_t successor = 0;
+         successor < successorCount && !unassigned.empty(); ++successor) {
+      auto &frontier = frontiers[successor];
+      for (size_t frontierIndex = 0; frontierIndex < frontier.size();
+           ++frontierIndex) {
+        const auto provinceId = provinceIds[frontier[frontierIndex]];
+        for (const auto neighbourId : neighbours.at(provinceId)) {
+          const auto candidate = indices.find(neighbourId);
+          if (candidate == indices.end() ||
+              !unassigned.contains(candidate->second))
+            continue;
+          assignments[candidate->second] = static_cast<PolityId>(successor);
+          unassigned.erase(candidate->second);
+          frontier.push_back(candidate->second);
+          assigned = true;
+          break;
+        }
+        if (assigned)
+          break;
+      }
+    }
+    if (assigned)
+      continue;
+    const auto orphan = *unassigned.begin();
+    size_t successor = 0;
+    size_t smallestTerritory = provinceIds.size();
+    for (size_t candidate = 0; candidate < successorCount; ++candidate) {
+      const auto territorySize =
+          std::count(assignments.begin(), assignments.end(),
+                     static_cast<PolityId>(candidate));
+      if (territorySize < smallestTerritory) {
+        smallestTerritory = territorySize;
+        successor = candidate;
+      }
+    }
+    assignments[orphan] = static_cast<PolityId>(successor);
+    unassigned.erase(orphan);
+    frontiers[successor].push_back(orphan);
+  }
+  return assignments;
+}
 
 bool isEligible(const std::shared_ptr<ArdaProvince> &province) {
   return province && !province->isSea() && !province->isLake() &&
@@ -139,6 +210,18 @@ NormalizedInput normalize(const Input &input) {
         normalized.provinceRegions[province->ID] = ardaRegion->ID;
         normalized.provinceContinents[province->ID] = continent->ID;
         normalized.regions[ardaRegion->ID].push_back(province->ID);
+        if (province->isCoastalToOcean())
+          normalized.coastalProvinces.insert(province->ID);
+        const auto regionIsIsland =
+            ardaRegion->areaSubType == Fwg::Areas::AreaSubType::Island ||
+            ardaRegion->areaSubType == Fwg::Areas::AreaSubType::CoastalIsland ||
+            ardaRegion->areaSubType == Fwg::Areas::AreaSubType::LakeIsland;
+        const auto provinceIsIsland =
+            province->areaSubType == Fwg::Areas::AreaSubType::Island ||
+            province->areaSubType == Fwg::Areas::AreaSubType::CoastalIsland ||
+            province->areaSubType == Fwg::Areas::AreaSubType::LakeIsland;
+        if (regionIsIsland || provinceIsIsland)
+          normalized.islandProvinces.insert(province->ID);
       }
     }
   }
@@ -201,11 +284,38 @@ NormalizedInput normalize(const Input &input) {
     normalized.environments[provinceId] = environment;
   }
 
+  for (const auto sourceId : normalized.coastalProvinces) {
+    const auto &source = normalized.provinces.at(sourceId);
+    for (const auto targetId : normalized.islandProvinces) {
+      if (sourceId == targetId ||
+          !normalized.coastalProvinces.contains(targetId))
+        continue;
+      const auto &target = normalized.provinces.at(targetId);
+      const auto dx = static_cast<double>(source->position.widthCenter -
+                                          target->position.widthCenter);
+      const auto dy = static_cast<double>(source->position.heightCenter -
+                                          target->position.heightCenter);
+      const auto distance = std::sqrt(dx * dx + dy * dy);
+      if (distance > 0.0)
+        normalized.seaDistances.emplace(std::make_pair(sourceId, targetId),
+                                        distance);
+    }
+  }
+
   return normalized;
 }
 
 bool chance(double probability) {
   return probability > 0.0 && RandNum::getRandom<double>(1.0) < probability;
+}
+
+PolityId strongestPolityOf(const State &state) {
+  const auto strongest = std::max_element(
+      state.polityStrengths.begin(), state.polityStrengths.end(),
+      [](const auto &left, const auto &right) {
+        return left.second.score < right.second.score;
+      });
+  return strongest == state.polityStrengths.end() ? NoPolity : strongest->first;
 }
 
 Fwg::Gfx::Colour randomPolityColour() {
@@ -224,13 +334,88 @@ int stepFor(const Configuration &configuration, Year year) {
   return configuration.modernStepYears;
 }
 
+double polityCapacityAt(const Configuration &configuration, Year year) {
+  const auto compound = [](double multiplier, double rate, Year years) {
+    return multiplier *
+           std::pow(1.0 + rate,
+                    static_cast<double>(std::max(0, years)) / 100.0);
+  };
+  const auto renaissanceStart =
+      std::max(configuration.renaissanceStartYear, configuration.startYear);
+  const auto industrialStart =
+      std::max(configuration.industrialRevolutionStartYear, renaissanceStart);
+  auto multiplier =
+      compound(1.0, configuration.ancientPolityCapacityGrowthPerCentury,
+               std::min(year, renaissanceStart) - configuration.startYear);
+  multiplier = compound(multiplier,
+                        configuration.renaissancePolityCapacityGrowthPerCentury,
+                        std::min(year, industrialStart) - renaissanceStart);
+  return static_cast<double>(configuration.initialPolityCapacity) *
+         compound(multiplier,
+                  configuration.industrialPolityCapacityGrowthPerCentury,
+                  year - industrialStart);
+}
+
+double capacityExpansionMultiplier(const Configuration &configuration,
+                                   Year year, size_t territorySize) {
+  const auto capacity = polityCapacityAt(configuration, year);
+  if (capacity <= 0.0 || territorySize <= capacity)
+    return 1.0;
+  const auto overCapacity =
+      (static_cast<double>(territorySize) - capacity) / capacity;
+  return 1.0 /
+         (1.0 + configuration.overCapacityExpansionPenalty * overCapacity);
+}
+
+double expansionBorderScore(
+    ProvinceId targetProvince, PolityId attacker,
+    const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours,
+    const std::map<ProvinceId, ProvinceState> &provinces) {
+  const auto &targetNeighbours = neighbours.at(targetProvince);
+  double score = static_cast<double>(targetNeighbours.size());
+  for (const auto neighbourId : targetNeighbours) {
+    const auto &neighbour = provinces.at(neighbourId);
+    if (neighbour.owner == attacker)
+      score += 3.0;
+
+    size_t attackerNeighbours = 0;
+    size_t foreignNeighbours = 0;
+    for (const auto surroundingId : neighbours.at(neighbourId)) {
+      const auto &surrounding = provinces.at(surroundingId);
+      if (surrounding.owner == attacker)
+        ++attackerNeighbours;
+      else if (surrounding.owner == neighbour.owner)
+        ++foreignNeighbours;
+    }
+    if (foreignNeighbours > 0 && attackerNeighbours + 1 >= foreignNeighbours)
+      score -= 8.0;
+    if (foreignNeighbours == 1 && attackerNeighbours > 0)
+      score -= 12.0;
+  }
+  return score;
+}
+
 void applyEvent(State &state, const Event &event) {
   state.year = event.year;
   switch (event.type) {
   case EventType::CreatePolity:
-    state.polities[event.polityId] = {event.polityId, event.year, std::nullopt,
-                                      event.description == "tribe",
-                                      event.colour};
+    state.polities[event.polityId] = {
+        event.polityId, event.year, std::nullopt,
+        std::nullopt,   {},         event.description == "tribe",
+        event.colour};
+    break;
+  case EventType::CreateSuccessorPolity:
+    state.polities[event.polityId] = {
+        event.polityId,
+        event.year,
+        std::nullopt,
+        event.parentId >= 0 ? std::optional<PolityId>(event.parentId)
+                            : std::nullopt,
+        {},
+        false,
+        event.colour};
+    if (event.parentId >= 0 && state.polities.contains(event.parentId))
+      state.polities.at(event.parentId).successorIds.push_back(event.polityId);
     break;
   case EventType::ConvertCulturePopulation:
     if (auto province = state.provinces.find(event.provinceId);
@@ -242,6 +427,10 @@ void applyEvent(State &state, const Event &event) {
       province->second.culturePopulations[event.cultureId] += event.value;
       refreshDominantCulture(province->second);
     }
+    break;
+  case EventType::UpdatePolityStrength:
+    state.polityStrengths[event.polityId] = {event.value, event.secondaryValue,
+                                             event.score};
     break;
   case EventType::InitializeProvince:
     state.provinces[event.provinceId] = {event.polityId, event.cultureId,
@@ -316,13 +505,13 @@ void applyEvent(State &state, const Event &event) {
       province->second.carryingCapacity = event.value;
     break;
   case EventType::MigratePopulation:
-    if (auto source = state.provinces.find(event.provinceId);
-        source != state.provinces.end())
-      source->second.population =
-          std::max(0.0, source->second.population - event.value);
-    if (auto target = state.provinces.find(event.regionId);
-        target != state.provinces.end())
-      target->second.population += event.value;
+    // if (auto source = state.provinces.find(event.provinceId);
+    //     source != state.provinces.end())
+    //   source->second.population =
+    //       std::max(0.0, source->second.population - event.value);
+    // if (auto target = state.provinces.find(event.regionId);
+    //     target != state.provinces.end())
+    //   target->second.population += event.value;
     break;
   case EventType::SetRegionalPhase:
     state.regionalPhases[event.regionId] =
@@ -344,20 +533,20 @@ void applyEvent(State &state, const Event &event) {
           static_cast<SuperRegionPhase>(static_cast<int>(event.value));
     break;
   case EventType::MigrateCulturePopulation:
-    if (auto source = state.provinces.find(event.provinceId);
-        source != state.provinces.end())
-      source->second.culturePopulations[event.cultureId] =
-          std::max(0.0, source->second.culturePopulations[event.cultureId] -
-                            event.value);
-    if (auto target = state.provinces.find(event.regionId);
-        target != state.provinces.end())
-      target->second.culturePopulations[event.cultureId] += event.value;
-    if (auto source = state.provinces.find(event.provinceId);
-        source != state.provinces.end())
-      source->second.culture = state.dominantCultureOf(event.provinceId);
-    if (auto target = state.provinces.find(event.regionId);
-        target != state.provinces.end())
-      target->second.culture = state.dominantCultureOf(event.regionId);
+    // if (auto source = state.provinces.find(event.provinceId);
+    //     source != state.provinces.end())
+    //   source->second.culturePopulations[event.cultureId] =
+    //       std::max(0.0, source->second.culturePopulations[event.cultureId] -
+    //                         event.value);
+    // if (auto target = state.provinces.find(event.regionId);
+    //     target != state.provinces.end())
+    //   target->second.culturePopulations[event.cultureId] += event.value;
+    // if (auto source = state.provinces.find(event.provinceId);
+    //     source != state.provinces.end())
+    //   source->second.culture = state.dominantCultureOf(event.provinceId);
+    // if (auto target = state.provinces.find(event.regionId);
+    //     target != state.provinces.end())
+    //   target->second.culture = state.dominantCultureOf(event.regionId);
     break;
   case EventType::ColonizeProvince:
     if (auto province = state.provinces.find(event.provinceId);
@@ -373,6 +562,8 @@ const char *eventTypeName(EventType type) {
     return "InitializeProvince";
   case EventType::CreatePolity:
     return "CreatePolity";
+  case EventType::CreateSuccessorPolity:
+    return "CreateSuccessorPolity";
   case EventType::TransferProvince:
     return "TransferProvince";
   case EventType::DissolvePolity:
@@ -387,6 +578,8 @@ const char *eventTypeName(EventType type) {
     return "SetReligion";
   case EventType::UpdatePopulation:
     return "UpdatePopulation";
+  case EventType::UpdatePolityStrength:
+    return "UpdatePolityStrength";
   case EventType::UpdateDevelopment:
     return "UpdateDevelopment";
   case EventType::UpdateCarryingCapacity:
@@ -411,6 +604,605 @@ const char *eventTypeName(EventType type) {
     return "ConsolidateRegion";
   }
   return "Unknown";
+}
+
+using AppendEvent = std::function<void(Event &&)>;
+
+void logYearProgress(Year year, Year targetYear,
+                     const std::map<EventType, std::size_t> &eventCounts) {
+  std::ostringstream eventProgress;
+  eventProgress << "Simulating year " << year << " of " << targetYear
+                << " | cumulative events: ";
+  bool firstEventCount = true;
+  for (const auto &[eventType, count] : eventCounts) {
+    if (!firstEventCount)
+      eventProgress << ", ";
+    eventProgress << eventTypeName(eventType) << '=' << count;
+    firstEventCount = false;
+  }
+  Fwg::Utils::Logging::logLine(eventProgress.str());
+}
+
+void updateSuperRegionPhases(Year year, Year nextYear,
+                             const Configuration &configuration, State &state,
+                             const AppendEvent &append) {
+  std::vector<SuperRegionId> ordered;
+  for (const auto &[id, superRegion] : state.superRegions)
+    ordered.push_back(id);
+  if (nextYear >= configuration.persistentDevelopmentStartYear) {
+    std::sort(ordered.begin(), ordered.end(),
+              [&](const auto left, const auto right) {
+                return state.superRegions.at(left).development >
+                       state.superRegions.at(right).development;
+              });
+  } else if (!ordered.empty()) {
+    std::rotate(ordered.begin(),
+                ordered.begin() +
+                    RandNum::getRandom<int>(static_cast<int>(ordered.size())),
+                ordered.end());
+  }
+  for (size_t index = 0; index < ordered.size(); ++index) {
+    const auto phase =
+        index < 2 ? SuperRegionPhase::Booming : SuperRegionPhase::Lagging;
+    append({nextYear, EventType::SetSuperRegionPhase, -1, ordered[index],
+            NoPolity, NoPolity, -1, NoReligion,
+            static_cast<double>(static_cast<int>(phase)), 0.0,
+            "superregional development cycle"});
+  }
+}
+
+void updateRegionalPhases(Year year, Year nextYear,
+                          const Configuration &configuration,
+                          const NormalizedInput &normalized,
+                          const AppendEvent &append) {
+  for (const auto &[regionId, provinces] : normalized.regions) {
+    const auto phase =
+        static_cast<RegionalPhase>(RandNum::getRandom<int>(3) - 1);
+    append({nextYear, EventType::SetRegionalPhase, -1, regionId, NoPolity,
+            NoPolity, -1, NoReligion,
+            static_cast<double>(static_cast<int>(phase)), 0.0,
+            "regional boom or bust transition"});
+  }
+}
+
+void updateProvinceGrowth(
+    const Year nextYear, double centuries, const Configuration &configuration,
+    const NormalizedInput &normalized, State &state,
+    const std::map<ProvinceId, double> &growthPotential,
+    const std::map<ProvinceId, double> &baseCapacity, const AppendEvent &append,
+    std::map<PolityId, std::vector<ProvinceId>> &territories) {
+  for (const auto &[provinceId, province] : state.provinces) {
+    const auto potential = growthPotential.at(provinceId);
+    const auto regionId = normalized.provinceRegions.at(provinceId);
+    const auto phase = state.regionalPhases.contains(regionId)
+                           ? state.regionalPhases.at(regionId)
+                           : RegionalPhase::Neutral;
+    const auto superRegionId = state.regionSuperRegions.at(regionId);
+    const auto superPhase = state.superRegions.at(superRegionId).phase;
+    const bool bordersBoomingSuperRegion =
+        std::any_of(state.superRegions.at(superRegionId).neighbours.begin(),
+                    state.superRegions.at(superRegionId).neighbours.end(),
+                    [&](const auto neighbourId) {
+                      return state.superRegions.at(neighbourId).phase ==
+                             SuperRegionPhase::Booming;
+                    });
+    const double superRegionMultiplier =
+        (superPhase == SuperRegionPhase::Booming   ? 1.8
+         : superPhase == SuperRegionPhase::Lagging ? 0.55
+                                                   : 1.0) +
+        (bordersBoomingSuperRegion && superPhase != SuperRegionPhase::Booming
+             ? configuration.superRegionNeighbourInfluence
+             : 0.0);
+    const double capacity = baseCapacity.at(provinceId) *
+                            capacityEraMultiplier(configuration, nextYear) *
+                            (1.0 + province.development * 0.05) *
+                            phaseMultiplier(phase) * superRegionMultiplier;
+    const double densityFactor = std::clamp(
+        1.0 - province.population / std::max(capacity, 1.0), 0.0, 1.0);
+    const auto immigrationHeadroom =
+        std::any_of(normalized.neighbours.at(provinceId).begin(),
+                    normalized.neighbours.at(provinceId).end(),
+                    [&](const auto neighbourId) {
+                      const auto &neighbour = state.provinces.at(neighbourId);
+                      return neighbour.carryingCapacity > neighbour.population;
+                    });
+    const double phaseGrowth = phaseMultiplier(phase) * superRegionMultiplier;
+    const double immigrationBonus = immigrationHeadroom ? 1.0 : 0.0;
+    const double emigrationPenalty =
+        normalized.neighbours.at(provinceId).empty() ? 0.0 : 0.25;
+    const double gainChance = std::clamp(
+        configuration.populationGrowthPerCentury * centuries * potential *
+            densityFactor *
+            (0.5 + phaseGrowth + immigrationBonus - emigrationPenalty),
+        0.0, 1.0);
+    auto population = province.population;
+    if (chance(gainChance) && population < capacity)
+      population = std::floor(population) + 1.0;
+    population = std::max(configuration.minimumPopulation,
+                          std::min(population, std::floor(capacity)));
+    const double developmentChange =
+        configuration.developmentGrowthPerCentury * potential *
+        (1.0 + std::log1p(province.population) / 10.0) * centuries *
+        (phase == RegionalPhase::Bust ? -0.35 : phaseMultiplier(phase)) *
+        superRegionMultiplier;
+    const double development =
+        std::max(0.0, province.development + developmentChange);
+    state.superRegions[superRegionId].development += developmentChange;
+    append({nextYear, EventType::UpdateCarryingCapacity, provinceId, regionId,
+            NoPolity, NoPolity, -1, NoReligion, capacity,
+            capacityEraMultiplier(configuration, nextYear),
+            "era-adjusted carrying capacity"});
+    if (population != province.population) {
+      append({nextYear, EventType::UpdatePopulation, provinceId, -1, NoPolity,
+              NoPolity, -1, NoReligion, population, 0.0, "population growth"});
+    }
+    if (development != province.development) {
+      append({nextYear, EventType::UpdateDevelopment, provinceId, -1, NoPolity,
+              NoPolity, -1, NoReligion, development, 0.0,
+              "development growth"});
+    }
+    territories[province.owner].push_back(provinceId);
+  }
+}
+
+void updatePolityStrengths(const Year nextYear, State &state,
+                           const AppendEvent &append) {
+  std::map<PolityId, PolityStrength> strengths;
+  for (const auto &[provinceId, province] : state.provinces) {
+    auto &strength = strengths[province.owner];
+    strength.population += province.population;
+    strength.development += province.development;
+  }
+  for (auto &[polityId, strength] : strengths) {
+    strength.score = strength.population * 0.01 + strength.development * 10.0;
+    append({nextYear,
+            EventType::UpdatePolityStrength,
+            -1,
+            -1,
+            polityId,
+            NoPolity,
+            -1,
+            NoReligion,
+            strength.population,
+            strength.development,
+            "polity strength snapshot",
+            -1,
+            {},
+            strength.score});
+  }
+}
+
+void integrateCultures(const Year nextYear, double centuries,
+                       const Configuration &configuration, State &state,
+                       const AppendEvent &append) {
+  double stabilityThreshold = 0.0;
+  for (const auto &[polityId, strength] : state.polityStrengths)
+    stabilityThreshold = std::max(stabilityThreshold, strength.score * 0.5);
+  for (const auto &[provinceId, province] : state.provinces) {
+    if (state.polityStrengths.at(province.owner).score < stabilityThreshold ||
+        province.culturePopulations.size() < 2)
+      continue;
+    const auto dominantCulture = state.dominantCultureOf(provinceId);
+    for (const auto &[cultureId, culturalPopulation] :
+         province.culturePopulations) {
+      if (cultureId == dominantCulture)
+        continue;
+      const auto conversion = culturalPopulation *
+                              configuration.culturalIntegrationRatePerCentury *
+                              centuries;
+      if (conversion > 0.0)
+        append({nextYear, EventType::ConvertCulturePopulation, provinceId, -1,
+                NoPolity, NoPolity, dominantCulture, NoReligion, conversion,
+                0.0, "stable polity cultural integration", cultureId});
+    }
+  }
+}
+
+void colonize(const Year nextYear, double centuries,
+              const Configuration &configuration,
+              const NormalizedInput &normalized, State &state,
+              const AppendEvent &append, PolityId strongestPolity) {
+  if (nextYear < configuration.colonizationStartYear ||
+      nextYear >= configuration.regionOwnershipYear ||
+      strongestPolity == NoPolity)
+    return;
+  ProvinceId sourceProvince = -1;
+  for (const auto &[provinceId, province] : state.provinces) {
+    if (province.owner == strongestPolity &&
+        normalized.provinces.at(provinceId)->isCoastalToOcean() &&
+        (sourceProvince < 0 ||
+         province.development > state.provinces.at(sourceProvince).development))
+      sourceProvince = provinceId;
+  }
+  ProvinceId targetProvince = -1;
+  if (sourceProvince < 0)
+    return;
+  for (const auto &[provinceId, province] : state.provinces) {
+    const auto targetRegion = normalized.provinceRegions.at(provinceId);
+    const auto targetSuperRegion = state.regionSuperRegions.at(targetRegion);
+    const bool lagging = state.superRegions.at(targetSuperRegion).phase ==
+                         SuperRegionPhase::Lagging;
+    const bool reachableByLand =
+        normalized.provinceContinents.at(provinceId) ==
+        normalized.provinceContinents.at(sourceProvince);
+    const bool reachableBySea =
+        normalized.provinces.at(provinceId)->isCoastalToOcean();
+    if (province.owner != strongestPolity && lagging &&
+        (reachableByLand || reachableBySea) &&
+        (targetProvince < 0 ||
+         province.development < state.provinces.at(targetProvince).development))
+      targetProvince = provinceId;
+  }
+  if (targetProvince < 0 ||
+      !chance(configuration.colonialSettlementRatePerCentury * centuries *
+              capacityExpansionMultiplier(
+                  configuration, nextYear,
+                  static_cast<size_t>(std::count_if(
+                      state.provinces.begin(), state.provinces.end(),
+                      [strongestPolity](const auto &entry) {
+                        return entry.second.owner == strongestPolity;
+                      })))))
+    return;
+  append({nextYear, EventType::ColonizeProvince, targetProvince,
+          normalized.provinceRegions.at(targetProvince), strongestPolity,
+          state.provinces.at(targetProvince).owner, -1, NoReligion, 1.0, 0.0,
+          "colonial settlement"});
+}
+
+void maritimeExpansion(
+    const Year nextYear, double centuries, const Configuration &configuration,
+    const NormalizedInput &normalized, State &state, const AppendEvent &append,
+    const std::map<PolityId, std::vector<ProvinceId>> &territories) {
+  if (nextYear < configuration.maritimeExpansionStartYear)
+    return;
+
+  const auto centuriesSinceStart = std::max(
+      0.0,
+      static_cast<double>(nextYear - configuration.maritimeExpansionStartYear) /
+          100.0);
+  const auto maritimeRange = std::max(
+      1.0, configuration.initialMaritimeRange *
+               std::pow(1.0 + configuration.maritimeRangeGrowthPerCentury,
+                        centuriesSinceStart));
+  for (const auto &[polityId, provinceIds] : territories) {
+    const auto strength = state.polityStrengths.find(polityId);
+    if (strength == state.polityStrengths.end())
+      continue;
+    const auto capacityMultiplier = capacityExpansionMultiplier(
+        configuration, nextYear, provinceIds.size());
+    if (!chance(configuration.maritimeExpansionChance * centuries *
+                capacityMultiplier))
+      continue;
+
+    ProvinceId sourceProvince = -1;
+    ProvinceId targetProvince = -1;
+    double targetDistance = std::numeric_limits<double>::max();
+    for (const auto sourceId : provinceIds) {
+      if (!normalized.coastalProvinces.contains(sourceId))
+        continue;
+      for (const auto &[route, distance] : normalized.seaDistances) {
+        if (route.first != sourceId || distance > maritimeRange)
+          continue;
+        const auto candidateId = route.second;
+        const auto &candidate = state.provinces.at(candidateId);
+        if (candidate.owner == polityId)
+          continue;
+        if (distance < targetDistance) {
+          sourceProvince = sourceId;
+          targetProvince = candidateId;
+          targetDistance = distance;
+        }
+      }
+    }
+    if (sourceProvince < 0 || targetProvince < 0)
+      continue;
+
+    const auto distanceMultiplier =
+        std::exp(-targetDistance / std::max(1.0, maritimeRange));
+    const auto &target = state.provinces.at(targetProvince);
+    const auto attacker = strength->second.score;
+    const auto defender = state.polityStrengths.contains(target.owner)
+                              ? state.polityStrengths.at(target.owner).score
+                              : 0.0;
+    if (target.owner != NoPolity) {
+      if (chance(configuration.maritimeConquestMultiplier * centuries *
+                 distanceMultiplier * attacker /
+                 std::max(1.0, attacker + defender)))
+        append({nextYear, EventType::TransferProvince, targetProvince,
+                normalized.provinceRegions.at(targetProvince), polityId,
+                target.owner, -1, NoReligion, 0.0, 0.0,
+                "maritime island conquest"});
+    } else if (nextYear >= configuration.colonizationStartYear &&
+               chance(configuration.maritimeColonizationMultiplier * centuries *
+                      distanceMultiplier)) {
+      append({nextYear, EventType::ColonizeProvince, targetProvince,
+              normalized.provinceRegions.at(targetProvince), polityId, NoPolity,
+              -1, NoReligion, 1.0, 0.0, "maritime island colonization"});
+    }
+  }
+}
+
+void balancePolities(const Year nextYear, double centuries,
+                     const Configuration &configuration,
+                     const NormalizedInput &normalized, State &state,
+                     const AppendEvent &append, PolityId &nextPolity,
+                     std::map<PolityId, std::vector<ProvinceId>> &territories) {
+  const auto currentPolityCount = static_cast<double>(territories.size());
+  const auto initialPolityCount =
+      static_cast<double>(normalized.provinces.size());
+  const double simulationProgress =
+      std::clamp(static_cast<double>(nextYear - configuration.startYear) /
+                     static_cast<double>(configuration.targetYear -
+                                         configuration.startYear),
+                 0.0, 1.0);
+  const double desiredPolityCount =
+      initialPolityCount +
+      (static_cast<double>(configuration.targetEndPolityCount) -
+       initialPolityCount) *
+          simulationProgress;
+  const double consolidationPressure =
+      initialPolityCount == configuration.targetEndPolityCount
+          ? 0.0
+          : std::clamp(
+                (currentPolityCount - desiredPolityCount) /
+                    (initialPolityCount - configuration.targetEndPolityCount),
+                0.0, 1.0);
+
+  const bool aggressive = nextYear >= configuration.polityAggressionStartYear;
+  const double expansionMultiplier =
+      aggressive ? configuration.aggressiveExpansionMultiplier : 1.0;
+  const double fragmentationMultiplier =
+      aggressive ? configuration.aggressiveFragmentationMultiplier : 1.0;
+  const double expansionPressure =
+      std::max(consolidationPressure, aggressive ? 0.35 : 0.0);
+  const double postStabilizationProgress =
+      configuration.polityStabilizationStartYear >= configuration.targetYear
+          ? 0.0
+          : std::clamp(
+                static_cast<double>(
+                    nextYear - configuration.polityStabilizationStartYear) /
+                    static_cast<double>(
+                        configuration.targetYear -
+                        configuration.polityStabilizationStartYear),
+                0.0, 1.0);
+  const double stabilizationMultiplier =
+      1.0 - postStabilizationProgress *
+                (1.0 - configuration.postStabilizationFragmentationMultiplier);
+  for (const auto &[provinceId, province] : state.provinces) {
+    const auto territorySize = territories[province.owner].size();
+    const auto capacityMultiplier =
+        capacityExpansionMultiplier(configuration, nextYear, territorySize);
+    if (!chance(configuration.expansionChance * expansionMultiplier *
+                centuries * expansionPressure * capacityMultiplier))
+      continue;
+    const auto &neighbours = normalized.neighbours.at(provinceId);
+    if (neighbours.empty())
+      continue;
+    std::vector<std::pair<ProvinceId, double>> candidates;
+    candidates.reserve(neighbours.size());
+    for (const auto neighbourId : neighbours) {
+      const auto &neighbour = state.provinces.at(neighbourId);
+      if (neighbour.owner == province.owner)
+        continue;
+      const auto attacker = state.polityStrengths.at(province.owner).score;
+      const auto defender = state.polityStrengths.at(neighbour.owner).score;
+      if (!chance(attacker / std::max(1.0, attacker + defender)))
+        continue;
+      candidates.emplace_back(neighbourId,
+                              expansionBorderScore(neighbourId, province.owner,
+                                                   normalized.neighbours,
+                                                   state.provinces));
+    }
+    if (candidates.empty())
+      continue;
+    const auto bestScore =
+        std::max_element(candidates.begin(), candidates.end(),
+                         [](const auto &left, const auto &right) {
+                           return left.second < right.second;
+                         })
+            ->second;
+    std::vector<ProvinceId> bestCandidates;
+    for (const auto &[candidateId, score] : candidates)
+      if (score >= bestScore - 0.001)
+        bestCandidates.push_back(candidateId);
+    const auto selected = bestCandidates[RandNum::getRandom<int>(
+        static_cast<int>(bestCandidates.size()))];
+    const auto &target = state.provinces.at(selected);
+    append({nextYear, EventType::TransferProvince, selected,
+            normalized.provinceRegions.at(selected), province.owner,
+            target.owner, -1, NoReligion, 0.0, 0.0, "provincial expansion"});
+  }
+
+  territories.clear();
+  for (const auto &[provinceId, province] : state.provinces)
+    territories[province.owner].push_back(provinceId);
+  maritimeExpansion(nextYear, centuries, configuration, normalized, state,
+                    append, territories);
+
+  territories.clear();
+  for (const auto &[provinceId, province] : state.provinces)
+    territories[province.owner].push_back(provinceId);
+  const auto strongestPolity = strongestPolityOf(state);
+  const auto strongestScore =
+      strongestPolity == NoPolity
+          ? 0.0
+          : state.polityStrengths.at(strongestPolity).score;
+  for (const auto &[polityId, provinceIds] : territories) {
+    if (provinceIds.size() < 2)
+      continue;
+    const auto splitProvince = provinceIds.back();
+    const auto polityScore = state.polityStrengths.at(polityId).score;
+    const auto foundedYear = state.polities.at(polityId).foundedYear;
+    const auto maturationProgress =
+        configuration.successorMaturationYears <= 0
+            ? 1.0
+            : std::clamp(static_cast<double>(nextYear - foundedYear) /
+                             static_cast<double>(
+                                 configuration.successorMaturationYears),
+                         0.0, 1.0);
+    const auto maturationMultiplier =
+        configuration.successorFragmentationMultiplier +
+        maturationProgress *
+            (1.0 - configuration.successorFragmentationMultiplier);
+    const auto smallPolityProgress =
+        configuration.smallPolityProtectionSize == 0 ||
+                provinceIds.size() <= configuration.smallPolityProtectionSize
+            ? 0.0
+            : std::clamp(
+                  static_cast<double>(provinceIds.size() -
+                                      configuration.smallPolityProtectionSize) /
+                      static_cast<double>(
+                          configuration.smallPolityProtectionSize),
+                  0.0, 1.0);
+    const auto smallPolityMultiplier =
+        configuration.smallPolityFragmentationMultiplier +
+        smallPolityProgress *
+            (1.0 - configuration.smallPolityFragmentationMultiplier);
+    const bool decaying =
+        strongestScore > 0.0 &&
+        polityScore <= strongestScore * configuration.decayStrengthRatio;
+    const bool decaySplit =
+        decaying && chance(configuration.decayFragmentationChance * centuries *
+                           stabilizationMultiplier * maturationMultiplier *
+                           smallPolityMultiplier);
+    const bool ordinarySplit = chance(
+        configuration.splitOffChance * fragmentationMultiplier * centuries *
+        std::max(0.25, 1.0 - consolidationPressure) * stabilizationMultiplier *
+        maturationMultiplier * smallPolityMultiplier);
+    if (!decaySplit && !ordinarySplit)
+      continue;
+    if (decaySplit) {
+      const auto configuredMaximum = static_cast<size_t>(
+          std::clamp(configuration.maximumImplosionSuccessors, 1, 10));
+      const auto desiredSuccessorCount = provinceIds.size() >= 8 ? 4u : 3u;
+      const auto successorCount =
+          std::min(provinceIds.size(),
+                   std::min(configuredMaximum,
+                            static_cast<size_t>(desiredSuccessorCount)));
+      std::vector<PolityId> successors;
+      successors.reserve(successorCount);
+      for (size_t index = 0; index < successorCount; ++index) {
+        const auto successorId = nextPolity++;
+        successors.push_back(successorId);
+        append({nextYear, EventType::CreateSuccessorPolity, -1, -1, successorId,
+                NoPolity, -1, NoReligion, 0.0, 0.0, "successor state", polityId,
+                randomPolityColour()});
+      }
+      const auto assignments = contiguousSuccessorAssignments(
+          provinceIds, successors.size(), normalized.neighbours);
+      for (size_t index = 0; index < provinceIds.size(); ++index) {
+        const auto successorId =
+            successors[static_cast<size_t>(assignments[index])];
+        append({nextYear, EventType::TransferProvince, provinceIds[index],
+                normalized.provinceRegions.at(provinceIds[index]), successorId,
+                polityId, -1, NoReligion, 0.0, 0.0,
+                "successor state partition"});
+      }
+      append({nextYear, EventType::DissolvePolity, -1, -1, polityId, NoPolity,
+              -1, NoReligion, 0.0, 0.0, "polity implosion"});
+      continue;
+    }
+    const auto splitPolity = nextPolity++;
+    append({nextYear, EventType::CreatePolity, -1, -1, splitPolity, NoPolity,
+            -1, NoReligion, 0.0, 0.0, "tribe", -1, randomPolityColour()});
+    append({nextYear, EventType::TransferProvince, splitProvince,
+            normalized.provinceRegions.at(splitProvince), splitPolity, polityId,
+            -1, NoReligion, 0.0, 0.0, "fragmentation"});
+  }
+}
+
+void evolveCultureAndReligion(const Year nextYear, double centuries,
+                              const Configuration &configuration,
+                              const NormalizedInput &normalized, State &state,
+                              const AppendEvent &append, CultureId &nextCulture,
+                              ReligionId &nextReligion) {
+  if (nextYear < configuration.classicalStartYear)
+    return;
+  for (const auto &[provinceId, province] : state.provinces) {
+    if (province.religion == NoReligion &&
+        chance(configuration.religionEmergenceChance * centuries)) {
+      const auto religionId = nextReligion++;
+      append({nextYear, EventType::CreateReligion, provinceId, -1, NoPolity,
+              NoPolity, -1, religionId, 0.0, 0.0, "religion emergence", -1,
+              randomPolityColour()});
+      append({nextYear, EventType::SetReligion, provinceId, -1, NoPolity,
+              NoPolity, -1, religionId, 0.0, 0.0, "religion adoption"});
+    }
+    if (province.religion != NoReligion &&
+        chance(configuration.religionSplitChance * centuries)) {
+      const auto religionId = nextReligion++;
+      append({nextYear, EventType::CreateReligion, provinceId, -1, NoPolity,
+              NoPolity, -1, religionId, 0.0, 0.0, "religion split",
+              province.religion, randomPolityColour()});
+      append({nextYear, EventType::SetReligion, provinceId, -1, NoPolity,
+              NoPolity, -1, religionId, 0.0, 0.0, "religion schism"});
+    }
+    for (const auto neighbourId : normalized.neighbours.at(provinceId)) {
+      const auto &neighbour = state.provinces.at(neighbourId);
+      if (province.religion == NoReligion && neighbour.religion != NoReligion &&
+          chance(configuration.religionSpreadChance * centuries)) {
+        append({nextYear, EventType::SetReligion, provinceId, -1, NoPolity,
+                NoPolity, -1, neighbour.religion, 0.0, 0.0, "religion spread"});
+        break;
+      }
+      if (province.culture != neighbour.culture &&
+          province.owner == neighbour.owner &&
+          chance(configuration.cultureAssimilationChance * centuries)) {
+        append({nextYear, EventType::SetCulture, provinceId, -1, NoPolity,
+                NoPolity, neighbour.culture, NoReligion, 0.0, 0.0,
+                "cultural assimilation"});
+        break;
+      }
+      if (province.culture == neighbour.culture &&
+          chance(configuration.cultureSplitChance * centuries)) {
+        const auto cultureId = nextCulture++;
+        append({nextYear, EventType::CreateCulture, provinceId, -1, NoPolity,
+                NoPolity, cultureId, NoReligion, 0.0, 0.0, "culture split",
+                province.culture, randomPolityColour()});
+        append({nextYear, EventType::SetCulture, provinceId, -1, NoPolity,
+                NoPolity, cultureId, NoReligion, 0.0, 0.0,
+                "cultural differentiation"});
+        break;
+      }
+    }
+  }
+}
+
+void consolidateRegions(const Year nextYear, const Configuration &configuration,
+                        const NormalizedInput &normalized, const State &state,
+                        const AppendEvent &append) {
+  for (const auto &[regionId, provinceIds] : normalized.regions) {
+    std::map<PolityId, int> ownership;
+    for (const auto provinceId : provinceIds)
+      ++ownership[state.provinces.at(provinceId).owner];
+    const auto dominant =
+        std::max_element(ownership.begin(), ownership.end(),
+                         [](const auto &left, const auto &right) {
+                           return left.second != right.second
+                                      ? left.second < right.second
+                                      : left.first > right.first;
+                         })
+            ->first;
+    for (const auto provinceId : provinceIds) {
+      const auto previous = state.provinces.at(provinceId).owner;
+      if (previous != dominant)
+        append({nextYear, EventType::ConsolidateRegion, provinceId, regionId,
+                dominant, previous, -1, NoReligion, 0.0, 0.0,
+                "regional consolidation"});
+    }
+  }
+}
+
+void dissolveEmptyPolities(const Year nextYear, State &state,
+                           const AppendEvent &append) {
+  std::map<PolityId, std::vector<ProvinceId>> territories;
+  for (const auto &[provinceId, province] : state.provinces)
+    territories[province.owner].push_back(provinceId);
+  for (const auto &[polityId, polity] : state.polities) {
+    if (!polity.dissolvedYear && !territories.contains(polityId))
+      append({nextYear, EventType::DissolvePolity, -1, -1, polityId, NoPolity,
+              -1, NoReligion, 0.0, 0.0, "annexed or dissolved"});
+  }
 }
 
 } // namespace
@@ -483,6 +1275,7 @@ Result HistorySimulation::run(const Input &input) {
   std::map<ProvinceId, double> baseCapacity;
   auto append = [&](Event &&event) {
     result.events.emplace_back(std::move(event));
+    ++result.eventCounts[result.events.back().type];
     applyEvent(state, result.events.back());
   };
   const auto totalRegions = std::max<size_t>(1, normalized.regions.size());
@@ -566,11 +1359,7 @@ Result HistorySimulation::run(const Input &input) {
                          1.0, static_cast<double>(environment.area) / 100.0)) /
                      (1.0 + environment.inclination));
     baseCapacity.emplace(provinceId, environmentalCapacity);
-    const double population =
-        std::min(environmentalCapacity,
-                 (province->population > 0.0 ? province->population
-                                             : environmentalCapacity * 0.25) *
-                     potential);
+    const double population = 1.0;
     const double development = (province->averageDevelopment > 0.0
                                     ? province->averageDevelopment
                                     : configuration.defaultDevelopment) *
@@ -596,443 +1385,37 @@ Result HistorySimulation::run(const Input &input) {
   for (Year year = configuration.startYear; year < configuration.targetYear;) {
     const Year nextYear =
         std::min(year + stepFor(configuration, year), configuration.targetYear);
-    Fwg::Utils::Logging::logLine("Simulating year ", std::to_string(year),
-                                 " of ",
-                                 std::to_string(configuration.targetYear));
+    logYearProgress(year, configuration.targetYear, result.eventCounts);
     const double centuries = static_cast<double>(nextYear - year) / 100.0;
-    if (configuration.superRegionCycleYears > 0 &&
-        (nextYear - configuration.startYear) /
-                configuration.superRegionCycleYears >
-            (year - configuration.startYear) /
-                configuration.superRegionCycleYears) {
-      std::vector<SuperRegionId> ordered;
-      for (const auto &[id, superRegion] : state.superRegions)
-        ordered.push_back(id);
-      if (nextYear >= configuration.persistentDevelopmentStartYear) {
-        std::sort(ordered.begin(), ordered.end(),
-                  [&](const auto left, const auto right) {
-                    return state.superRegions.at(left).development >
-                           state.superRegions.at(right).development;
-                  });
-      } else {
-        std::rotate(ordered.begin(),
-                    ordered.begin() + RandNum::getRandom<int>(
-                                          static_cast<int>(ordered.size())),
-                    ordered.end());
-      }
-      for (size_t index = 0; index < ordered.size(); ++index) {
-        const auto phase =
-            index < 2 ? SuperRegionPhase::Booming : SuperRegionPhase::Lagging;
-        append({nextYear, EventType::SetSuperRegionPhase, -1, ordered[index],
-                NoPolity, NoPolity, -1, NoReligion,
-                static_cast<double>(static_cast<int>(phase)), 0.0,
-                "superregional development cycle"});
-      }
+    if (!(configuration.superRegionCycleYears <= 0 ||
+          (nextYear - configuration.startYear) /
+                  configuration.superRegionCycleYears <=
+              (year - configuration.startYear) /
+                  configuration.superRegionCycleYears)) {
+      updateSuperRegionPhases(year, nextYear, configuration, state, append);
     }
-    if (configuration.regionPhaseDurationYears > 0 &&
-        (nextYear - configuration.startYear) /
-                configuration.regionPhaseDurationYears >
-            (year - configuration.startYear) /
-                configuration.regionPhaseDurationYears) {
-      for (const auto &[regionId, provinces] : normalized.regions) {
-        const auto phase =
-            static_cast<RegionalPhase>(RandNum::getRandom<int>(3) - 1);
-        append({nextYear, EventType::SetRegionalPhase, -1, regionId, NoPolity,
-                NoPolity, -1, NoReligion,
-                static_cast<double>(static_cast<int>(phase)), 0.0,
-                "regional boom or bust transition"});
-      }
+    if (!(configuration.regionPhaseDurationYears <= 0 ||
+          (nextYear - configuration.startYear) /
+                  configuration.regionPhaseDurationYears <=
+              (year - configuration.startYear) /
+                  configuration.regionPhaseDurationYears)) {
+      updateRegionalPhases(year, nextYear, configuration, normalized, append);
     }
     std::map<PolityId, std::vector<ProvinceId>> territories;
-    for (const auto &[provinceId, province] : state.provinces) {
-      const auto potential = growthPotential.at(provinceId);
-      const auto regionId = normalized.provinceRegions.at(provinceId);
-      const auto phase = state.regionalPhases.contains(regionId)
-                             ? state.regionalPhases.at(regionId)
-                             : RegionalPhase::Neutral;
-      const auto superRegionId = state.regionSuperRegions.at(regionId);
-      const auto superPhase = state.superRegions.at(superRegionId).phase;
-      const bool bordersBoomingSuperRegion =
-          std::any_of(state.superRegions.at(superRegionId).neighbours.begin(),
-                      state.superRegions.at(superRegionId).neighbours.end(),
-                      [&](const auto neighbourId) {
-                        return state.superRegions.at(neighbourId).phase ==
-                               SuperRegionPhase::Booming;
-                      });
-      const double superRegionMultiplier =
-          (superPhase == SuperRegionPhase::Booming   ? 1.8
-           : superPhase == SuperRegionPhase::Lagging ? 0.55
-                                                     : 1.0) +
-          (bordersBoomingSuperRegion && superPhase != SuperRegionPhase::Booming
-               ? configuration.superRegionNeighbourInfluence
-               : 0.0);
-      const double capacity = baseCapacity.at(provinceId) *
-                              capacityEraMultiplier(configuration, nextYear) *
-                              (1.0 + province.development * 0.05) *
-                              phaseMultiplier(phase) * superRegionMultiplier;
-      const double densityFactor =
-          1.0 - province.population / std::max(capacity, 1.0);
-      const double population =
-          std::max(configuration.minimumPopulation,
-                   province.population *
-                       (1.0 + configuration.populationGrowthPerCentury *
-                                  potential * densityFactor * centuries));
-      const double developmentChange =
-          configuration.developmentGrowthPerCentury * potential *
-          (1.0 + std::log1p(province.population) / 10.0) * centuries *
-          (phase == RegionalPhase::Bust ? -0.35 : phaseMultiplier(phase)) *
-          superRegionMultiplier;
-      const double development =
-          std::max(0.0, province.development + developmentChange);
-      state.superRegions[superRegionId].development += developmentChange;
-      append({nextYear, EventType::UpdateCarryingCapacity, provinceId, regionId,
-              NoPolity, NoPolity, -1, NoReligion, capacity,
-              capacityEraMultiplier(configuration, nextYear),
-              "era-adjusted carrying capacity"});
-      append({nextYear, EventType::UpdatePopulation, provinceId, -1, NoPolity,
-              NoPolity, -1, NoReligion, population, 0.0, "population growth"});
-      append({nextYear, EventType::UpdateDevelopment, provinceId, -1, NoPolity,
-              NoPolity, -1, NoReligion, development, 0.0,
-              "development growth"});
-      territories[province.owner].push_back(provinceId);
-    }
-    for (const auto &[provinceId, province] : state.provinces) {
-      const auto sourceCapacity =
-          state.provinces.at(provinceId).carryingCapacity;
-      const auto sourceAttraction =
-          sourceCapacity - province.population + province.development * 10.0;
-      ProvinceId destinationId = -1;
-      double bestAttraction = sourceAttraction;
-      for (const auto neighbourId : normalized.neighbours.at(provinceId)) {
-        const auto &destination = state.provinces.at(neighbourId);
-        const auto attraction = destination.carryingCapacity -
-                                destination.population +
-                                destination.development * 10.0;
-        if (attraction > bestAttraction) {
-          bestAttraction = attraction;
-          destinationId = neighbourId;
-        }
-      }
-      if (destinationId >= 0) {
-        const auto amount = std::min(
-            province.population * configuration.migrationRatePerCentury *
-                centuries,
-            std::max(0.0, state.provinces.at(destinationId).carryingCapacity -
-                              state.provinces.at(destinationId).population));
-        if (amount > 0.0)
-          append({nextYear, EventType::MigratePopulation, provinceId,
-                  destinationId, NoPolity, NoPolity, -1, NoReligion, amount,
-                  0.0, "adjacent migration"});
-        for (const auto &[cultureId, culturePopulation] :
-             state.provinces.at(provinceId).culturePopulations) {
-          const auto culturalAmount =
-              amount * culturePopulation /
-              std::max(1.0, state.provinces.at(provinceId).population + amount);
-          if (culturalAmount > 0.0)
-            append({nextYear, EventType::MigrateCulturePopulation, provinceId,
-                    destinationId, NoPolity, NoPolity, cultureId, NoReligion,
-                    culturalAmount, 0.0, "adjacent cultural migration"});
-        }
-      }
-    }
-    if (nextYear >= configuration.longDistanceMigrationStartYear) {
-      Fwg::Utils::Logging::logLine(
-          "Year %d: %zu provinces, %zu polities, %zu cultures, %zu religions",
-          nextYear, state.provinces.size(), state.polities.size(),
-          state.cultures.size(), state.religions.size());
-      for (const auto &[provinceId, province] : state.provinces) {
-        ProvinceId destinationId = -1;
-        double bestHeadroom = 0.0;
-        for (const auto &[candidateId, candidate] : state.provinces) {
-          if (candidateId == provinceId ||
-              normalized.provinceContinents.at(candidateId) !=
-                  normalized.provinceContinents.at(provinceId))
-            continue;
-          const auto headroom =
-              candidate.carryingCapacity - candidate.population;
-          if (headroom > bestHeadroom) {
-            bestHeadroom = headroom;
-            destinationId = candidateId;
-          }
-        }
-        if (destinationId >= 0) {
-          const auto amount = std::min(
-              province.population *
-                  configuration.longDistanceMigrationRatePerCentury * centuries,
-              bestHeadroom);
-          if (amount > 0.0)
-            append({nextYear, EventType::MigratePopulation, provinceId,
-                    destinationId, NoPolity, NoPolity, -1, NoReligion, amount,
-                    0.0, "same-continent migration"});
-          for (const auto &[cultureId, culturePopulation] :
-               state.provinces.at(provinceId).culturePopulations) {
-            const auto culturalAmount =
-                amount * culturePopulation /
-                std::max(1.0,
-                         state.provinces.at(provinceId).population + amount);
-            if (culturalAmount > 0.0)
-              append({nextYear, EventType::MigrateCulturePopulation, provinceId,
-                      destinationId, NoPolity, NoPolity, cultureId, NoReligion,
-                      culturalAmount, 0.0,
-                      "same-continent cultural migration"});
-          }
-        }
-      }
-    }
-    state.polityStrengths.clear();
-    for (const auto &[provinceId, province] : state.provinces) {
-      auto &strength = state.polityStrengths[province.owner];
-      strength.population += province.population;
-      strength.development += province.development;
-    }
-    for (auto &[polityId, strength] : state.polityStrengths)
-      strength.score = strength.population * 0.01 + strength.development * 10.0;
-    const auto strongestPolity = std::max_element(
-        state.polityStrengths.begin(), state.polityStrengths.end(),
-        [](const auto &left, const auto &right) {
-          return left.second.score < right.second.score;
-        });
-    const auto stabilityThreshold =
-        strongestPolity == state.polityStrengths.end()
-            ? 0.0
-            : strongestPolity->second.score * 0.5;
-    for (const auto &[provinceId, province] : state.provinces) {
-      if (state.polityStrengths.at(province.owner).score < stabilityThreshold ||
-          province.culturePopulations.size() < 2)
-        continue;
-      const auto dominantCulture = state.dominantCultureOf(provinceId);
-      for (const auto &[cultureId, culturalPopulation] :
-           province.culturePopulations) {
-        if (cultureId == dominantCulture)
-          continue;
-        const auto conversion =
-            culturalPopulation *
-            configuration.culturalIntegrationRatePerCentury * centuries;
-        if (conversion > 0.0)
-          append({nextYear, EventType::ConvertCulturePopulation, provinceId, -1,
-                  NoPolity, NoPolity, dominantCulture, NoReligion, conversion,
-                  0.0, "stable polity cultural integration", cultureId});
-      }
-    }
-    if (nextYear >= configuration.colonizationStartYear &&
-        nextYear < configuration.regionOwnershipYear &&
-        strongestPolity != state.polityStrengths.end()) {
-      ProvinceId sourceProvince = -1;
-      for (const auto &[provinceId, province] : state.provinces) {
-        if (province.owner == strongestPolity->first &&
-            normalized.provinces.at(provinceId)->isCoastalToOcean() &&
-            (sourceProvince < 0 ||
-             province.development >
-                 state.provinces.at(sourceProvince).development))
-          sourceProvince = provinceId;
-      }
-      ProvinceId targetProvince = -1;
-      if (sourceProvince >= 0) {
-        for (const auto &[provinceId, province] : state.provinces) {
-          const auto targetRegion = normalized.provinceRegions.at(provinceId);
-          const auto targetSuperRegion =
-              state.regionSuperRegions.at(targetRegion);
-          const bool lagging = state.superRegions.at(targetSuperRegion).phase ==
-                               SuperRegionPhase::Lagging;
-          const bool reachableByLand =
-              normalized.provinceContinents.at(provinceId) ==
-              normalized.provinceContinents.at(sourceProvince);
-          const bool reachableBySea =
-              normalized.provinces.at(provinceId)->isCoastalToOcean();
-          if (province.owner != strongestPolity->first && lagging &&
-              (reachableByLand || reachableBySea) &&
-              (targetProvince < 0 ||
-               province.development <
-                   state.provinces.at(targetProvince).development))
-            targetProvince = provinceId;
-        }
-      }
-      if (targetProvince >= 0 &&
-          chance(configuration.colonialSettlementRatePerCentury * centuries)) {
-        const auto settlers = std::min(
-            state.provinces.at(sourceProvince).population *
-                configuration.colonialSettlementRatePerCentury * centuries,
-            std::max(0.0, state.provinces.at(targetProvince).carryingCapacity -
-                              state.provinces.at(targetProvince).population));
-        if (settlers > 0.0) {
-          append({nextYear, EventType::ColonizeProvince, targetProvince,
-                  normalized.provinceRegions.at(targetProvince),
-                  strongestPolity->first,
-                  state.provinces.at(targetProvince).owner, -1, NoReligion,
-                  settlers, 0.0, "colonial settlement"});
-          append({nextYear, EventType::MigratePopulation, sourceProvince,
-                  targetProvince, NoPolity, NoPolity, -1, NoReligion, settlers,
-                  0.0, "colonial migration"});
-          for (const auto &[cultureId, culturalPopulation] :
-               state.provinces.at(sourceProvince).culturePopulations) {
-            const auto culturalSettlers =
-                settlers * culturalPopulation /
-                std::max(1.0, state.provinces.at(sourceProvince).population +
-                                  settlers);
-            if (culturalSettlers > 0.0)
-              append({nextYear, EventType::MigrateCulturePopulation,
-                      sourceProvince, targetProvince, NoPolity, NoPolity,
-                      cultureId, NoReligion, culturalSettlers, 0.0,
-                      "colonial cultural migration"});
-          }
-        }
-      }
-    }
-
-    const auto currentPolityCount = static_cast<double>(territories.size());
-    const auto initialPolityCount =
-        static_cast<double>(normalized.provinces.size());
-    const double simulationProgress =
-        std::clamp(static_cast<double>(nextYear - configuration.startYear) /
-                       static_cast<double>(configuration.targetYear -
-                                           configuration.startYear),
-                   0.0, 1.0);
-    const double desiredPolityCount =
-        initialPolityCount +
-        (static_cast<double>(configuration.targetEndPolityCount) -
-         initialPolityCount) *
-            simulationProgress;
-    const double consolidationPressure =
-        initialPolityCount == configuration.targetEndPolityCount
-            ? 0.0
-            : std::clamp(
-                  (currentPolityCount - desiredPolityCount) /
-                      (initialPolityCount - configuration.targetEndPolityCount),
-                  0.0, 1.0);
-
-    if (nextYear < configuration.regionOwnershipYear) {
-      for (const auto &[provinceId, province] : state.provinces) {
-        if (!chance(configuration.expansionChance * centuries *
-                    consolidationPressure))
-          continue;
-        const auto &neighbours = normalized.neighbours.at(provinceId);
-        if (neighbours.empty())
-          continue;
-        const auto firstNeighbour =
-            RandNum::getRandom<int>(static_cast<int>(neighbours.size()));
-        for (size_t offset = 0; offset < neighbours.size(); ++offset) {
-          const auto neighbourId =
-              neighbours[(firstNeighbour + offset) % neighbours.size()];
-          const auto &neighbour = state.provinces.at(neighbourId);
-          if (neighbour.owner != province.owner) {
-            const auto attacker =
-                state.polityStrengths.at(province.owner).score;
-            const auto defender =
-                state.polityStrengths.at(neighbour.owner).score;
-            if (!chance(attacker / std::max(1.0, attacker + defender)))
-              continue;
-            append({nextYear, EventType::TransferProvince, neighbourId,
-                    normalized.provinceRegions.at(neighbourId), province.owner,
-                    neighbour.owner, -1, NoReligion, 0.0, 0.0,
-                    "provincial expansion"});
-            break;
-          }
-        }
-      }
-
-      territories.clear();
-      for (const auto &[provinceId, province] : state.provinces)
-        territories[province.owner].push_back(provinceId);
-      for (const auto &[polityId, provinceIds] : territories) {
-        if (provinceIds.size() < 2 ||
-            !chance(configuration.fragmentationChance * centuries *
-                    (1.0 - consolidationPressure)))
-          continue;
-        const auto splitProvince = provinceIds.back();
-        const auto splitPolity = nextPolity++;
-        append({nextYear, EventType::CreatePolity, -1, -1, splitPolity,
-                NoPolity, -1, NoReligion, 0.0, 0.0, "tribe", -1,
-                randomPolityColour()});
-        append({nextYear, EventType::TransferProvince, splitProvince,
-                normalized.provinceRegions.at(splitProvince), splitPolity,
-                polityId, -1, NoReligion, 0.0, 0.0, "fragmentation"});
-      }
-    }
-
-    if (nextYear >= configuration.classicalStartYear) {
-      for (const auto &[provinceId, province] : state.provinces) {
-        if (province.religion == NoReligion &&
-            chance(configuration.religionEmergenceChance * centuries)) {
-          const auto religionId = nextReligion++;
-          append({nextYear, EventType::CreateReligion, provinceId, -1, NoPolity,
-                  NoPolity, -1, religionId, 0.0, 0.0, "religion emergence", -1,
-                  randomPolityColour()});
-          append({nextYear, EventType::SetReligion, provinceId, -1, NoPolity,
-                  NoPolity, -1, religionId, 0.0, 0.0, "religion adoption"});
-        }
-        if (province.religion != NoReligion &&
-            chance(configuration.religionSplitChance * centuries)) {
-          const auto religionId = nextReligion++;
-          append({nextYear, EventType::CreateReligion, provinceId, -1, NoPolity,
-                  NoPolity, -1, religionId, 0.0, 0.0, "religion split",
-                  province.religion, randomPolityColour()});
-          append({nextYear, EventType::SetReligion, provinceId, -1, NoPolity,
-                  NoPolity, -1, religionId, 0.0, 0.0, "religion schism"});
-        }
-        for (const auto neighbourId : normalized.neighbours.at(provinceId)) {
-          const auto &neighbour = state.provinces.at(neighbourId);
-          if (province.religion == NoReligion &&
-              neighbour.religion != NoReligion &&
-              chance(configuration.religionSpreadChance * centuries)) {
-            append({nextYear, EventType::SetReligion, provinceId, -1, NoPolity,
-                    NoPolity, -1, neighbour.religion, 0.0, 0.0,
-                    "religion spread"});
-            break;
-          }
-          if (province.culture != neighbour.culture &&
-              province.owner == neighbour.owner &&
-              chance(configuration.cultureAssimilationChance * centuries)) {
-            append({nextYear, EventType::SetCulture, provinceId, -1, NoPolity,
-                    NoPolity, neighbour.culture, NoReligion, 0.0, 0.0,
-                    "cultural assimilation"});
-            break;
-          }
-          if (province.culture == neighbour.culture &&
-              chance(configuration.cultureSplitChance * centuries)) {
-            const auto cultureId = nextCulture++;
-            append({nextYear, EventType::CreateCulture, provinceId, -1,
-                    NoPolity, NoPolity, cultureId, NoReligion, 0.0, 0.0,
-                    "culture split", province.culture, randomPolityColour()});
-            append({nextYear, EventType::SetCulture, provinceId, -1, NoPolity,
-                    NoPolity, cultureId, NoReligion, 0.0, 0.0,
-                    "cultural differentiation"});
-            break;
-          }
-        }
-      }
-    }
-
+    updateProvinceGrowth(nextYear, centuries, configuration, normalized, state,
+                         growthPotential, baseCapacity, append, territories);
+    updatePolityStrengths(nextYear, state, append);
+    integrateCultures(nextYear, centuries, configuration, state, append);
+    /*colonize(nextYear, centuries, configuration, normalized, state, append,
+             strongestPolityOf(state));*/
+    balancePolities(nextYear, centuries, configuration, normalized, state,
+                    append, nextPolity, territories);
+    evolveCultureAndReligion(nextYear, centuries, configuration, normalized,
+                             state, append, nextCulture, nextReligion);
     if (nextYear >= configuration.regionOwnershipYear) {
-      for (const auto &[regionId, provinceIds] : normalized.regions) {
-        std::map<PolityId, int> ownership;
-        for (const auto provinceId : provinceIds)
-          ++ownership[state.provinces.at(provinceId).owner];
-        const auto dominant =
-            std::max_element(ownership.begin(), ownership.end(),
-                             [](const auto &left, const auto &right) {
-                               return left.second != right.second
-                                          ? left.second < right.second
-                                          : left.first > right.first;
-                             })
-                ->first;
-        for (const auto provinceId : provinceIds) {
-          const auto previous = state.provinces.at(provinceId).owner;
-          if (previous != dominant)
-            append({nextYear, EventType::ConsolidateRegion, provinceId,
-                    regionId, dominant, previous, -1, NoReligion, 0.0, 0.0,
-                    "regional consolidation"});
-        }
-      }
+      consolidateRegions(nextYear, configuration, normalized, state, append);
     }
-
-    territories.clear();
-    for (const auto &[provinceId, province] : state.provinces)
-      territories[province.owner].push_back(provinceId);
-    for (const auto &[polityId, polity] : state.polities) {
-      if (!polity.dissolvedYear && !territories.contains(polityId))
-        append({nextYear, EventType::DissolvePolity, -1, -1, polityId, NoPolity,
-                -1, NoReligion, 0.0, 0.0, "annexed or dissolved"});
-    }
+    dissolveEmptyPolities(nextYear, state, append);
     year = nextYear;
   }
 
@@ -1045,31 +1428,19 @@ Result HistorySimulation::run(const Input &input) {
         event.year > configuration.targetYear)
       result.errors.push_back(
           {event.year, "Event year is outside the configured simulation range",
-           event.provinceId, event.regionId});
+           event.provinceId >= 0 ? std::optional<ProvinceId>(event.provinceId)
+                                 : std::nullopt,
+           event.regionId >= 0 ? std::optional<RegionId>(event.regionId)
+                               : std::nullopt});
     if (event.year < previousYear)
-      result.errors.push_back({event.year,
-                               "Event log is not chronologically ordered",
-                               event.provinceId, event.regionId});
-    if (event.type == EventType::TransferProvince &&
-        event.description == "provincial expansion") {
-      const auto neighbours = provinceNeighbours.find(event.provinceId);
-      const bool touchesOwner =
-          neighbours != provinceNeighbours.end() &&
-          std::any_of(neighbours->second.begin(), neighbours->second.end(),
-                      [&](ProvinceId neighbourId) {
-                        const auto neighbour =
-                            eventState.provinces.find(neighbourId);
-                        return neighbour != eventState.provinces.end() &&
-                               neighbour->second.owner == event.polityId;
-                      });
-      if (!touchesOwner)
-        result.errors.push_back(
-            {event.year,
-             "Provincial expansion does not cross a valid land border",
-             event.provinceId, event.regionId});
-    }
-    applyEvent(eventState, event);
+      result.errors.push_back(
+          {event.year, "Events are not ordered chronologically",
+           event.provinceId >= 0 ? std::optional<ProvinceId>(event.provinceId)
+                                 : std::nullopt,
+           event.regionId >= 0 ? std::optional<RegionId>(event.regionId)
+                               : std::nullopt});
     previousYear = event.year;
+    applyEvent(eventState, event);
   }
   return result;
 }
@@ -1077,13 +1448,12 @@ Result HistorySimulation::run(const Input &input) {
 State HistorySimulation::reconstruct(const std::vector<Event> &events,
                                      Year year) const {
   State state;
-  state.year = configuration.startYear;
   for (const auto &event : events) {
     if (event.year > year)
       break;
     applyEvent(state, event);
+    state.year = event.year;
   }
-  state.year = year;
   return state;
 }
 
@@ -1194,16 +1564,18 @@ HistorySimulation::writeArtifacts(const Input &input, const Result &result,
                         {}});
       return std::nullopt;
     }
+    // Keep TSV schema stable: successor lineage is encoded via "type" and
+    // "parent" without adding new columns.
     eventLog << "year\ttype\tprovince\tregion\tpolity\tprevious_"
                 "polity\tculture\treligion\tparent\tvalue\tsecondary_"
-                "value\tred\tgreen\tblue\tdescription\n";
+                "value\tscore\tred\tgreen\tblue\tdescription\n";
     for (const auto &event : result.events) {
       eventLog << event.year << '\t' << eventTypeName(event.type) << '\t'
                << event.provinceId << '\t' << event.regionId << '\t'
                << event.polityId << '\t' << event.previousPolityId << '\t'
                << event.cultureId << '\t' << event.religionId << '\t'
                << event.parentId << '\t' << event.value << '\t'
-               << event.secondaryValue << '\t'
+               << event.secondaryValue << '\t' << event.score << '\t'
                << static_cast<int>(event.colour.getRed()) << '\t'
                << static_cast<int>(event.colour.getGreen()) << '\t'
                << static_cast<int>(event.colour.getBlue()) << '\t'
@@ -1248,43 +1620,45 @@ HistorySimulation::writeArtifacts(const Input &input, const Result &result,
       const auto year = years[index];
       const auto state = reconstruct(result.events, year);
       for (const auto &[provinceId, provinceState] : state.provinces) {
-        developmentLog << year << '\t' << provinceId << '\t'
-                       << provinceState.development << '\n';
-        const auto regionId = normalized.provinceRegions.at(provinceId);
-        populationLog << year << '\t' << provinceId << '\t'
-                      << provinceState.population << '\t'
-                      << provinceState.carryingCapacity << '\t'
-                      << static_cast<int>(
-                             state.regionalPhases.contains(regionId)
-                                 ? state.regionalPhases.at(regionId)
-                                 : RegionalPhase::Neutral)
-                      << '\n';
-        for (const auto &[cultureId, culturePopulation] :
-             provinceState.culturePopulations) {
-          const auto &culture = state.cultures.at(cultureId);
-          cultureLog << year << '\t' << provinceId << '\t' << cultureId << '\t'
-                     << culturePopulation << '\t'
-                     << (cultureId == state.dominantCultureOf(provinceId) ? 1
-                                                                          : 0)
-                     << '\t' << culture.originProvinceId << '\t'
-                     << culture.foundedYear << '\t'
-                     << culture.parentId.value_or(-1) << '\n';
-        }
-        if (provinceState.religion != NoReligion) {
-          const auto &religion = state.religions.at(provinceState.religion);
-          religionLog << year << '\t' << provinceId << '\t'
-                      << provinceState.religion << '\t'
-                      << religion.originProvinceId << '\t'
-                      << religion.foundedYear << '\t'
-                      << religion.parentId.value_or(-1) << '\n';
-        } else {
-          religionLog << year << '\t' << provinceId << "\t-1\t-1\t-1\t-1\n";
-        }
-        for (const auto &[superRegionId, superRegion] : state.superRegions)
-          superRegionLog << year << '\t' << superRegionId << '\t'
-                         << superRegion.continentId << '\t'
-                         << static_cast<int>(superRegion.phase) << '\t'
-                         << superRegion.development << '\n';
+        // developmentLog << year << '\t' << provinceId << '\t'
+        //                << provinceState.development << '\n';
+        // const auto regionId = normalized.provinceRegions.at(provinceId);
+        // populationLog << year << '\t' << provinceId << '\t'
+        //               << provinceState.population << '\t'
+        //               << provinceState.carryingCapacity << '\t'
+        //               << static_cast<int>(
+        //                      state.regionalPhases.contains(regionId)
+        //                          ? state.regionalPhases.at(regionId)
+        //                          : RegionalPhase::Neutral)
+        //               << '\n';
+        // for (const auto &[cultureId, culturePopulation] :
+        //      provinceState.culturePopulations) {
+        //   const auto &culture = state.cultures.at(cultureId);
+        //   cultureLog << year << '\t' << provinceId << '\t' << cultureId <<
+        //   '\t'
+        //              << culturePopulation << '\t'
+        //              << (cultureId == state.dominantCultureOf(provinceId) ? 1
+        //                                                                   :
+        //                                                                   0)
+        //              << '\t' << culture.originProvinceId << '\t'
+        //              << culture.foundedYear << '\t'
+        //              << culture.parentId.value_or(-1) << '\n';
+        // }
+        // if (provinceState.religion != NoReligion) {
+        //   const auto &religion = state.religions.at(provinceState.religion);
+        //   religionLog << year << '\t' << provinceId << '\t'
+        //               << provinceState.religion << '\t'
+        //               << religion.originProvinceId << '\t'
+        //               << religion.foundedYear << '\t'
+        //               << religion.parentId.value_or(-1) << '\n';
+        // } else {
+        //   religionLog << year << '\t' << provinceId << "\t-1\t-1\t-1\t-1\n";
+        // }
+        // for (const auto &[superRegionId, superRegion] : state.superRegions)
+        //   superRegionLog << year << '\t' << superRegionId << '\t'
+        //                  << superRegion.continentId << '\t'
+        //                  << static_cast<int>(superRegion.phase) << '\t'
+        //                  << superRegion.development << '\n';
       }
       auto frame = baseMap;
       auto developmentFrame = baseMap;
@@ -1336,16 +1710,16 @@ HistorySimulation::writeArtifacts(const Input &input, const Result &result,
       filename << "ownership_" << std::setw(3) << std::setfill('0') << index
                << '_' << year << ".png";
       const auto mapPath = outputDirectory / filename.str();
-      Fwg::Gfx::Png::save(frame, mapPath.string(), false);
+      Fwg::Gfx::Png::save(frame, mapPath.string(), true);
       paths.ownershipMaps.push_back(mapPath);
       const auto developmentPath = developmentDirectory / filename.str();
       const auto populationPath = populationDirectory / filename.str();
       const auto culturePath = cultureDirectory / filename.str();
       const auto religionPath = religionDirectory / filename.str();
-      Fwg::Gfx::Png::save(developmentFrame, developmentPath.string(), false);
-      Fwg::Gfx::Png::save(populationFrame, populationPath.string(), false);
-      Fwg::Gfx::Png::save(cultureFrame, culturePath.string(), false);
-      Fwg::Gfx::Png::save(religionFrame, religionPath.string(), false);
+      Fwg::Gfx::Png::save(developmentFrame, developmentPath.string(), true);
+      Fwg::Gfx::Png::save(populationFrame, populationPath.string(), true);
+      // Fwg::Gfx::Png::save(cultureFrame, culturePath.string(), true);
+      // Fwg::Gfx::Png::save(religionFrame, religionPath.string(), true);
       paths.developmentMaps.push_back(developmentPath);
       paths.populationMaps.push_back(populationPath);
       paths.cultureMaps.push_back(culturePath);

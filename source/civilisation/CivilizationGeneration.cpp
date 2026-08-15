@@ -29,20 +29,124 @@ void generateCultureData(
                            Arda::Gfx::visualiseRegions(regions));
 }
 
+void deriveCultureData(
+    Simulation::SimulationExport &simulationExport, CivilizationData &civData,
+    std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
+    std::vector<std::shared_ptr<Arda::ArdaRegion>> &regions,
+    std::vector<std::shared_ptr<ArdaContinent>> &continents,
+    std::vector<std::shared_ptr<SuperRegion>> &superRegions) {
+  civData.religions.clear();
+  civData.cultures.clear();
+  for (auto &cultureGroup : civData.cultureGroups)
+    cultureGroup->clear();
+  civData.cultureGroups.clear();
+
+  std::map<Simulation::ReligionId, std::shared_ptr<Religion>> religions;
+  std::map<Simulation::ProvinceId, std::shared_ptr<ArdaProvince>> provincesById;
+  for (const auto &province : ardaProvinces)
+    if (province)
+      provincesById.emplace(province->ID, province);
+
+  for (const auto &[religionId, lineage] : simulationExport.religions) {
+    auto religion = std::make_shared<Religion>();
+    religion->name = "Religion " + std::to_string(religionId);
+    religion->centerOfReligion = lineage.originProvinceId;
+    religion->colour = lineage.colour;
+    religions.emplace(religionId, religion);
+    civData.religions.push_back(religion);
+  }
+
+  std::map<Simulation::CultureId, std::shared_ptr<Culture>> cultures;
+  for (const auto &[cultureId, lineage] : simulationExport.cultures) {
+    auto culture = std::make_shared<Culture>();
+    culture->name = "Culture " + std::to_string(cultureId);
+    culture->colour = lineage.colour;
+    culture->language = std::make_shared<Arda::Language>();
+    cultures.emplace(cultureId, culture);
+    civData.cultures.push_back(culture);
+  }
+
+  for (const auto &[cultureId, culture] : cultures) {
+    const auto lineage = simulationExport.cultures.find(cultureId);
+    if (lineage == simulationExport.cultures.end())
+      continue;
+    auto groupId = cultureId;
+    auto parentId = lineage->second.parentId;
+    while (parentId) {
+      groupId = *parentId;
+      const auto parent = simulationExport.cultures.find(*parentId);
+      if (parent == simulationExport.cultures.end() || !parent->second.parentId)
+        break;
+      parentId = parent->second.parentId;
+    }
+    auto group = std::find_if(
+        civData.cultureGroups.begin(), civData.cultureGroups.end(),
+        [groupId](const auto &candidate) {
+          return candidate->name == "Culture group " + std::to_string(groupId);
+        });
+    if (group == civData.cultureGroups.end()) {
+      auto newGroup = std::make_shared<CultureGroup>(
+          "Culture group " + std::to_string(groupId), culture->colour);
+      const auto center = provincesById.find(lineage->second.originProvinceId);
+      newGroup->setCenter(center == provincesById.end() ? nullptr
+                                                        : center->second);
+      civData.cultureGroups.push_back(newGroup);
+      group = std::prev(civData.cultureGroups.end());
+    }
+    culture->cultureGroup = *group;
+    (*group)->addCulture(culture);
+  }
+
+  for (const auto &province : ardaProvinces) {
+    if (!province)
+      continue;
+    const auto exportedProvince = simulationExport.provinces.find(province->ID);
+    if (exportedProvince == simulationExport.provinces.end())
+      continue;
+    province->cultures.clear();
+    const auto culture = cultures.find(exportedProvince->second.cultureId);
+    if (culture != cultures.end())
+      province->cultures.emplace(culture->second, 1.0f);
+    province->religions.clear();
+    const auto religion = religions.find(exportedProvince->second.religionId);
+    if (religion != religions.end())
+      province->religions.emplace(religion->second, 1.0);
+  }
+
+  for (auto &cultureGroup : civData.cultureGroups)
+    cultureGroup->determineVisualType();
+  distributeLanguages(civData);
+  nameRegions(regions);
+  nameContinents(continents, regions);
+  nameSuperRegions(superRegions, regions);
+  Arda::Gfx::displayCultureGroups(ardaProvinces);
+  Arda::Gfx::displayCultures(ardaProvinces);
+  Arda::Areas::saveRegions(regions, Fwg::Cfg::Values().mapsPath + "areas/",
+                           Arda::Gfx::visualiseRegions(regions));
+}
+
 void generateFullCivilisationData(
+    Simulation::SimulationExport &simulationExport,
     std::vector<std::shared_ptr<Arda::ArdaRegion>> &regions,
     std::vector<std::shared_ptr<Arda::ArdaProvince>> &ardaProvinces,
     CivilizationData &civData,
     std::vector<std::shared_ptr<ArdaContinent>> &continents,
     std::vector<std::shared_ptr<SuperRegion>> &superRegions,
     const double targetWorldPopulation, const double targetWorldGdp) {
-  generateDevelopment(ardaProvinces, regions, continents);
-  generatePopulation(civData, ardaProvinces, regions, continents,
-                     targetWorldPopulation);
+  // generateDevelopment(ardaProvinces, regions, continents);
+  // generatePopulation(civData, ardaProvinces, regions, continents,
+  //                    targetWorldPopulation);
+  // generateEconomyData(civData, ardaProvinces, regions, continents,
+  //                     targetWorldPopulation);
+  // generateCultureData(civData, ardaProvinces, regions, continents,
+  //                     superRegions);
+
+  deriveDevelopment(simulationExport, ardaProvinces, regions, continents);
+  derivePopulation(simulationExport, civData, ardaProvinces, regions, continents, targetWorldPopulation);
   generateEconomyData(civData, ardaProvinces, regions, continents,
                       targetWorldPopulation);
-  generateCultureData(civData, ardaProvinces, regions, continents,
-                      superRegions);
+  deriveCultureData(simulationExport, civData, ardaProvinces, regions,
+                    continents, superRegions);
 }
 
 void loadDevelopment(
@@ -123,6 +227,34 @@ void generateDevelopment(
 
     region->averageDevelopment =
         totalDevelopment / region->ardaProvinces.size();
+  }
+}
+
+void deriveDevelopment(
+    Simulation::SimulationExport simulationExport,
+    const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
+    const std::vector<std::shared_ptr<ArdaRegion>> &regions,
+    const std::vector<std::shared_ptr<ArdaContinent>> &continents) {
+  for (const auto &province : provinces) {
+    if (!province)
+      continue;
+    const auto exportedProvince = simulationExport.provinces.find(province->ID);
+    if (exportedProvince == simulationExport.provinces.end())
+      continue;
+    province->averageDevelopment =
+        exportedProvince->second.normalizedDevelopment;
+  }
+
+  for (const auto &region : regions) {
+    if (!region || region->ardaProvinces.empty())
+      continue;
+    auto totalDevelopment = 0.0;
+    for (const auto &province : region->ardaProvinces) {
+      if (province)
+        totalDevelopment += province->averageDevelopment;
+    }
+    region->averageDevelopment =
+        totalDevelopment / static_cast<double>(region->ardaProvinces.size());
   }
 }
 
@@ -217,6 +349,39 @@ void generatePopulation(
                         worldPopulationFactorSum, targetWorldPopulation);
   civData.worldPopulationFactorSum = worldPopulationFactorSum;
 }
+void derivePopulation(
+    Simulation::SimulationExport simulationExport, CivilizationData &civData,
+    const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
+    const std::vector<std::shared_ptr<ArdaRegion>> &regions,
+    const std::vector<std::shared_ptr<ArdaContinent>> &continents,
+    double targetWorldPopulation) {
+  double worldPopulationFactorSum = 0.0;
+  for (const auto &province : provinces) {
+    if (!province)
+      continue;
+    const auto exportedProvince = simulationExport.provinces.find(province->ID);
+    if (exportedProvince == simulationExport.provinces.end()) {
+      province->populationDensity = 0.0;
+      province->population = 0;
+      province->worldPopulationShare = 0.0;
+      continue;
+    }
+
+    const auto &simulationProvince = exportedProvince->second;
+    province->populationDensity = simulationProvince.normalizedPopulation;
+    worldPopulationFactorSum +=
+        province->populationDensity * province->getNonOwningPixelView().size();
+    if (province->populationDensity < 0.0f) {
+      Fwg::Utils::Logging::logLine("ERROR: populationDensity is negative: ",
+                                   province->populationDensity);
+    }
+  }
+
+  postProcessPopulation(provinces, regions, continents,
+                        worldPopulationFactorSum, targetWorldPopulation);
+  civData.worldPopulationFactorSum = worldPopulationFactorSum;
+
+}
 
 /* Very simple calculation of economic activity. The modules can override this
  * to implement their own, more complex calculations
@@ -288,7 +453,8 @@ void generateReligions(
       auto religionCenter = ardaProvinces[religion->centerOfReligion];
       auto nDistance = Fwg::getPositionDistance(
           religionCenter->position, ardaProvince->position, config.width);
-      if (Fwg::Utils::Math::switchIfComparator(nDistance, distance, std::less())) {
+      if (Fwg::Utils::Math::switchIfComparator(nDistance, distance,
+                                               std::less())) {
         closestReligion = x;
       }
     }

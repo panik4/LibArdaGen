@@ -15,6 +15,7 @@
 #include "culture/NameUtils.h"
 #include "flags/Flag.h"
 #include "resources/ResourceGeneration.h"
+#include "simulation/Simulation.h"
 #include "utils/ArdaUtils.h"
 #include <map>
 namespace Arda {
@@ -59,6 +60,7 @@ struct ArdaStats {
 struct ArdaData {
   double worldEconomicActivity = 0;
   Civilization::CivilizationLayer civLayer;
+  Simulation::SimulationExport simulationExport;
 };
 
 class ArdaGen : public Fwg::FastWorldGenerator {
@@ -103,10 +105,13 @@ public:
                            const Fwg::Gfx::Image &inputFeatures);
   bool loadDevelopment(Fwg::Cfg &config, const std::string &path);
   bool genDevelopment(Fwg::Cfg &config);
+  bool deriveDevelopment(Fwg::Cfg &config);
   bool loadPopulation(Fwg::Cfg &config, const Fwg::Gfx::Image &inputPop);
   bool genPopulation(Fwg::Cfg &config);
+  bool derivePopulation(Fwg::Cfg &config);
   void genEconomyData();
   void genCultureData();
+  void deriveCultureData();
   void genCivilisationData();
   void clearLocations();
   void genLocationType(const Fwg::Civilization::LocationType &type);
@@ -131,6 +136,7 @@ public:
                      const std::string &path);
   void loadCountries(std::function<std::shared_ptr<Country>()> factory,
                      const Fwg::Gfx::Image &inputImage);
+  void deriveCountries(std::function<std::shared_ptr<Country>()> factory);
   // print a map showing all countries for debug purposes
   Fwg::Gfx::Image visualiseCountries(Fwg::Gfx::Image &countryBmp,
                                      const Fwg::Gfx::Image &worldMap,

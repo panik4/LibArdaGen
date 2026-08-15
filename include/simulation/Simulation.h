@@ -49,6 +49,7 @@ struct Configuration {
   int superRegionCycleYears = 500;
   Year persistentDevelopmentStartYear = 1000;
   Year colonizationStartYear = 1500;
+  Year polityAggressionStartYear = -3000;
   double superRegionNeighbourInfluence = 0.35;
   double culturalIntegrationRatePerCentury = 0.01;
   double colonialSettlementRatePerCentury = 0.03;
@@ -63,7 +64,30 @@ struct Configuration {
   double longDistanceMigrationRatePerCentury = 0.01;
   double expansionChance = 0.30;
   double fragmentationChance = 0.04;
+  double aggressiveExpansionMultiplier = 2.0;
+  double aggressiveFragmentationMultiplier = 2.5;
+  double splitOffChance = 0.12;
+  int maximumImplosionSuccessors = 10;
+  size_t initialPolityCapacity = 4;
+  double ancientPolityCapacityGrowthPerCentury = 0.04;
+  double renaissancePolityCapacityGrowthPerCentury = 0.12;
+  double industrialPolityCapacityGrowthPerCentury = 0.35;
+  Year successorMaturationYears = 150;
+  double successorFragmentationMultiplier = 0.2;
+  size_t smallPolityProtectionSize = 4;
+  double smallPolityFragmentationMultiplier = 0.05;
+  double overCapacityExpansionPenalty = 0.75;
+  Year polityStabilizationStartYear = 1500;
+  double postStabilizationFragmentationMultiplier = 0.35;
+  double decayStrengthRatio = 0.35;
+  double decayFragmentationChance = 0.20;
   double religionEmergenceChance = 0.03;
+  Year maritimeExpansionStartYear = -1000;
+  double maritimeExpansionChance = 0.06;
+  double initialMaritimeRange = 150.0;
+  double maritimeRangeGrowthPerCentury = 0.08;
+  double maritimeColonizationMultiplier = 0.7;
+  double maritimeConquestMultiplier = 0.45;
   double religionSpreadChance = 0.10;
   double religionSplitChance = 0.01;
   double cultureAssimilationChance = 0.03;
@@ -100,6 +124,7 @@ enum class SuperRegionPhase { Lagging = -1, Neutral = 0, Booming = 1 };
 enum class EventType {
   InitializeProvince,
   CreatePolity,
+  CreateSuccessorPolity,
   TransferProvince,
   DissolvePolity,
   CreateCulture,
@@ -107,6 +132,7 @@ enum class EventType {
   CreateReligion,
   SetReligion,
   UpdatePopulation,
+  UpdatePolityStrength,
   UpdateDevelopment,
   UpdateCarryingCapacity,
   MigratePopulation,
@@ -134,12 +160,15 @@ struct Event {
   std::string description;
   int parentId = -1;
   Fwg::Gfx::Colour colour;
+  double score = 0.0;
 };
 
 struct Polity {
   PolityId id = NoPolity;
   Year foundedYear = StartYear;
   std::optional<Year> dissolvedYear;
+  std::optional<PolityId> predecessorId;
+  std::vector<PolityId> successorIds;
   bool isTribe = true;
   Fwg::Gfx::Colour colour;
 };
@@ -210,6 +239,7 @@ struct ValidationError {
 
 struct Result {
   std::vector<Event> events;
+  std::map<EventType, std::size_t> eventCounts;
   std::vector<ValidationError> errors;
   State finalState;
 
@@ -233,10 +263,54 @@ public:
                  const std::filesystem::path &outputDirectory,
                  std::vector<ValidationError> &errors) const;
 
+  State getFinalState() const { return finalState; }
+  std::map<ProvinceId, RegionId> getProvinceRegions() const {
+    return provinceRegions;
+  }
+  std::map<ProvinceId, std::vector<ProvinceId>> getProvinceNeighbours() const {
+    return provinceNeighbours;
+  }
+
 private:
   Configuration configuration;
   std::map<ProvinceId, RegionId> provinceRegions;
   std::map<ProvinceId, std::vector<ProvinceId>> provinceNeighbours;
+  State finalState;
+};
+
+struct SimulationProvinceExport {
+  ProvinceId id = -1;
+  RegionId regionId = -1;
+  PolityId polityId = NoPolity;
+  CultureId cultureId = -1;
+  ReligionId religionId = NoReligion;
+  double population = 0.0;
+  double normalizedPopulation = 0.0;
+  double development = 0.0;
+  double normalizedDevelopment = 0.0;
+};
+
+struct SimulationPolityExport {
+  Polity polity;
+  PolityStrength strength;
+  std::vector<ProvinceId> provinceIds;
+  std::vector<RegionId> regionIds;
+};
+
+struct SimulationPolityPeakExport {
+  std::vector<ProvinceId> provinceIds;
+  std::vector<RegionId> regionIds;
+};
+
+struct SimulationExport {
+  Year year = StartYear;
+  std::map<ProvinceId, SimulationProvinceExport> provinces;
+  std::map<PolityId, SimulationPolityExport> polities;
+  std::map<CultureId, CultureLineage> cultures;
+  std::map<ReligionId, ReligionLineage> religions;
+  std::map<RegionId, std::vector<ProvinceId>> regions;
+  std::map<RegionId, std::vector<PolityId>> historicalRegionOwners;
+  std::map<PolityId, SimulationPolityPeakExport> historicalPolityPeaks;
 };
 
 } // namespace Arda::Simulation
