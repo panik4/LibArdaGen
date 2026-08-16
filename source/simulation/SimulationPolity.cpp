@@ -139,11 +139,11 @@ void implode(const Year nextYear, double centuries,
     }
   }
   for (const auto &[polityId, provinceIds] : territories) {
-    if (provinceIds.size() < 2 || !state.polities.contains(polityId) ||
+    if (provinceIds.size() < 2 || !state::findPolity(state, polityId) ||
         !state.polityStrengths.contains(polityId))
       continue;
     const auto polityScore = state.polityStrengths.at(polityId).score;
-    const auto foundedYear = state.polities.at(polityId).foundedYear;
+    const auto foundedYear = state::findPolity(state, polityId)->foundedYear;
     const auto maturationProgress =
         configuration.successorMaturationYears <= 0
             ? 1.0
@@ -226,8 +226,11 @@ void consolidateRegions(const Year nextYear, const Configuration &configuration,
   (void)configuration;
   for (const auto &[regionId, provinceIds] : normalized.regions) {
     std::map<PolityId, int> ownership;
-    for (const auto provinceId : provinceIds)
-      ++ownership[state.provinces.at(provinceId).owner];
+    for (const auto provinceId : provinceIds) {
+      const auto *provinceState = state::findProvince(state, provinceId);
+      if (provinceState)
+        ++ownership[provinceState->owner];
+    }
     const auto dominant =
         std::max_element(ownership.begin(), ownership.end(),
                          [](const auto &left, const auto &right) {
@@ -237,7 +240,10 @@ void consolidateRegions(const Year nextYear, const Configuration &configuration,
                          })
             ->first;
     for (const auto provinceId : provinceIds) {
-      const auto previous = state.provinces.at(provinceId).owner;
+      const auto *province = state::findProvince(state, provinceId);
+      if (!province)
+        continue;
+      const auto previous = province->owner;
       if (previous != dominant)
         append({nextYear, EventType::ConsolidateRegion, provinceId, regionId,
                 dominant, previous, -1, NoReligion, 0.0, 0.0,
@@ -249,10 +255,13 @@ void consolidateRegions(const Year nextYear, const Configuration &configuration,
 void dissolveEmpty(const Year nextYear, State &state,
                    const AppendEvent &append) {
   const auto territories = state::territoriesByPolity(state);
-  for (const auto &[polityId, polity] : state.polities)
-    if (!polity.dissolvedYear && !territories.contains(polityId))
+  for (PolityId polityId = 0;
+       polityId < static_cast<PolityId>(state.polities.size()); ++polityId) {
+    const auto *polity = state::findPolity(state, polityId);
+    if (polity && !polity->dissolvedYear && !territories.contains(polityId))
       append({nextYear, EventType::DissolvePolity, -1, -1, polityId, NoPolity,
               -1, NoReligion, 0.0, 0.0, "annexed or dissolved"});
+  }
 }
 
 } // namespace Arda::Simulation::polity

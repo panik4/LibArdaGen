@@ -4,6 +4,15 @@
 
 namespace Arda::Simulation::state {
 
+const ProvinceState *findProvince(const State &state, ProvinceId provinceId);
+ProvinceState *findProvince(State &state, ProvinceId provinceId);
+
+const Polity *findPolity(const State &state, PolityId polityId);
+Polity *findPolity(State &state, PolityId polityId);
+
+ProvinceState &ensureProvince(State &state, ProvinceId provinceId);
+Polity &ensurePolity(State &state, PolityId polityId);
+
 std::map<PolityId, std::vector<ProvinceId>>
 territoriesByPolity(const State &state);
 

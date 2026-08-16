@@ -77,21 +77,22 @@ bool hasMaritimeWarConnectionOneWay(PolityId left, PolityId right,
 double expansionBorderScore(
     ProvinceId targetProvince, PolityId attacker,
     const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours,
-    const std::map<ProvinceId, ProvinceState> &provinces) {
+    const std::vector<ProvinceState> &provinces) {
   const auto &targetNeighbours = neighbours.at(targetProvince);
   double score = static_cast<double>(targetNeighbours.size());
   for (const auto neighbourId : targetNeighbours) {
-    const auto &neighbour = provinces.at(neighbourId);
-    if (neighbour.owner == attacker)
+    const auto &neighbour = provinces.at(static_cast<std::size_t>(neighbourId));
+    if (neighbour.initialized && neighbour.owner == attacker)
       score += 3.0;
 
     size_t attackerNeighbours = 0;
     size_t foreignNeighbours = 0;
     for (const auto surroundingId : neighbours.at(neighbourId)) {
-      const auto &surrounding = provinces.at(surroundingId);
-      if (surrounding.owner == attacker)
+      const auto &surrounding =
+          provinces.at(static_cast<std::size_t>(surroundingId));
+      if (surrounding.initialized && surrounding.owner == attacker)
         ++attackerNeighbours;
-      else if (surrounding.owner == neighbour.owner)
+      else if (surrounding.initialized && surrounding.owner == neighbour.owner)
         ++foreignNeighbours;
     }
     if (foreignNeighbours > 0 && attackerNeighbours + 1 >= foreignNeighbours)
@@ -120,11 +121,14 @@ expansionTargetWeakness(PolityId attacker, PolityId defender,
 bool remainsContiguousAfterConquest(
     PolityId owner, ProvinceId removedProvince,
     const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours,
-    const std::map<ProvinceId, ProvinceState> &provinces) {
+    const std::vector<ProvinceState> &provinces) {
   std::vector<ProvinceId> remaining;
   remaining.reserve(provinces.size());
-  for (const auto &[provinceId, province] : provinces)
-    if (province.owner == owner && provinceId != removedProvince)
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(provinces.size()); ++provinceId)
+    if (provinces[static_cast<std::size_t>(provinceId)].initialized &&
+        provinces[static_cast<std::size_t>(provinceId)].owner == owner &&
+        provinceId != removedProvince)
       remaining.push_back(provinceId);
   if (remaining.size() < 2)
     return true;
@@ -159,32 +163,13 @@ struct CapitalProvinces {
 CapitalProvinces findCapitalProvinces(
     PolityId left, PolityId right, const State &state,
     const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces) {
-  const auto leftPolity = state.polities.find(left);
-  const auto rightPolity = state.polities.find(right);
-  if (leftPolity == state.polities.end() ||
-      rightPolity == state.polities.end() ||
-      (!leftPolity->second.capital && leftPolity->second.capitalProvince < 0) ||
-      (!rightPolity->second.capital &&
-       rightPolity->second.capitalProvince < 0))
+  const auto *leftPolity = state::findPolity(state, left);
+  const auto *rightPolity = state::findPolity(state, right);
+  if (!leftPolity || !rightPolity || !leftPolity->capital ||
+      !rightPolity->capital)
     return {};
 
-  const auto leftProvince =
-      leftPolity->second.capital
-          ? leftPolity->second.capital
-          : provinces.find(leftPolity->second.capitalProvince) != provinces.end()
-                ? provinces.at(leftPolity->second.capitalProvince)
-                : nullptr;
-  const auto rightProvince =
-      rightPolity->second.capital
-          ? rightPolity->second.capital
-          : provinces.find(rightPolity->second.capitalProvince) !=
-                    provinces.end()
-                ? provinces.at(rightPolity->second.capitalProvince)
-                : nullptr;
-  if (!leftProvince || !rightProvince)
-    return {};
-
-  return {leftProvince.get(), rightProvince.get()};
+  return {leftPolity->capital.get(), rightPolity->capital.get()};
 }
 
 double polityDistance(
@@ -257,8 +242,8 @@ void resolveWars(
   size_t missingLandMassData = 0;
   size_t navalDefenderSelections = 0;
   size_t stateCoastalProvinces = 0;
-  for (const auto &[provinceId, province] : state.provinces)
-    if (province.coastal)
+  for (const auto &province : state.provinces)
+    if (province.initialized && province.coastal)
       ++stateCoastalProvinces;
   {
     size_t routeCount = 0;
@@ -272,40 +257,39 @@ void resolveWars(
     for (const auto &[sourceId, routes] : normalized.seaRoutesFrom)
       for (const auto &route : routes) {
         ++routeCount;
-        const auto source = state.provinces.find(sourceId);
-        const auto target = state.provinces.find(route.provinceId);
-        if (source == state.provinces.end() || target == state.provinces.end())
+        const auto *source = state::findProvince(state, sourceId);
+        const auto *target = state::findProvince(state, route.provinceId);
+        if (!source || !target)
           continue;
-        if (source->second.owner != NoPolity)
+        if (source->owner != NoPolity)
           ++ownedSourceRoutes;
-        if (target->second.owner != NoPolity)
+        if (target->owner != NoPolity)
           ++ownedTargetRoutes;
-        if (source->second.owner != NoPolity &&
-            target->second.owner != NoPolity &&
-            source->second.owner != target->second.owner)
+        if (source->owner != NoPolity && target->owner != NoPolity &&
+            source->owner != target->owner)
           ++crossPolityRoutes;
         const auto sourceProvince = inputProvinces.find(sourceId);
         const auto targetProvince = inputProvinces.find(route.provinceId);
         if (sourceProvince != inputProvinces.end() &&
             targetProvince != inputProvinces.end() && sourceProvince->second &&
-            targetProvince->second && sourceProvince->second->landMassID >= 0 &&
+            targetProvince->second &&
+            sourceProvince->second->landMassID >= 0 &&
             targetProvince->second->landMassID >= 0 &&
             sourceProvince->second->landMassID !=
                 targetProvince->second->landMassID) {
           ++crossLandMassRoutes;
-          if (source->second.owner != NoPolity &&
-              target->second.owner != NoPolity &&
-              source->second.owner != target->second.owner) {
+          if (source->owner != NoPolity && target->owner != NoPolity &&
+              source->owner != target->owner) {
             ++crossLandMassCrossPolityRoutes;
             if (!crossLandMassSampleLogged) {
               std::ostringstream crossLandMassSample;
               crossLandMassSample
                   << "Cross-landmass route ownership sample in " << nextYear
                   << ": source=" << sourceId
-                  << " sourceOwner=" << source->second.owner
+                  << " sourceOwner=" << source->owner
                   << " sourceLandMass=" << sourceProvince->second->landMassID
                   << " target=" << route.provinceId
-                  << " targetOwner=" << target->second.owner
+                  << " targetOwner=" << target->owner
                   << " targetLandMass=" << targetProvince->second->landMassID
                   << " distance=" << route.distance;
               Fwg::Utils::Logging::logLine(crossLandMassSample.str());
@@ -315,12 +299,12 @@ void resolveWars(
         }
         if (!sampleLogged) {
           std::ostringstream sample;
-          sample << "Naval route ownership sample in " << nextYear
-                 << ": source=" << sourceId
-                 << " sourceOwner=" << source->second.owner << " sourceCoastal="
-                 << (source->second.coastal ? "true" : "false")
-                 << " target=" << route.provinceId
-                 << " targetOwner=" << target->second.owner
+           sample << "Naval route ownership sample in " << nextYear
+                  << ": source=" << sourceId
+                  << " sourceOwner=" << source->owner << " sourceCoastal="
+                  << (source->coastal ? "true" : "false")
+                  << " target=" << route.provinceId
+                  << " targetOwner=" << target->owner
                  << " distance=" << route.distance;
           Fwg::Utils::Logging::logLine(sample.str());
           sampleLogged = true;
@@ -361,8 +345,8 @@ void resolveWars(
       }
       const auto sharedLandMass =
           capitalsShareLandMass(attackerId, candidateId, state, inputProvinces);
-      const auto attackerPolity = state.polities.find(attackerId);
-      const auto candidatePolity = state.polities.find(candidateId);
+      const auto *attackerPolity = state::findPolity(state, attackerId);
+      const auto *candidatePolity = state::findPolity(state, candidateId);
       const auto capitals =
           findCapitalProvinces(attackerId, candidateId, state, inputProvinces);
       const bool capitalsHaveDifferentLandmasses =
@@ -387,9 +371,9 @@ void resolveWars(
         std::ostringstream message;
         message << "Naval representative pair in " << nextYear
                 << ": attacker=" << attackerId << " defender=" << candidateId
-                << " attackerCapital=" << attackerPolity->second.capitalProvince
+                << " attackerCapital=" << attackerPolity->capitalProvince
                 << " defenderCapital="
-                << candidatePolity->second.capitalProvince
+                << candidatePolity->capitalProvince
                 << " attackerLandMass=" << capitals.left->landMassID
                 << " defenderLandMass=" << capitals.right->landMassID
                 << " ownedCoastalSources=" << ownedCoastalSources
@@ -478,14 +462,19 @@ void resolveWars(
     const auto &losers = attackersWin ? defenders : attackers;
     std::set<int> attackerContinents;
     std::set<int> defenderContinents;
-    for (const auto &[provinceId, province] : state.provinces) {
+    for (ProvinceId provinceId = 0;
+         provinceId < static_cast<ProvinceId>(state.provinces.size());
+         ++provinceId) {
+      const auto *province = state::findProvince(state, provinceId);
+      if (!province)
+        continue;
       const auto continent = normalized.provinceContinents.find(provinceId);
       if (continent == normalized.provinceContinents.end())
         continue;
-      if (std::find(attackers.begin(), attackers.end(), province.owner) !=
+      if (std::find(attackers.begin(), attackers.end(), province->owner) !=
           attackers.end())
         attackerContinents.insert(continent->second);
-      if (std::find(defenders.begin(), defenders.end(), province.owner) !=
+      if (std::find(defenders.begin(), defenders.end(), province->owner) !=
           defenders.end())
         defenderContinents.insert(continent->second);
     }
@@ -524,14 +513,19 @@ void resolveWars(
           continue;
         size_t borderScore = 0;
         for (const auto neighbourId : normalized.neighbours.at(provinceId))
-          if (std::find(winners.begin(), winners.end(),
-                        state.provinces.at(neighbourId).owner) != winners.end())
+          if (const auto *neighbour = state::findProvince(state, neighbourId);
+              neighbour &&
+              std::find(winners.begin(), winners.end(), neighbour->owner) !=
+                  winners.end())
             ++borderScore;
         if (borderScore == 0)
           continue;
         std::vector<PolityId> borderingWinners;
         for (const auto neighbourId : normalized.neighbours.at(provinceId)) {
-          const auto owner = state.provinces.at(neighbourId).owner;
+          const auto *neighbour = state::findProvince(state, neighbourId);
+          if (!neighbour)
+            continue;
+          const auto owner = neighbour->owner;
           if (std::find(winners.begin(), winners.end(), owner) !=
                   winners.end() &&
               std::find(borderingWinners.begin(), borderingWinners.end(),
@@ -570,7 +564,10 @@ void resolveWars(
       if (landTransferCount >= std::min(configuration.maximumWarTransfers,
                                         configuration.maximumWarLandTransfers))
         break;
-      const auto loser = state.provinces.at(provinceId).owner;
+      const auto *province = state::findProvince(state, provinceId);
+      if (!province)
+        continue;
+      const auto loser = province->owner;
       if (!remainsContiguousAfterConquest(
               loser, provinceId, normalized.neighbours, state.provinces))
         continue;
@@ -587,8 +584,8 @@ void resolveWars(
                      0.0,
                      "war territorial settlement"};
       transfer.warId = warId;
-      transfer.overseas = state.provinces.at(provinceId).overseas;
-      transfer.colony = state.provinces.at(provinceId).colony;
+      transfer.overseas = province->overseas;
+      transfer.colony = province->colony;
       const auto previousEventCount = events.size();
       append(std::move(transfer));
       if (events.size() > previousEventCount)
@@ -601,9 +598,9 @@ void resolveWars(
         configuration.maximumWarMaritimeTransfers > 0) {
       for (const auto loser : losers) {
         for (const auto provinceId : territories.at(loser)) {
-          if (transferred.contains(provinceId) ||
-              (!state.provinces.at(provinceId).island &&
-               !state.provinces.at(provinceId).overseas))
+          const auto *province = state::findProvince(state, provinceId);
+          if (!province || transferred.contains(provinceId) ||
+              (!province->island && !province->overseas))
             continue;
           const auto routes = normalized.seaRoutesTo.find(provinceId);
           if (routes == normalized.seaRoutesTo.end())
@@ -612,14 +609,14 @@ void resolveWars(
           for (const auto &route : routes->second) {
             if (route.distance > maritimeRange)
               continue;
-            const auto source = state.provinces.find(route.provinceId);
-            if (source == state.provinces.end())
+            const auto *source = state::findProvince(state, route.provinceId);
+            if (!source)
               continue;
             if (std::find(winners.begin(), winners.end(),
-                          source->second.owner) != winners.end() &&
+                          source->owner) != winners.end() &&
                 std::find(reachableWinners.begin(), reachableWinners.end(),
-                          source->second.owner) == reachableWinners.end())
-              reachableWinners.push_back(source->second.owner);
+                          source->owner) == reachableWinners.end())
+             reachableWinners.push_back(source->owner);
           }
           if (reachableWinners.empty())
             continue;
@@ -642,7 +639,7 @@ void resolveWars(
                          "war overseas settlement"};
           transfer.warId = warId;
           transfer.overseas = true;
-          transfer.colony = state.provinces.at(provinceId).colony;
+          transfer.colony = province->colony;
           const auto previousEventCount = events.size();
           append(std::move(transfer));
           if (events.size() > previousEventCount)

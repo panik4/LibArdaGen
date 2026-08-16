@@ -1,38 +1,86 @@
 #include "simulation/SimulationState.h"
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace Arda::Simulation {
 
 const ProvinceState *State::findProvince(ProvinceId provinceId) const {
-  const auto province = provinces.find(provinceId);
-  return province == provinces.end() ? nullptr : &province->second;
+  return state::findProvince(*this, provinceId);
 }
 
 std::vector<ProvinceId> State::territoryOf(PolityId polityId) const {
   std::vector<ProvinceId> territory;
-  for (const auto &[provinceId, province] : provinces)
-    if (province.owner == polityId)
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(provinces.size()); ++provinceId)
+    if (const auto *province = state::findProvince(*this, provinceId);
+        province && province->owner == polityId)
       territory.push_back(provinceId);
   return territory;
 }
 
 CultureId State::dominantCultureOf(ProvinceId provinceId) const {
-  const auto province = provinces.find(provinceId);
-  if (province == provinces.end() ||
-      province->second.culturePopulations.empty())
+  const auto *province = state::findProvince(*this, provinceId);
+  if (!province || province->culturePopulations.empty())
     return -1;
-  return province->second.culture;
+  return province->culture;
 }
 
 namespace state {
 
+const ProvinceState *findProvince(const State &state, ProvinceId provinceId) {
+  if (provinceId < 0 ||
+      static_cast<std::size_t>(provinceId) >= state.provinces.size() ||
+      !state.provinces[static_cast<std::size_t>(provinceId)].initialized)
+    return nullptr;
+  return &state.provinces[static_cast<std::size_t>(provinceId)];
+}
+
+ProvinceState *findProvince(State &state, ProvinceId provinceId) {
+  return const_cast<ProvinceState *>(
+      findProvince(static_cast<const State &>(state), provinceId));
+}
+
+const Polity *findPolity(const State &state, PolityId polityId) {
+  if (polityId < 0 ||
+      static_cast<std::size_t>(polityId) >= state.polities.size() ||
+      !state.polities[static_cast<std::size_t>(polityId)].initialized)
+    return nullptr;
+  return &state.polities[static_cast<std::size_t>(polityId)];
+}
+
+Polity *findPolity(State &state, PolityId polityId) {
+  return const_cast<Polity *>(
+      findPolity(static_cast<const State &>(state), polityId));
+}
+
+ProvinceState &ensureProvince(State &state, ProvinceId provinceId) {
+  if (provinceId < 0)
+    throw std::out_of_range("negative province ID");
+  const auto index = static_cast<std::size_t>(provinceId);
+  if (state.provinces.size() <= index)
+    state.provinces.resize(index + 1);
+  return state.provinces[index];
+}
+
+Polity &ensurePolity(State &state, PolityId polityId) {
+  if (polityId < 0)
+    throw std::out_of_range("negative polity ID");
+  const auto index = static_cast<std::size_t>(polityId);
+  if (state.polities.size() <= index)
+    state.polities.resize(index + 1);
+  return state.polities[index];
+}
+
 std::map<PolityId, std::vector<ProvinceId>>
 territoriesByPolity(const State &state) {
   std::map<PolityId, std::vector<ProvinceId>> territories;
-  for (const auto &[provinceId, province] : state.provinces)
-    if (province.owner != NoPolity)
-      territories[province.owner].push_back(provinceId);
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(state.provinces.size());
+       ++provinceId)
+    if (const auto *province = findProvince(state, provinceId);
+        province && province->owner != NoPolity)
+      territories[province->owner].push_back(provinceId);
   return territories;
 }
 
@@ -44,20 +92,20 @@ const std::set<ProvinceId> &coastalProvincesOf(const State &state,
 }
 
 void setCapital(State &state, PolityId polityId, ProvinceId provinceId) {
-  const auto polity = state.polities.find(polityId);
-  if (polity == state.polities.end())
+  auto *polity = findPolity(state, polityId);
+  if (!polity)
     return;
-  polity->second.capitalProvince = provinceId;
+  polity->capitalProvince = provinceId;
   const auto province = state.geography.find(provinceId);
-  polity->second.capital =
+  polity->capital =
       province == state.geography.end() ? nullptr : province->second;
 }
 
 const std::shared_ptr<ArdaProvince> &capitalOf(const State &state,
                                                 PolityId polityId) {
   static const std::shared_ptr<ArdaProvince> empty;
-  const auto polity = state.polities.find(polityId);
-  return polity == state.polities.end() ? empty : polity->second.capital;
+  const auto *polity = findPolity(state, polityId);
+  return polity ? polity->capital : empty;
 }
 
 void refreshDominantCulture(ProvinceState &province) {
@@ -74,18 +122,21 @@ void refreshDominantCulture(ProvinceState &province) {
 }
 
 void relocateCapital(State &state, PolityId polityId) {
-  const auto polity = state.polities.find(polityId);
-  if (polity == state.polities.end())
+  auto *polity = findPolity(state, polityId);
+  if (!polity)
     return;
-  const auto capital = state.provinces.find(polity->second.capitalProvince);
-  if (capital != state.provinces.end() && capital->second.owner == polityId)
+  const auto *capital = findProvince(state, polity->capitalProvince);
+  if (capital && capital->owner == polityId)
     return;
   ProvinceId replacement = NoPolity;
-  for (const auto &[provinceId, province] : state.provinces) {
-    if (province.owner != polityId)
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(state.provinces.size());
+       ++provinceId) {
+    const auto *province = findProvince(state, provinceId);
+    if (!province || province->owner != polityId)
       continue;
     if (replacement == NoPolity ||
-        province.population > state.provinces.at(replacement).population)
+        province->population > findProvince(state, replacement)->population)
       replacement = provinceId;
   }
   setCapital(state, polityId, replacement);

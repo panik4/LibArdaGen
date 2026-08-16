@@ -290,7 +290,12 @@ HistorySimulation::writeArtifacts(const Input &input, const Result &result,
     for (size_t index = 0; index < years.size(); ++index) {
       const auto year = years[index];
       const auto state = reconstruct(result.events, year);
-      for (const auto &[provinceId, provinceState] : state.provinces) {
+      for (ProvinceId provinceId = 0;
+           provinceId < static_cast<ProvinceId>(state.provinces.size());
+           ++provinceId) {
+        const auto *provinceState = state::findProvince(state, provinceId);
+        if (!provinceState)
+          continue;
         // developmentLog << year << '\t' << provinceId << '\t'
         //                << provinceState.development << '\n';
         // const auto regionId = normalized.provinceRegions.at(provinceId);
@@ -338,7 +343,9 @@ HistorySimulation::writeArtifacts(const Input &input, const Result &result,
       auto religionFrame = baseMap;
       double maximumDevelopment = 0.0;
       double maximumPopulation = 0.0;
-      for (const auto &[provinceId, provinceState] : state.provinces) {
+      for (const auto &provinceState : state.provinces) {
+        if (!provinceState.initialized)
+          continue;
         maximumDevelopment =
             std::max(maximumDevelopment, provinceState.development);
         maximumPopulation =
@@ -348,7 +355,10 @@ HistorySimulation::writeArtifacts(const Input &input, const Result &result,
         const auto provinceState = state.findProvince(provinceId);
         if (!provinceState)
           continue;
-        const auto colour = state.polities.at(provinceState->owner).colour;
+        const auto *owner = state::findPolity(state, provinceState->owner);
+        if (!owner)
+          continue;
+        const auto colour = owner->colour;
         const auto development =
             maximumDevelopment > 0.0
                 ? static_cast<unsigned char>(

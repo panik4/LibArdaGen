@@ -1,5 +1,7 @@
 #include "simulation/SimulationExporter.h"
 
+#include "simulation/SimulationState.h"
+
 #include <algorithm>
 #include <map>
 #include <set>
@@ -16,16 +18,21 @@ struct ProvinceExportMetrics {
 ProvinceExportMetrics calculateProvinceExportMetrics(
     const State &state, const std::map<ProvinceId, size_t> &provinceAreas) {
   ProvinceExportMetrics metrics;
-  for (const auto &[provinceId, province] : state.provinces) {
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(state.provinces.size());
+       ++provinceId) {
+    const auto *province = state::findProvince(state, provinceId);
+    if (!province)
+      continue;
     const auto area = provinceAreas.find(provinceId);
     const auto populationDensity =
         area != provinceAreas.end() && area->second > 0
-            ? province.population / static_cast<double>(area->second)
+            ? province->population / static_cast<double>(area->second)
             : 0.0;
     metrics.maximumPopulationDensity =
         std::max(metrics.maximumPopulationDensity, populationDensity);
     metrics.maximumDevelopment =
-        std::max(metrics.maximumDevelopment, province.development);
+        std::max(metrics.maximumDevelopment, province->development);
   }
   return metrics;
 }
@@ -34,27 +41,32 @@ void exportProvinceData(SimulationExport &exported, const State &state,
                         const std::map<ProvinceId, RegionId> &provinceRegions,
                         const std::map<ProvinceId, size_t> &provinceAreas,
                         const ProvinceExportMetrics &metrics) {
-  for (const auto &[provinceId, province] : state.provinces) {
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(state.provinces.size());
+       ++provinceId) {
+    const auto *province = state::findProvince(state, provinceId);
+    if (!province)
+      continue;
     const auto region = provinceRegions.find(provinceId);
     const auto regionId = region == provinceRegions.end() ? -1 : region->second;
     const auto area = provinceAreas.find(provinceId);
     const auto populationDensity =
         area != provinceAreas.end() && area->second > 0
-            ? province.population / static_cast<double>(area->second)
+            ? province->population / static_cast<double>(area->second)
             : 0.0;
     exported.provinces.emplace(
         provinceId,
         SimulationProvinceExport{
-            provinceId, regionId, province.owner, province.culture,
-            province.religion, province.population,
+            provinceId, regionId, province->owner, province->culture,
+            province->religion, province->population,
             metrics.maximumPopulationDensity > 0.0
                 ? populationDensity / metrics.maximumPopulationDensity
                 : 0.0,
-            province.development,
-            metrics.maximumDevelopment > 0.0
-                ? province.development / metrics.maximumDevelopment
-                : 0.0,
-            province.overseas, province.colony});
+             province->development,
+             metrics.maximumDevelopment > 0.0
+                 ? province->development / metrics.maximumDevelopment
+                 : 0.0,
+             province->overseas, province->colony});
     if (regionId >= 0)
       exported.regions[regionId].push_back(provinceId);
   }
@@ -64,11 +76,16 @@ void exportActiveCivilizationLineages(SimulationExport &exported,
                                       const State &state) {
   std::set<CultureId> activeCultures;
   std::set<ReligionId> activeReligions;
-  for (const auto &[provinceId, province] : state.provinces) {
-    if (province.culture >= 0)
-      activeCultures.insert(province.culture);
-    if (province.religion != NoReligion)
-      activeReligions.insert(province.religion);
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(state.provinces.size());
+       ++provinceId) {
+    const auto *province = state::findProvince(state, provinceId);
+    if (!province)
+      continue;
+    if (province->culture >= 0)
+      activeCultures.insert(province->culture);
+    if (province->religion != NoReligion)
+      activeReligions.insert(province->religion);
   }
 
   for (auto culture = exported.cultures.begin();
@@ -99,10 +116,10 @@ void exportHistoricalOwnership(
   const auto lineageRoot = [&state](PolityId polityId) {
     std::set<PolityId> visited;
     while (polityId != NoPolity && visited.insert(polityId).second) {
-      const auto polity = state.polities.find(polityId);
-      if (polity == state.polities.end() || !polity->second.predecessorId)
+      const auto *polity = state::findPolity(state, polityId);
+      if (!polity || !polity->predecessorId)
         break;
-      polityId = *polity->second.predecessorId;
+      polityId = *polity->predecessorId;
     }
     return polityId;
   };
@@ -139,17 +156,24 @@ void exportSignificantPolities(SimulationExport &exported, const State &state) {
   constexpr double recentCollapseSizeRatio = 0.01;
   constexpr Year recentCollapseYears = 100;
   std::set<PolityId> currentPolities;
-  for (const auto &[provinceId, province] : state.provinces)
-    if (province.owner != NoPolity)
-      currentPolities.insert(province.owner);
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(state.provinces.size());
+       ++provinceId)
+    if (const auto *province = state::findProvince(state, provinceId);
+        province && province->owner != NoPolity)
+      currentPolities.insert(province->owner);
 
-  for (const auto &[polityId, polity] : state.polities) {
+  for (PolityId polityId = 0;
+       polityId < static_cast<PolityId>(state.polities.size()); ++polityId) {
+    const auto *polity = state::findPolity(state, polityId);
+    if (!polity)
+      continue;
     const auto strength = state.polityStrengths.find(polityId);
     const auto score =
         strength == state.polityStrengths.end() ? 0.0 : strength->second.score;
     const bool recentlyDissolved =
-        polity.dissolvedYear && *polity.dissolvedYear <= state.year &&
-        state.year - *polity.dissolvedYear <= recentCollapseYears;
+        polity->dissolvedYear && *polity->dissolvedYear <= state.year &&
+        state.year - *polity->dissolvedYear <= recentCollapseYears;
     const double requiredRatio =
         recentlyDissolved ? recentCollapseSizeRatio : significantSizeRatio;
     const bool ownsFinalProvince = currentPolities.contains(polityId);
@@ -158,7 +182,7 @@ void exportSignificantPolities(SimulationExport &exported, const State &state) {
       continue;
 
     SimulationPolityExport polityExport;
-    polityExport.polity = polity;
+    polityExport.polity = *polity;
     if (strength != state.polityStrengths.end())
       polityExport.strength = strength->second;
     for (const auto &[provinceId, province] : exported.provinces) {

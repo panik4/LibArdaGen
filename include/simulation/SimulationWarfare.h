@@ -16,7 +16,7 @@ double maritimeRangeForYear(Year year, const Configuration &configuration);
 double expansionBorderScore(
     ProvinceId targetProvince, PolityId attacker,
     const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours,
-    const std::map<ProvinceId, ProvinceState> &provinces);
+    const std::vector<ProvinceState> &provinces);
 
 double
 expansionTargetWeakness(PolityId attacker, PolityId defender,
@@ -25,11 +25,10 @@ expansionTargetWeakness(PolityId attacker, PolityId defender,
 bool remainsContiguousAfterConquest(
     PolityId owner, ProvinceId removedProvince,
     const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours,
-    const std::map<ProvinceId, ProvinceState> &provinces);
+    const std::vector<ProvinceState> &provinces);
 
 bool hasMaritimeWarConnection(PolityId left, PolityId right, const State &state,
-                              const detail::NormalizedInput &normalized,
-                              double maritimeRange);
+                               const std::vector<std::vector<bool>> &reachability);
 
 bool capitalsShareLandMass(
     PolityId left, PolityId right, const State &state,

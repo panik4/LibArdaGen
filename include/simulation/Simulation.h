@@ -194,6 +194,7 @@ struct Event {
 };
 
 struct Polity {
+  bool initialized = false;
   PolityId id = NoPolity;
   Year foundedYear = StartYear;
   std::optional<Year> dissolvedYear;
@@ -223,6 +224,7 @@ struct ReligionLineage {
 };
 
 struct ProvinceState {
+  bool initialized = false;
   PolityId owner = NoPolity;
   CultureId culture = -1;
   ReligionId religion = NoReligion;
@@ -253,8 +255,8 @@ struct PolityStrength {
 
 struct State {
   Year year = StartYear;
-  std::map<ProvinceId, ProvinceState> provinces;
-  std::map<PolityId, Polity> polities;
+  std::vector<ProvinceState> provinces;
+  std::vector<Polity> polities;
   std::map<CultureId, CultureLineage> cultures;
   std::map<ReligionId, ReligionLineage> religions;
   std::map<RegionId, RegionalPhase> regionalPhases;

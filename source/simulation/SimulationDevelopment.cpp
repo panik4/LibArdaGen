@@ -1,4 +1,5 @@
 #include "simulation/SimulationDevelopment.h"
+#include "simulation/SimulationState.h"
 
 #include "RandNum.h"
 #include "utils/Cfg.h"
@@ -130,7 +131,11 @@ void updateProvinceGrowth(
     const std::map<ProvinceId, double> &growthPotential,
     const std::map<ProvinceId, double> &baseCapacity, const AppendEvent &append,
     std::map<PolityId, std::vector<ProvinceId>> &territories) {
-  for (const auto &[provinceId, province] : state.provinces) {
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(state.provinces.size()); ++provinceId) {
+    const auto *province = state::findProvince(state, provinceId);
+    if (!province)
+      continue;
     const auto potential = growthPotential.at(provinceId);
     const auto regionId = normalized.provinceRegions.at(provinceId);
     const auto phase = state.regionalPhases.contains(regionId)
@@ -154,16 +159,16 @@ void updateProvinceGrowth(
              : 0.0);
     const double capacity = baseCapacity.at(provinceId) *
                             capacityEraMultiplier(configuration, nextYear) *
-                            (1.0 + province.development * 0.05) *
+                             (1.0 + province->development * 0.05) *
                             phaseMultiplier(phase) * superRegionMultiplier;
     const double densityFactor = std::clamp(
-        1.0 - province.population / std::max(capacity, 1.0), 0.0, 1.0);
+        1.0 - province->population / std::max(capacity, 1.0), 0.0, 1.0);
     const auto immigrationHeadroom =
         std::any_of(normalized.neighbours.at(provinceId).begin(),
                     normalized.neighbours.at(provinceId).end(),
                     [&](const auto neighbourId) {
-                      const auto &neighbour = state.provinces.at(neighbourId);
-                      return neighbour.carryingCapacity > neighbour.population;
+                      const auto *neighbour = state::findProvince(state, neighbourId);
+                      return neighbour && neighbour->carryingCapacity > neighbour->population;
                     });
     const double phaseGrowth = phaseMultiplier(phase) * superRegionMultiplier;
     const double immigrationBonus = immigrationHeadroom ? 1.0 : 0.0;
@@ -174,43 +179,47 @@ void updateProvinceGrowth(
             densityFactor *
             (0.5 + phaseGrowth + immigrationBonus - emigrationPenalty),
         0.0, 1.0);
-    auto population = province.population;
+    auto population = province->population;
     if (chance(gainChance) && population < capacity)
       population = std::floor(population) + 1.0;
     population = std::max(configuration.minimumPopulation,
                           std::min(population, std::floor(capacity)));
     const double developmentChange =
         configuration.developmentGrowthPerCentury * potential *
-        (1.0 + std::log1p(province.population) / 10.0) * centuries *
+        (1.0 + std::log1p(province->population) / 10.0) * centuries *
         (phase == RegionalPhase::Bust ? -0.35 : phaseMultiplier(phase)) *
         superRegionMultiplier;
     const double development =
-        std::max(0.0, province.development + developmentChange);
+        std::max(0.0, province->development + developmentChange);
     state.superRegions[superRegionId].development += developmentChange;
     append({nextYear, EventType::UpdateCarryingCapacity, provinceId, regionId,
             NoPolity, NoPolity, -1, NoReligion, capacity,
             capacityEraMultiplier(configuration, nextYear),
             "era-adjusted carrying capacity"});
-    if (population != province.population) {
+    if (population != province->population) {
       append({nextYear, EventType::UpdatePopulation, provinceId, -1, NoPolity,
               NoPolity, -1, NoReligion, population, 0.0, "population growth"});
     }
-    if (development != province.development) {
+    if (development != province->development) {
       append({nextYear, EventType::UpdateDevelopment, provinceId, -1, NoPolity,
               NoPolity, -1, NoReligion, development, 0.0,
               "development growth"});
     }
-    territories[province.owner].push_back(provinceId);
+    territories[province->owner].push_back(provinceId);
   }
 }
 
 void updatePolityStrengths(const Year nextYear, State &state,
                            const AppendEvent &append) {
   std::map<PolityId, PolityStrength> strengths;
-  for (const auto &[provinceId, province] : state.provinces) {
-    auto &strength = strengths[province.owner];
-    strength.population += province.population;
-    strength.development += province.development;
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(state.provinces.size()); ++provinceId) {
+    const auto *province = state::findProvince(state, provinceId);
+    if (!province)
+      continue;
+    auto &strength = strengths[province->owner];
+    strength.population += province->population;
+    strength.development += province->development;
   }
   for (auto &[polityId, strength] : strengths) {
     strength.score = strength.population * 0.01 + strength.development * 10.0;
