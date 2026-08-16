@@ -6,72 +6,74 @@
 
 namespace Arda::Simulation::validation {
 
-std::vector<ValidationError> validateState(
-	const State &state, const Configuration &configuration,
-	const std::map<ProvinceId, RegionId> &provinceRegions, Year year,
-	bool requireWholeRegions) {
+std::vector<ValidationError>
+validateState(const State &state, const Configuration &configuration,
+              const std::map<ProvinceId, RegionId> &provinceRegions, Year year,
+              bool requireWholeRegions) {
   std::vector<ValidationError> errors;
   std::map<PolityId, size_t> territorySizes;
   for (const auto &[provinceId, province] : state.provinces) {
-	if (province.owner == NoPolity || !state.polities.contains(province.owner))
-	  errors.push_back({year, "Province has no valid owner", provinceId, {}});
-	if (province.culture < 0 || !state.cultures.contains(province.culture))
-	  errors.push_back({year, "Province has no valid culture", provinceId, {}});
-	if (province.religion != NoReligion &&
-		!state.religions.contains(province.religion))
-	  errors.push_back({year, "Province has no valid religion", provinceId, {}});
-	if (province.population < configuration.minimumPopulation)
-	  errors.push_back({year,
-						"Province population is below the configured minimum",
-						provinceId,
-						{}});
-	++territorySizes[province.owner];
-	if (province.development < 0.0)
-	  errors.push_back(
-		  {year, "Province development is negative", provinceId, {}});
-	if (province.carryingCapacity < configuration.minimumPopulation)
-	  errors.push_back(
-		  {year,
-		   "Province carrying capacity is below the configured minimum",
-		   provinceId,
-		   {}});
-	const auto culturalPopulation = std::accumulate(
-		province.culturePopulations.begin(), province.culturePopulations.end(),
-		0.0, [](double total, const auto &entry) { return total + entry.second; });
-	if (std::abs(culturalPopulation - province.population) >
-		std::max(0.001, province.population * 0.001))
-	  errors.push_back(
-		  {year,
-		   "Cultural populations do not sum to province population",
-		   provinceId,
-		   {}});
+    if (province.owner == NoPolity || !state.polities.contains(province.owner))
+      errors.push_back({year, "Province has no valid owner", provinceId, {}});
+    if (province.culture < 0 || !state.cultures.contains(province.culture))
+      errors.push_back({year, "Province has no valid culture", provinceId, {}});
+    if (province.religion != NoReligion &&
+        !state.religions.contains(province.religion))
+      errors.push_back(
+          {year, "Province has no valid religion", provinceId, {}});
+    if (province.population < configuration.minimumPopulation)
+      errors.push_back({year,
+                        "Province population is below the configured minimum",
+                        provinceId,
+                        {}});
+    ++territorySizes[province.owner];
+    if (province.development < 0.0)
+      errors.push_back(
+          {year, "Province development is negative", provinceId, {}});
+    if (province.carryingCapacity < configuration.minimumPopulation)
+      errors.push_back(
+          {year,
+           "Province carrying capacity is below the configured minimum",
+           provinceId,
+           {}});
+    const auto culturalPopulation = std::accumulate(
+        province.culturePopulations.begin(), province.culturePopulations.end(),
+        0.0,
+        [](double total, const auto &entry) { return total + entry.second; });
+    if (std::abs(culturalPopulation - province.population) >
+        std::max(0.001, province.population * 0.001))
+      errors.push_back(
+          {year,
+           "Cultural populations do not sum to province population",
+           provinceId,
+           {}});
   }
   for (const auto &[polityId, polity] : state.polities) {
-	if (polity.dissolvedYear || territorySizes[polityId] == 0)
-	  continue;
-	const auto capital = state.provinces.find(polity.capitalProvince);
-	if (capital == state.provinces.end() || capital->second.owner != polityId)
-	  errors.push_back({year, "Living polity has no valid capital", {}, {}});
+    if (polity.dissolvedYear || territorySizes[polityId] == 0)
+      continue;
+    const auto capital = state.provinces.find(polity.capitalProvince);
+    if (capital == state.provinces.end() || capital->second.owner != polityId)
+      errors.push_back({year, "Living polity has no valid capital", {}, {}});
   }
   const auto boomingSuperRegions =
-	  std::count_if(state.superRegions.begin(), state.superRegions.end(),
-					[](const auto &entry) {
-					  return entry.second.phase == SuperRegionPhase::Booming;
-					});
+      std::count_if(state.superRegions.begin(), state.superRegions.end(),
+                    [](const auto &entry) {
+                      return entry.second.phase == SuperRegionPhase::Booming;
+                    });
   if (boomingSuperRegions > 2)
-	errors.push_back({year, "More than two superregions are booming", {}, {}});
+    errors.push_back({year, "More than two superregions are booming", {}, {}});
   if (requireWholeRegions) {
-	std::map<RegionId, PolityId> owners;
-	for (const auto &[provinceId, province] : state.provinces) {
-	  const auto region = provinceRegions.find(provinceId);
-	  if (region == provinceRegions.end())
-		continue;
-	  const auto [owner, inserted] =
-		  owners.emplace(region->second, province.owner);
-	  if (!inserted && owner->second != province.owner)
-		errors.push_back(
-			{year, "Region has split ownership", {}, region->second});
-	}
+    std::map<RegionId, PolityId> owners;
+    for (const auto &[provinceId, province] : state.provinces) {
+      const auto region = provinceRegions.find(provinceId);
+      if (region == provinceRegions.end())
+        continue;
+      const auto [owner, inserted] =
+          owners.emplace(region->second, province.owner);
+      if (!inserted && owner->second != province.owner)
+        errors.push_back(
+            {year, "Region has split ownership", {}, region->second});
+    }
   }
   return errors;
 }

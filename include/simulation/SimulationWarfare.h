@@ -5,27 +5,41 @@
 namespace Arda::Simulation::warfare {
 
 double provinceCenterDistance(const ArdaProvince &left,
-							  const ArdaProvince &right);
+                              const ArdaProvince &right);
 
 double polityDistance(
-	PolityId left, PolityId right, const State &state,
-	const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces);
+    PolityId left, PolityId right, const State &state,
+    const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces);
 
 double maritimeRangeForYear(Year year, const Configuration &configuration);
 
-bool hasMaritimeWarConnection(
-	PolityId left, PolityId right, const State &state,
-	const detail::NormalizedInput &normalized, double maritimeRange);
+double expansionBorderScore(
+    ProvinceId targetProvince, PolityId attacker,
+    const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours,
+    const std::map<ProvinceId, ProvinceState> &provinces);
+
+double
+expansionTargetWeakness(PolityId attacker, PolityId defender,
+                        const std::map<PolityId, PolityStrength> &strengths);
+
+bool remainsContiguousAfterConquest(
+    PolityId owner, ProvinceId removedProvince,
+    const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours,
+    const std::map<ProvinceId, ProvinceState> &provinces);
+
+bool hasMaritimeWarConnection(PolityId left, PolityId right, const State &state,
+                              const detail::NormalizedInput &normalized,
+                              double maritimeRange);
 
 bool capitalsShareLandMass(
-	PolityId left, PolityId right, const State &state,
-	const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces);
+    PolityId left, PolityId right, const State &state,
+    const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces);
 
 void resolveWars(
-	Year nextYear, double centuries, const Configuration &configuration,
-	const detail::NormalizedInput &normalized, State &state,
-	const detail::AppendEvent &append, std::vector<WarEvent> &wars,
-	int &nextWarId, const std::vector<Event> &events,
-	const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &inputProvinces);
+    Year nextYear, double centuries, const Configuration &configuration,
+    const detail::NormalizedInput &normalized, State &state,
+    const detail::AppendEvent &append, std::vector<WarEvent> &wars,
+    int &nextWarId, const std::vector<Event> &events,
+    const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &inputProvinces);
 
 } // namespace Arda::Simulation::warfare

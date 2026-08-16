@@ -7,12 +7,12 @@ namespace Arda::Simulation::detail {
 
 struct NormalizedInput {
   struct Environment {
-	double habitability = 0.5;
-	double arableLand = 0.5;
-	double inclination = 0.0;
-	bool coastal = false;
-	bool island = false;
-	size_t area = 0;
+    double habitability = 0.5;
+    double arableLand = 0.5;
+    double inclination = 0.0;
+    bool coastal = false;
+    bool island = false;
+    size_t area = 0;
   };
 
   std::map<ProvinceId, std::shared_ptr<ArdaProvince>> provinces;

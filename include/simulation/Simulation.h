@@ -167,8 +167,8 @@ enum class EventType {
   MigrateCulturePopulation,
   ConvertCulturePopulation,
   ColonizeProvince,
-  ConsolidateRegion
-  , SetCapital
+  ConsolidateRegion,
+  SetCapital
 };
 
 struct Event {
