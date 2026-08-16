@@ -36,6 +36,30 @@ territoriesByPolity(const State &state) {
   return territories;
 }
 
+const std::set<ProvinceId> &coastalProvincesOf(const State &state,
+                                               PolityId polityId) {
+  static const std::set<ProvinceId> empty;
+  const auto coastal = state.coastalProvinceIds.find(polityId);
+  return coastal == state.coastalProvinceIds.end() ? empty : coastal->second;
+}
+
+void setCapital(State &state, PolityId polityId, ProvinceId provinceId) {
+  const auto polity = state.polities.find(polityId);
+  if (polity == state.polities.end())
+    return;
+  polity->second.capitalProvince = provinceId;
+  const auto province = state.geography.find(provinceId);
+  polity->second.capital =
+      province == state.geography.end() ? nullptr : province->second;
+}
+
+const std::shared_ptr<ArdaProvince> &capitalOf(const State &state,
+                                                PolityId polityId) {
+  static const std::shared_ptr<ArdaProvince> empty;
+  const auto polity = state.polities.find(polityId);
+  return polity == state.polities.end() ? empty : polity->second.capital;
+}
+
 void refreshDominantCulture(ProvinceState &province) {
   if (province.culturePopulations.empty()) {
     province.culture = -1;
@@ -64,7 +88,7 @@ void relocateCapital(State &state, PolityId polityId) {
         province.population > state.provinces.at(replacement).population)
       replacement = provinceId;
   }
-  polity->second.capitalProvince = replacement;
+  setCapital(state, polityId, replacement);
 }
 
 } // namespace state

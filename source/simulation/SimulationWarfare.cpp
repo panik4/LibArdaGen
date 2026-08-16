@@ -14,27 +14,60 @@ bool chance(double probability) {
   return probability > 0.0 && RandNum::getRandom<double>(1.0) < probability;
 }
 
-}
+} // namespace
 
 namespace Arda::Simulation::warfare {
 namespace {
 
-bool hasMaritimeWarConnectionOneWay(PolityId left, PolityId right,
-                                    const State &state,
-                                    const detail::NormalizedInput &normalized,
-                                    double maritimeRange) {
+using MaritimeReachability = std::vector<std::vector<bool>>;
+
+MaritimeReachability
+buildMaritimeReachability(const detail::NormalizedInput &normalized,
+                          double maritimeRange) {
+  ProvinceId maximumProvinceId = -1;
   for (const auto &[sourceId, routes] : normalized.seaRoutesFrom) {
-    const auto source = state.provinces.find(sourceId);
-    if (source == state.provinces.end() || source->second.owner != left ||
-        !source->second.coastal)
+    maximumProvinceId = std::max(maximumProvinceId, sourceId);
+    for (const auto &route : routes)
+      maximumProvinceId = std::max(maximumProvinceId, route.provinceId);
+  }
+  if (maximumProvinceId < 0)
+    return {};
+
+  const auto provinceCount = static_cast<std::size_t>(maximumProvinceId) + 1;
+  MaritimeReachability reachability(provinceCount,
+                                    std::vector<bool>(provinceCount, false));
+  for (const auto &[sourceId, routes] : normalized.seaRoutesFrom) {
+    if (sourceId < 0 || sourceId > maximumProvinceId)
       continue;
     for (const auto &route : routes) {
       if (route.distance > maritimeRange)
         break;
-      const auto target = state.provinces.find(route.provinceId);
-      if (target != state.provinces.end() && target->second.owner == right)
-        return true;
+      if (route.provinceId >= 0 && route.provinceId <= maximumProvinceId)
+        reachability[static_cast<std::size_t>(sourceId)]
+                    [static_cast<std::size_t>(route.provinceId)] = true;
     }
+  }
+  return reachability;
+}
+
+bool hasMaritimeWarConnectionOneWay(PolityId left, PolityId right,
+                                    const State &state,
+                                    const MaritimeReachability &reachability) {
+  const auto &coastalSources =
+      Arda::Simulation::state::coastalProvincesOf(state, left);
+  const auto &coastalTargets =
+      Arda::Simulation::state::coastalProvincesOf(state, right);
+  for (const auto sourceId : coastalSources) {
+    if (sourceId < 0 ||
+        static_cast<std::size_t>(sourceId) >= reachability.size())
+      continue;
+    const auto &reachableTargets =
+        reachability[static_cast<std::size_t>(sourceId)];
+    for (const auto targetId : coastalTargets)
+      if (targetId >= 0 &&
+          static_cast<std::size_t>(targetId) < reachableTargets.size() &&
+          reachableTargets[static_cast<std::size_t>(targetId)])
+        return true;
   }
   return false;
 }
@@ -69,9 +102,9 @@ double expansionBorderScore(
   return score;
 }
 
-double expansionTargetWeakness(
-    PolityId attacker, PolityId defender,
-    const std::map<PolityId, PolityStrength> &strengths) {
+double
+expansionTargetWeakness(PolityId attacker, PolityId defender,
+                        const std::map<PolityId, PolityStrength> &strengths) {
   if (defender == NoPolity)
     return 1.0;
   const auto attackerIt = strengths.find(attacker);
@@ -118,25 +151,50 @@ double provinceCenterDistance(const ArdaProvince &left,
   return std::sqrt(dx * dx + dy * dy);
 }
 
-double polityDistance(
+struct CapitalProvinces {
+  const ArdaProvince *left = nullptr;
+  const ArdaProvince *right = nullptr;
+};
+
+CapitalProvinces findCapitalProvinces(
     PolityId left, PolityId right, const State &state,
     const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces) {
   const auto leftPolity = state.polities.find(left);
   const auto rightPolity = state.polities.find(right);
   if (leftPolity == state.polities.end() ||
       rightPolity == state.polities.end() ||
-      leftPolity->second.capitalProvince < 0 ||
-      rightPolity->second.capitalProvince < 0)
-    return std::numeric_limits<double>::max();
+      (!leftPolity->second.capital && leftPolity->second.capitalProvince < 0) ||
+      (!rightPolity->second.capital &&
+       rightPolity->second.capitalProvince < 0))
+    return {};
 
-  const auto leftProvince = provinces.find(leftPolity->second.capitalProvince);
+  const auto leftProvince =
+      leftPolity->second.capital
+          ? leftPolity->second.capital
+          : provinces.find(leftPolity->second.capitalProvince) != provinces.end()
+                ? provinces.at(leftPolity->second.capitalProvince)
+                : nullptr;
   const auto rightProvince =
-      provinces.find(rightPolity->second.capitalProvince);
-  if (leftProvince == provinces.end() || rightProvince == provinces.end() ||
-      !leftProvince->second || !rightProvince->second)
+      rightPolity->second.capital
+          ? rightPolity->second.capital
+          : provinces.find(rightPolity->second.capitalProvince) !=
+                    provinces.end()
+                ? provinces.at(rightPolity->second.capitalProvince)
+                : nullptr;
+  if (!leftProvince || !rightProvince)
+    return {};
+
+  return {leftProvince.get(), rightProvince.get()};
+}
+
+double polityDistance(
+    PolityId left, PolityId right, const State &state,
+    const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces) {
+  const auto capitals = findCapitalProvinces(left, right, state, provinces);
+  if (!capitals.left || !capitals.right)
     return std::numeric_limits<double>::max();
 
-  return provinceCenterDistance(*leftProvince->second, *rightProvince->second);
+  return provinceCenterDistance(*capitals.left, *capitals.right);
 }
 
 double maritimeRangeForYear(const Year year,
@@ -164,40 +222,35 @@ double maritimeRangeForYear(const Year year,
 }
 
 bool hasMaritimeWarConnection(PolityId left, PolityId right, const State &state,
-                              const detail::NormalizedInput &normalized,
-                              double maritimeRange) {
-  return hasMaritimeWarConnectionOneWay(left, right, state, normalized,
-                                        maritimeRange) ||
-         hasMaritimeWarConnectionOneWay(right, left, state, normalized,
-                                        maritimeRange);
+                              const MaritimeReachability &reachability) {
+  return hasMaritimeWarConnectionOneWay(left, right, state, reachability);
 }
 
 bool capitalsShareLandMass(
     PolityId left, PolityId right, const State &state,
     const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces) {
-  const auto leftPolity = state.polities.find(left);
-  const auto rightPolity = state.polities.find(right);
-  if (leftPolity == state.polities.end() || rightPolity == state.polities.end())
+  const auto capitals = findCapitalProvinces(left, right, state, provinces);
+  if (!capitals.left || !capitals.right || capitals.left->landMassID < 0 ||
+      capitals.right->landMassID < 0)
     return false;
 
-  const auto leftProvince = provinces.find(leftPolity->second.capitalProvince);
-  const auto rightProvince =
-      provinces.find(rightPolity->second.capitalProvince);
-  if (leftProvince == provinces.end() || rightProvince == provinces.end() ||
-      !leftProvince->second || !rightProvince->second ||
-      leftProvince->second->landMassID < 0 ||
-      rightProvince->second->landMassID < 0)
-    return false;
-
-  return leftProvince->second->landMassID == rightProvince->second->landMassID;
+  return capitals.left->landMassID == capitals.right->landMassID;
 }
 
-void resolveWars(const Year nextYear, double centuries, const Configuration &configuration, const detail::NormalizedInput &normalized, State &state, const detail::AppendEvent &append, std::vector<WarEvent> &wars, int &nextWarId, const std::vector<Event> &events, const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &inputProvinces) {
+void resolveWars(
+    const Year nextYear, double centuries, const Configuration &configuration,
+    const detail::NormalizedInput &normalized, State &state,
+    const detail::AppendEvent &append, std::vector<WarEvent> &wars,
+    int &nextWarId, const std::vector<Event> &events,
+    const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &inputProvinces) {
   const std::map<PolityId, std::vector<ProvinceId>> territories =
       Arda::Simulation::state::territoriesByPolity(state);
 
   std::set<PolityId> committed;
   const auto maritimeRange = maritimeRangeForYear(nextYear, configuration);
+  const auto maritimeReachability =
+      maritimeRange > 0.0 ? buildMaritimeReachability(normalized, maritimeRange)
+                          : MaritimeReachability{};
   size_t differentLandmassPairs = 0;
   size_t navalConnections = 0;
   size_t navalRangeFailures = 0;
@@ -301,43 +354,34 @@ void resolveWars(const Year nextYear, double centuries, const Configuration &con
         continue;
       const auto distance =
           polityDistance(attackerId, candidateId, state, inputProvinces);
-      const auto maritimeConnection =
-          navalChecksEnabled && maritimeRange > 0.0 &&
-          hasMaritimeWarConnection(attackerId, candidateId, state, normalized,
-                                   maritimeRange);
+      bool maritimeConnection = false;
+      if (navalChecksEnabled && maritimeRange > 0.0) {
+        maritimeConnection = hasMaritimeWarConnection(
+            attackerId, candidateId, state, maritimeReachability);
+      }
       const auto sharedLandMass =
           capitalsShareLandMass(attackerId, candidateId, state, inputProvinces);
       const auto attackerPolity = state.polities.find(attackerId);
       const auto candidatePolity = state.polities.find(candidateId);
-      const auto attackerCapital =
-          attackerPolity == state.polities.end()
-              ? inputProvinces.end()
-              : inputProvinces.find(attackerPolity->second.capitalProvince);
-      const auto candidateCapital =
-          candidatePolity == state.polities.end()
-              ? inputProvinces.end()
-              : inputProvinces.find(candidatePolity->second.capitalProvince);
-      const auto capitalsHaveDifferentLandmasses =
-          attackerCapital != inputProvinces.end() &&
-          candidateCapital != inputProvinces.end() && attackerCapital->second &&
-          candidateCapital->second &&
-          attackerCapital->second->landMassID >= 0 &&
-          candidateCapital->second->landMassID >= 0 &&
-          attackerCapital->second->landMassID !=
-              candidateCapital->second->landMassID;
+      const auto capitals =
+          findCapitalProvinces(attackerId, candidateId, state, inputProvinces);
+      const bool capitalsHaveDifferentLandmasses =
+          capitals.left != nullptr && capitals.right != nullptr &&
+          capitals.left->landMassID >= 0 && capitals.right->landMassID >= 0 &&
+          capitals.left->landMassID != capitals.right->landMassID;
       if (navalChecksEnabled && capitalsHaveDifferentLandmasses &&
           !representativePairLogged) {
-        size_t ownedCoastalSources = 0;
+        const auto &coastalSources =
+            Arda::Simulation::state::coastalProvincesOf(state, attackerId);
+        const auto ownedCoastalSources = coastalSources.size();
         size_t ownedSourceRoutes = 0;
         double shortestOwnedRoute = std::numeric_limits<double>::max();
-        for (const auto &[sourceId, routes] : normalized.seaRoutesFrom) {
-          const auto source = state.provinces.find(sourceId);
-          if (source == state.provinces.end() ||
-              source->second.owner != attackerId || !source->second.coastal)
+        for (const auto sourceId : coastalSources) {
+          const auto routes = normalized.seaRoutesFrom.find(sourceId);
+          if (routes == normalized.seaRoutesFrom.end())
             continue;
-          ++ownedCoastalSources;
-          ownedSourceRoutes += routes.size();
-          for (const auto &route : routes)
+          ownedSourceRoutes += routes->second.size();
+          for (const auto &route : routes->second)
             shortestOwnedRoute = std::min(shortestOwnedRoute, route.distance);
         }
         std::ostringstream message;
@@ -346,8 +390,8 @@ void resolveWars(const Year nextYear, double centuries, const Configuration &con
                 << " attackerCapital=" << attackerPolity->second.capitalProvince
                 << " defenderCapital="
                 << candidatePolity->second.capitalProvince
-                << " attackerLandMass=" << attackerCapital->second->landMassID
-                << " defenderLandMass=" << candidateCapital->second->landMassID
+                << " attackerLandMass=" << capitals.left->landMassID
+                << " defenderLandMass=" << capitals.right->landMassID
                 << " ownedCoastalSources=" << ownedCoastalSources
                 << " ownedSourceRoutes=" << ownedSourceRoutes
                 << " shortestOwnedRoute="
@@ -364,11 +408,9 @@ void resolveWars(const Year nextYear, double centuries, const Configuration &con
         else
           ++navalRangeFailures;
       } else if (navalChecksEnabled &&
-                 (attackerCapital == inputProvinces.end() ||
-                  candidateCapital == inputProvinces.end() ||
-                  !attackerCapital->second || !candidateCapital->second ||
-                  attackerCapital->second->landMassID < 0 ||
-                  candidateCapital->second->landMassID < 0)) {
+                 (!capitals.left || !capitals.right ||
+                  capitals.left->landMassID < 0 ||
+                  capitals.right->landMassID < 0)) {
         ++missingLandMassData;
       }
       const auto candidateDistance = sharedLandMass ? distance

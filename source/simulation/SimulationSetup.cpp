@@ -52,6 +52,7 @@ bool prepareInput(
 
 void initializeWorld(const Configuration &configuration,
                      detail::SimulationRun &run) {
+  run.state.geography = run.normalized.provinces;
   const auto totalRegions = std::max<size_t>(1, run.normalized.regions.size());
   SuperRegionId nextSuperRegion = 0;
   std::map<int, std::vector<RegionId>> continentRegions;

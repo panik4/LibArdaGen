@@ -88,8 +88,17 @@ SeaRouteMap buildWeightedSeaRoutes(
         const auto normalizedDepth = seaLevel > 0.0 && depthIt != depths.end()
                                          ? depthIt->second / seaLevel
                                          : 0.0;
-        const auto cost = transitionDistance *
-                          (neighbour->isSea() ? 1.0 + normalizedDepth : 1.0);
+        const auto currentDepthIt = depths.find(provinceId);
+        const auto currentNormalizedDepth =
+            seaLevel > 0.0 && currentDepthIt != depths.end()
+                ? currentDepthIt->second / seaLevel
+                : 0.0;
+        const auto currentMultiplier =
+            current->isSea() ? 1.0 + currentNormalizedDepth : 1.0;
+        const auto neighbourMultiplier =
+            neighbour->isSea() ? 1.0 + normalizedDepth : 1.0;
+        const auto cost =
+            transitionDistance * std::max(currentMultiplier, neighbourMultiplier);
         const auto candidateDistance = distance + cost;
         if (const auto existing = distances.find(neighbourId);
             existing != distances.end() &&

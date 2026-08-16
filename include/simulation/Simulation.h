@@ -203,6 +203,7 @@ struct Polity {
   Fwg::Gfx::Colour colour;
   CultureId primaryCulture = -1;
   ProvinceId capitalProvince = -1;
+  std::shared_ptr<ArdaProvince> capital;
 };
 
 struct CultureLineage {
@@ -260,6 +261,8 @@ struct State {
   std::map<RegionId, SuperRegionId> regionSuperRegions;
   std::map<SuperRegionId, DevelopmentSuperRegion> superRegions;
   std::map<PolityId, PolityStrength> polityStrengths;
+  std::map<PolityId, std::set<ProvinceId>> coastalProvinceIds;
+  std::map<ProvinceId, std::shared_ptr<ArdaProvince>> geography;
 
   [[nodiscard]] const ProvinceState *findProvince(ProvinceId provinceId) const;
   [[nodiscard]] std::vector<ProvinceId> territoryOf(PolityId polityId) const;

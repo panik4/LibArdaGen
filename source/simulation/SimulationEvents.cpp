@@ -55,6 +55,8 @@ void apply(State &state, const Event &event) {
     state.provinces[event.provinceId].island = event.island;
     state.provinces[event.provinceId].overseas = event.overseas;
     state.provinces[event.provinceId].colony = event.colony;
+    if (event.polityId != NoPolity && event.coastal)
+      state.coastalProvinceIds[event.polityId].insert(event.provinceId);
     state.cultures.try_emplace(event.cultureId,
                                CultureLineage{event.cultureId, event.provinceId,
                                               event.year, std::nullopt,
@@ -64,16 +66,24 @@ void apply(State &state, const Event &event) {
       if (polity.primaryCulture < 0)
         polity.primaryCulture = event.cultureId;
       if (polity.capitalProvince < 0)
-        polity.capitalProvince = event.provinceId;
+        ::Arda::Simulation::state::setCapital(state, event.polityId,
+                                               event.provinceId);
     }
     break;
   case EventType::TransferProvince:
   case EventType::ConsolidateRegion:
     if (auto province = state.provinces.find(event.provinceId);
         province != state.provinces.end()) {
+      const auto previousOwner = province->second.owner;
       province->second.owner = event.polityId;
       province->second.overseas = event.overseas;
       province->second.colony = event.colony;
+      if (province->second.coastal) {
+        if (previousOwner != NoPolity)
+          state.coastalProvinceIds[previousOwner].erase(event.provinceId);
+        if (event.polityId != NoPolity)
+          state.coastalProvinceIds[event.polityId].insert(event.provinceId);
+      }
       ::Arda::Simulation::state::relocateCapital(state, event.previousPolityId);
       if (event.polityId != NoPolity &&
           state.polities.contains(event.polityId) &&
@@ -83,12 +93,14 @@ void apply(State &state, const Event &event) {
       if (event.polityId != NoPolity &&
           state.polities.contains(event.polityId) &&
           state.polities.at(event.polityId).capitalProvince < 0)
-        state.polities.at(event.polityId).capitalProvince = event.provinceId;
+        ::Arda::Simulation::state::setCapital(state, event.polityId,
+                                               event.provinceId);
     }
     break;
   case EventType::SetCapital:
     if (state.polities.contains(event.polityId))
-      state.polities.at(event.polityId).capitalProvince = event.provinceId;
+      ::Arda::Simulation::state::setCapital(state, event.polityId,
+                                             event.provinceId);
     break;
   case EventType::SetPrimaryCulture:
     if (state.polities.contains(event.polityId))
@@ -196,9 +208,16 @@ void apply(State &state, const Event &event) {
   case EventType::ColonizeProvince:
     if (auto province = state.provinces.find(event.provinceId);
         province != state.provinces.end()) {
+      const auto previousOwner = province->second.owner;
       province->second.owner = event.polityId;
       province->second.overseas = true;
       province->second.colony = true;
+      if (province->second.coastal) {
+        if (previousOwner != NoPolity)
+          state.coastalProvinceIds[previousOwner].erase(event.provinceId);
+        if (event.polityId != NoPolity)
+          state.coastalProvinceIds[event.polityId].insert(event.provinceId);
+      }
       ::Arda::Simulation::state::relocateCapital(state, event.previousPolityId);
       if (event.polityId != NoPolity &&
           state.polities.contains(event.polityId) &&
