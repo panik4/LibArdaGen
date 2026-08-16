@@ -99,6 +99,8 @@ struct Configuration {
   double warAllianceDistanceMultiplier = 0.5;
   size_t maximumWarAllianceMembers = 3;
   size_t maximumWarTransfers = 4;
+  size_t maximumWarLandTransfers = 3;
+  size_t maximumWarMaritimeTransfers = 2;
   double religionSpreadChance = 0.35;
   double religionConversionChance = 0.40;
   double religionSplitChance = 0.0005;
