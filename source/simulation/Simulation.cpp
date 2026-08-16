@@ -2,6 +2,7 @@
 
 #include "RandNum.h"
 #include "rendering/Png.h"
+#include "utils/Cfg.h"
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -19,11 +20,6 @@ namespace Arda::Simulation {
 namespace {
 
 struct NormalizedInput {
-  struct SeaRoute {
-    ProvinceId provinceId = -1;
-    double distance = 0.0;
-  };
-
   struct Environment {
     double habitability = 0.5;
     double arableLand = 0.5;
@@ -39,13 +35,108 @@ struct NormalizedInput {
   std::map<ProvinceId, std::vector<ProvinceId>> neighbours;
   std::map<ProvinceId, int> provinceContinents;
   std::set<RegionId> islandRegions;
-  std::unordered_map<ProvinceId, std::vector<SeaRoute>> seaRoutesFrom;
-  std::unordered_map<ProvinceId, std::vector<SeaRoute>> seaRoutesTo;
+  SeaRouteMap seaRoutesFrom;
+  SeaRouteMap seaRoutesTo;
   std::map<RegionId, int> regionContinents;
   std::map<RegionId, std::vector<RegionId>> regionNeighbours;
   std::map<ProvinceId, Environment> environments;
   std::vector<ValidationError> errors;
 };
+
+SeaRouteMap buildWeightedSeaRoutes(
+    const std::vector<std::shared_ptr<ArdaContinent>> &continents,
+    const Fwg::Terrain::TerrainData *terrainData) {
+  std::map<ProvinceId, std::shared_ptr<ArdaProvince>> provinces;
+  for (const auto &continent : continents)
+    if (continent)
+      for (const auto &province : continent->ardaProvinces)
+        if (province)
+          provinces.emplace(province->ID, province);
+  std::map<ProvinceId, double> depths;
+  const auto seaLevel = static_cast<double>(Fwg::Cfg::Values().seaLevel);
+  for (const auto &[provinceId, province] : provinces) {
+    double depth = 0.0;
+    size_t samples = 0;
+    if (terrainData) {
+      for (const auto pixel : province->pixels) {
+        if (pixel < 0 ||
+            pixel >= static_cast<int>(terrainData->detailedHeightMap.size()))
+          continue;
+        depth += std::max(
+            0.0, seaLevel -
+                      static_cast<double>(terrainData->detailedHeightMap[pixel]));
+        ++samples;
+      }
+    }
+    depths[provinceId] = samples == 0 ? 0.0 : depth / samples;
+  }
+
+  SeaRouteMap routes;
+  for (const auto &[sourceId, source] : provinces) {
+    if (!source->isCoastalToOcean())
+      continue;
+    std::priority_queue<std::pair<double, ProvinceId>,
+                        std::vector<std::pair<double, ProvinceId>>,
+                        std::greater<>> queue;
+    std::map<ProvinceId, double> distances;
+    distances[sourceId] = 0.0;
+    queue.push({0.0, sourceId});
+    while (!queue.empty()) {
+      const auto [distance, provinceId] = queue.top();
+      queue.pop();
+      if (distance > distances.at(provinceId))
+        continue;
+      const auto currentIt = provinces.find(provinceId);
+      if (currentIt == provinces.end())
+        continue;
+      const auto &current = currentIt->second;
+      for (const auto &neighbour : current->provinceNeighbours) {
+        if (!neighbour || neighbour->isLake() ||
+            (!neighbour->isSea() && !neighbour->isCoastalToOcean()))
+          continue;
+        const auto neighbourId = neighbour->ID;
+        const auto neighbourIt = provinces.find(neighbourId);
+        if (neighbourIt == provinces.end())
+          continue;
+        const auto dx = static_cast<double>(
+            current->position.widthCenter - neighbour->position.widthCenter);
+        const auto dy = static_cast<double>(
+            current->position.heightCenter - neighbour->position.heightCenter);
+        const auto transitionDistance = std::sqrt(dx * dx + dy * dy);
+        const auto depthIt = depths.find(neighbourId);
+        const auto normalizedDepth =
+            seaLevel > 0.0 && depthIt != depths.end()
+                ? depthIt->second / seaLevel
+                : 0.0;
+        const auto cost = transitionDistance *
+                          (neighbour->isSea()
+                               ? 1.0 + normalizedDepth
+                               : 1.0);
+        const auto candidateDistance = distance + cost;
+        if (const auto existing = distances.find(neighbourId);
+            existing != distances.end() && existing->second <= candidateDistance)
+          continue;
+        distances[neighbourId] = candidateDistance;
+        queue.push({candidateDistance, neighbourId});
+      }
+    }
+    for (const auto &[targetId, distance] : distances) {
+      const auto targetIt = provinces.find(targetId);
+      if (targetIt == provinces.end())
+        continue;
+      const auto &target = targetIt->second;
+      if (targetId != sourceId && target->isCoastalToOcean() && !target->isSea())
+        routes[sourceId].push_back({targetId, distance});
+    }
+    std::sort(routes[sourceId].begin(), routes[sourceId].end(),
+              [](const auto &left, const auto &right) {
+                if (left.distance != right.distance)
+                  return left.distance < right.distance;
+                return left.provinceId < right.provinceId;
+              });
+  }
+  return routes;
+}
 
 std::vector<PolityId> contiguousSuccessorAssignments(
     const std::vector<ProvinceId> &provinceIds, size_t successorCount,
@@ -289,25 +380,25 @@ NormalizedInput normalize(const Input &input) {
     normalized.environments[provinceId] = environment;
   }
 
-  for (const auto &[sourceId, source] : normalized.provinces) {
-    if (!source->isCoastalToOcean())
+  const auto weightedRoutes =
+      buildWeightedSeaRoutes(input.continents, input.terrainData);
+  for (const auto &[sourceId, routes] : weightedRoutes) {
+    const auto sourceContinent = normalized.provinceContinents.find(sourceId);
+    if (sourceContinent == normalized.provinceContinents.end())
       continue;
-    for (const auto &[targetId, target] : normalized.provinces) {
-      if (sourceId == targetId ||
-          !target->isCoastalToOcean() ||
-          (!normalized.environments.at(targetId).island &&
-           normalized.provinceContinents.at(sourceId) ==
-               normalized.provinceContinents.at(targetId)))
+    for (const auto &route : routes) {
+      const auto environment = normalized.environments.find(route.provinceId);
+      const auto targetContinent =
+          normalized.provinceContinents.find(route.provinceId);
+      if (environment == normalized.environments.end() ||
+          targetContinent == normalized.provinceContinents.end())
         continue;
-      const auto dx = static_cast<double>(source->position.widthCenter -
-                                          target->position.widthCenter);
-      const auto dy = static_cast<double>(source->position.heightCenter -
-                                          target->position.heightCenter);
-      const auto distance = std::sqrt(dx * dx + dy * dy);
-      if (distance > 0.0) {
-        normalized.seaRoutesFrom[sourceId].push_back({targetId, distance});
-        normalized.seaRoutesTo[targetId].push_back({sourceId, distance});
-      }
+      if (!environment->second.island &&
+          sourceContinent->second == targetContinent->second)
+        continue;
+      normalized.seaRoutesFrom[sourceId].push_back(route);
+      normalized.seaRoutesTo[route.provinceId].push_back(
+          {sourceId, route.distance});
     }
   }
 
@@ -417,6 +508,32 @@ double expansionTargetWeakness(PolityId attacker, PolityId defender,
   return std::clamp(attackerScore /
                         std::max(1.0, attackerScore + defenderScore),
                     0.0, 1.0);
+}
+
+bool remainsContiguousAfterConquest(
+    PolityId owner, ProvinceId removedProvince,
+    const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours,
+    const std::map<ProvinceId, ProvinceState> &provinces) {
+  std::vector<ProvinceId> remaining;
+  remaining.reserve(provinces.size());
+  for (const auto &[provinceId, province] : provinces)
+    if (province.owner == owner && provinceId != removedProvince)
+      remaining.push_back(provinceId);
+  if (remaining.size() < 2)
+    return true;
+
+  std::set<ProvinceId> unvisited(remaining.begin(), remaining.end());
+  std::vector<ProvinceId> frontier{remaining.front()};
+  unvisited.erase(remaining.front());
+  while (!frontier.empty()) {
+    const auto provinceId = frontier.back();
+    frontier.pop_back();
+    for (const auto neighbourId : neighbours.at(provinceId)) {
+      if (unvisited.erase(neighbourId) > 0)
+        frontier.push_back(neighbourId);
+    }
+  }
+  return unvisited.empty();
 }
 
 void applyEvent(State &state, const Event &event) {
@@ -987,6 +1104,11 @@ void maritimeExpansion(
         const auto &candidate = state.provinces.at(candidateId);
         if (candidate.owner == polityId)
           continue;
+        if (candidate.owner != NoPolity &&
+            !remainsContiguousAfterConquest(
+                candidate.owner, candidateId, normalized.neighbours,
+                state.provinces))
+          continue;
         const auto weakness = expansionTargetWeakness(
             polityId, candidate.owner, state.polityStrengths);
         const auto candidateScore = weakness -
@@ -1092,9 +1214,25 @@ void balancePolities(const Year nextYear, double centuries,
       const auto &neighbour = state.provinces.at(neighbourId);
       if (neighbour.owner == province.owner)
         continue;
+      if (!remainsContiguousAfterConquest(
+              neighbour.owner, neighbourId, normalized.neighbours,
+              state.provinces))
+        continue;
       const auto attacker = state.polityStrengths.at(province.owner).score;
       const auto defender = state.polityStrengths.at(neighbour.owner).score;
-      if (!chance(attacker / std::max(1.0, attacker + defender)))
+      const auto targetTerritory = territories.find(neighbour.owner);
+      const auto targetSize = targetTerritory == territories.end()
+                                  ? size_t{0}
+                                  : targetTerritory->second.size();
+      const auto smallPolityConsolidationMultiplier =
+          nextYear >= configuration.regionOwnershipYear &&
+                  targetSize <= configuration.lateSmallPolitySize
+              ? configuration.lateSmallPolityConquestMultiplier
+              : 1.0;
+      if (!chance(std::clamp(
+              attacker / std::max(1.0, attacker + defender) *
+                  smallPolityConsolidationMultiplier,
+              0.0, 1.0)))
         continue;
       candidates.emplace_back(neighbourId,
                               expansionBorderScore(neighbourId, province.owner,
@@ -1419,7 +1557,7 @@ CultureId State::dominantCultureOf(ProvinceId provinceId) const {
 HistorySimulation::HistorySimulation(Configuration configuration)
     : configuration(std::move(configuration)) {}
 
-Result HistorySimulation::run(const Input &input) {
+Result HistorySimulation::runSimulation(const Input &input) {
   Result result;
   if (configuration.targetYear <= configuration.startYear) {
     result.errors.push_back({configuration.startYear,

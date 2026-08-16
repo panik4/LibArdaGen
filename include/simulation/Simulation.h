@@ -24,7 +24,6 @@ using ReligionId = int;
 using SuperRegionId = int;
 
 inline constexpr Year StartYear = -4000;
-inline constexpr Year RegionOwnershipYear = 1836;
 inline constexpr Year TargetYear = 1936;
 inline constexpr PolityId NoPolity = -1;
 inline constexpr ReligionId NoReligion = -1;
@@ -34,7 +33,7 @@ inline constexpr ReligionId NoReligion = -1;
 // consumers materialize those domain objects from a reconstructed State.
 struct Configuration {
   Year startYear = StartYear;
-  Year regionOwnershipYear = RegionOwnershipYear;
+  Year regionOwnershipYear = 1700;
   Year targetYear = TargetYear;
   int ancientStepYears = 100;
   int classicalStepYears = 50;
@@ -82,6 +81,8 @@ struct Configuration {
   double postStabilizationFragmentationMultiplier = 0.35;
   double decayStrengthRatio = 0.35;
   double decayFragmentationChance = 0.20;
+  size_t lateSmallPolitySize = 2;
+  double lateSmallPolityConquestMultiplier = 3.0;
   double religionEmergenceChance = 0.005;
   Year maritimeExpansionStartYear = 1000;
   double maritimeExpansionChance = 0.14;
@@ -124,6 +125,13 @@ struct Input {
   const Fwg::Climate::ClimateData *climateData = nullptr;
   const Fwg::Terrain::TerrainData *terrainData = nullptr;
 };
+
+struct SeaRoute {
+  ProvinceId provinceId = -1;
+  double distance = 0.0;
+};
+
+using SeaRouteMap = std::map<ProvinceId, std::vector<SeaRoute>>;
 
 enum class RegionalPhase { Bust = -1, Neutral = 0, Boom = 1 };
 
@@ -273,7 +281,7 @@ class HistorySimulation {
 public:
   explicit HistorySimulation(Configuration configuration = {});
 
-  [[nodiscard]] Result run(const Input &input);
+  [[nodiscard]] Result runSimulation(const Input &input);
   [[nodiscard]] State reconstruct(const std::vector<Event> &events,
                                   Year year) const;
   [[nodiscard]] std::vector<ValidationError>

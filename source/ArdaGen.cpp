@@ -344,8 +344,9 @@ bool ArdaGen::genPopulation(Fwg::Cfg &config) {
 }
 bool ArdaGen::derivePopulation(Fwg::Cfg &config) {
   Fwg::Utils::Randomisation::resetRandomisation();
-  Civilization::derivePopulation(ardaData.simulationExport, civData, ardaProvinces,
-                                 ardaRegions, ardaContinents, ardaConfig.targetWorldPopulation);
+  Civilization::derivePopulation(ardaData.simulationExport, civData,
+                                 ardaProvinces, ardaRegions, ardaContinents,
+                                 ardaConfig.targetWorldPopulation);
   gatherStatistics();
   return true;
 }
@@ -383,15 +384,18 @@ void ArdaGen::genCivilisationData() {
   Arda::Simulation::HistorySimulation simulation;
   const Arda::Simulation::Input input{ardaContinents, &climateData,
                                       &terrainData};
-  const auto result = simulation.run(input);
+  const auto result = simulation.runSimulation(input);
+  std::vector<Arda::Simulation::ValidationError> exportErrors;
+  simulation.writeArtifacts(input, result, worldMap,
+                            Fwg::Cfg::Values().mapsPath + "simulation",
+                            exportErrors);
   std::map<Arda::Simulation::ProvinceId, size_t> provinceAreas;
   for (const auto &province : ardaProvinces)
     provinceAreas.emplace(province->ID, province->pixels.size());
   ardaData.simulationExport =
       Arda::Simulation::SimulationExporter::exportFinalState(
           result.finalState, simulation.getProvinceRegions(),
-          result.polityHistory,
-          provinceAreas);
+          result.polityHistory, provinceAreas);
 
   Arda::Civilization::generateFullCivilisationData(
       ardaData.simulationExport, ardaRegions, ardaProvinces, civData,
