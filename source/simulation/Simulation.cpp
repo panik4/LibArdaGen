@@ -4,9 +4,13 @@
 #include "simulation/SimulationDevelopment.h"
 #include "simulation/SimulationEvents.h"
 #include "simulation/SimulationExpansion.h"
+#include "simulation/SimulationExecution.h"
 #include "simulation/SimulationGeography.h"
 #include "simulation/SimulationInternal.h"
 #include "simulation/SimulationPolity.h"
+#include "simulation/SimulationRun.h"
+#include "simulation/SimulationRandom.h"
+#include "simulation/SimulationSetup.h"
 #include "simulation/SimulationState.h"
 #include "simulation/SimulationValidation.h"
 #include "simulation/SimulationWarfare.h"
@@ -107,10 +111,6 @@ std::vector<PolityId> contiguousSuccessorAssignments(
   return assignments;
 }
 
-bool chance(double probability) {
-  return probability > 0.0 && RandNum::getRandom<double>(1.0) < probability;
-}
-
 PolityId strongestPolityOf(const State &state) {
   const auto strongest = std::max_element(
       state.polityStrengths.begin(), state.polityStrengths.end(),
@@ -118,12 +118,6 @@ PolityId strongestPolityOf(const State &state) {
         return left.second.score < right.second.score;
       });
   return strongest == state.polityStrengths.end() ? NoPolity : strongest->first;
-}
-
-Fwg::Gfx::Colour randomPolityColour() {
-  return {static_cast<unsigned char>(RandNum::getRandom<int>(256)),
-          static_cast<unsigned char>(RandNum::getRandom<int>(256)),
-          static_cast<unsigned char>(RandNum::getRandom<int>(256))};
 }
 
 int stepFor(const Configuration &configuration, Year year) {
@@ -166,265 +160,15 @@ HistorySimulation::HistorySimulation(Configuration configuration)
     : configuration(std::move(configuration)) {}
 
 Result HistorySimulation::runSimulation(const Input &input) {
-  Result result;
-  if (configuration.targetYear <= configuration.startYear) {
-    result.errors.push_back({configuration.startYear,
-                             "The target year must be after the start year",
-                             {},
-                             {}});
-    return result;
-  }
-  auto normalized = normalize(input);
-  result.errors = normalized.errors;
-  if (!result.errors.empty())
-    return result;
-
-  provinceRegions = normalized.provinceRegions;
-  provinceNeighbours = normalized.neighbours;
-  if (normalized.provinces.empty()) {
-    result.errors.push_back({configuration.startYear,
-                             "No eligible land provinces were supplied",
-                             {},
-                             {}});
-    return result;
-  }
-  if (configuration.targetEndPolityCount < 1 ||
-      configuration.targetEndPolityCount >
-          static_cast<int>(normalized.provinces.size())) {
-    result.errors.push_back({configuration.startYear,
-                             "The target end polity count must be between one "
-                             "and the number of eligible land provinces",
-                             {},
-                             {}});
-    return result;
-  }
-
-  State state;
-  state.year = configuration.startYear;
-  PolityId nextPolity = 0;
-  CultureId nextCulture = 0;
-  ReligionId nextReligion = 0;
-  int nextWarId = 0;
-  std::map<ProvinceId, double> growthPotential;
-  std::map<ProvinceId, double> baseCapacity;
-  auto append = [&](Event &&event) {
-    result.events.emplace_back(std::move(event));
-    if (result.events.back().type == EventType::InitializeProvince) {
-      const auto provinceId = result.events.back().provinceId;
-      result.events.back().coastal =
-          normalized.environments.at(provinceId).coastal;
-      result.events.back().island =
-          normalized.environments.at(provinceId).island;
-    }
-    ++result.eventCounts[result.events.back().type];
-    const auto &appliedEvent = result.events.back();
-    events::apply(state, appliedEvent);
-    if (appliedEvent.type == EventType::InitializeProvince ||
-        appliedEvent.type == EventType::TransferProvince ||
-        appliedEvent.type == EventType::ColonizeProvince ||
-        appliedEvent.type == EventType::ConsolidateRegion) {
-      if (appliedEvent.previousPolityId != NoPolity)
-        result.polityHistory.currentProvinceIds[appliedEvent.previousPolityId]
-            .erase(appliedEvent.provinceId);
-      if (appliedEvent.polityId != NoPolity) {
-        auto &current =
-            result.polityHistory.currentProvinceIds[appliedEvent.polityId];
-        current.insert(appliedEvent.provinceId);
-        auto &peak =
-            result.polityHistory.peakProvinceIds[appliedEvent.polityId];
-        if (current.size() > peak.size())
-          peak.assign(current.begin(), current.end());
-        if (appliedEvent.regionId >= 0)
-          result.polityHistory.historicalRegionOwners[appliedEvent.regionId]
-              .insert(appliedEvent.polityId);
-      }
-    }
-  };
-  const auto totalRegions = std::max<size_t>(1, normalized.regions.size());
-  SuperRegionId nextSuperRegion = 0;
-  std::map<int, std::vector<RegionId>> continentRegions;
-  for (const auto &[regionId, continentId] : normalized.regionContinents)
-    if (normalized.regions.contains(regionId))
-      continentRegions[continentId].push_back(regionId);
-  for (auto &[continentId, regionIds] : continentRegions) {
-    std::set<RegionId> unassigned(regionIds.begin(), regionIds.end());
-    const auto groupCount = std::max<size_t>(
-        1, std::min(regionIds.size(),
-                    static_cast<size_t>(std::round(
-                        static_cast<double>(
-                            configuration.targetDevelopmentSuperRegionCount) *
-                        regionIds.size() / totalRegions))));
-    const auto groupSize =
-        std::max<size_t>(1, (regionIds.size() + groupCount - 1) / groupCount);
-    while (!unassigned.empty()) {
-      const auto superRegionId = nextSuperRegion++;
-      append({configuration.startYear, EventType::CreateSuperRegion, -1,
-              superRegionId, continentId, NoPolity, -1, NoReligion, 0.0, 0.0,
-              "fixed development superregion"});
-      std::vector<RegionId> frontier{*unassigned.begin()};
-      size_t assigned = 0;
-      while (!frontier.empty() && assigned < groupSize) {
-        const auto regionId = frontier.back();
-        frontier.pop_back();
-        if (!unassigned.erase(regionId))
-          continue;
-        append({configuration.startYear, EventType::SetSuperRegion, -1,
-                regionId, NoPolity, NoPolity, -1, NoReligion,
-                static_cast<double>(superRegionId), 0.0,
-                "fixed superregion assignment"});
-        state.superRegions[superRegionId].regions.push_back(regionId);
-        ++assigned;
-        for (const auto neighbourId : normalized.regionNeighbours[regionId])
-          if (unassigned.contains(neighbourId))
-            frontier.push_back(neighbourId);
-      }
-    }
-  }
-  for (const auto &[regionId, neighbours] : normalized.regionNeighbours) {
-    const auto source = state.regionSuperRegions.find(regionId);
-    if (source == state.regionSuperRegions.end())
-      continue;
-    for (const auto neighbourId : neighbours) {
-      const auto target = state.regionSuperRegions.find(neighbourId);
-      if (target != state.regionSuperRegions.end() &&
-          target->second != source->second)
-        state.superRegions[source->second].neighbours.push_back(target->second);
-    }
-  }
-  for (auto &[id, superRegion] : state.superRegions) {
-    std::sort(superRegion.neighbours.begin(), superRegion.neighbours.end());
-    superRegion.neighbours.erase(std::unique(superRegion.neighbours.begin(),
-                                             superRegion.neighbours.end()),
-                                 superRegion.neighbours.end());
-  }
-
-  for (const auto &[provinceId, province] : normalized.provinces) {
-    const auto polityId = nextPolity++;
-    const auto cultureId = nextCulture++;
-    const auto habitability =
-        province->habitability > 0.0f
-            ? std::clamp(static_cast<double>(province->habitability), 0.0, 1.0)
-            : 0.5;
-    const auto connectivity =
-        std::min(normalized.neighbours.at(provinceId).size(), size_t{6});
-    const auto potential = 0.65 + habitability * 0.45 +
-                           static_cast<double>(connectivity) * 0.04 +
-                           RandNum::getRandom<double>(0.25);
-    growthPotential.emplace(provinceId, potential);
-    const auto &environment = normalized.environments.at(provinceId);
-    const double environmentalCapacity =
-        std::max(configuration.minimumPopulation,
-                 configuration.defaultPopulation *
-                     (0.5 + environment.habitability + environment.arableLand +
-                      (environment.coastal ? 0.25 : 0.0)) *
-                     std::sqrt(std::max(
-                         1.0, static_cast<double>(environment.area) / 100.0)) /
-                     (1.0 + environment.inclination));
-    baseCapacity.emplace(provinceId, environmentalCapacity);
-    const double population = 1.0;
-    const double development = (province->averageDevelopment > 0.0
-                                    ? province->averageDevelopment
-                                    : configuration.defaultDevelopment) *
-                               potential;
-    append({configuration.startYear, EventType::CreatePolity, -1, -1, polityId,
-            NoPolity, -1, NoReligion, 0.0, 0.0, "tribe", -1,
-            randomPolityColour()});
-    auto initializeProvince = Event{configuration.startYear,
-                                    EventType::InitializeProvince,
-                                    provinceId,
-                                    normalized.provinceRegions.at(provinceId),
-                                    polityId,
-                                    NoPolity,
-                                    cultureId,
-                                    NoReligion,
-                                    population,
-                                    development,
-                                    "initial tribe and culture",
-                                    -1,
-                                    randomPolityColour()};
-    initializeProvince.coastal = environment.coastal;
-    initializeProvince.island = environment.island;
-    append(std::move(initializeProvince));
-    append({configuration.startYear, EventType::UpdateCarryingCapacity,
-            provinceId, normalized.provinceRegions.at(provinceId), NoPolity,
-            NoPolity, -1, NoReligion, environmentalCapacity, 0.0,
-            "initial carrying capacity"});
-  }
-  for (const auto &[regionId, provinces] : normalized.regions)
-    append({configuration.startYear, EventType::SetRegionalPhase, -1, regionId,
-            NoPolity, NoPolity, -1, NoReligion,
-            static_cast<double>(static_cast<int>(RegionalPhase::Neutral)), 0.0,
-            "initial regional phase"});
-
-  for (Year year = configuration.startYear; year < configuration.targetYear;) {
-    const Year nextYear =
-        std::min(year + stepFor(configuration, year), configuration.targetYear);
-    logYearProgress(year, configuration.targetYear, result.eventCounts);
-    const double centuries = static_cast<double>(nextYear - year) / 100.0;
-    if (!(configuration.superRegionCycleYears <= 0 ||
-          (nextYear - configuration.startYear) /
-                  configuration.superRegionCycleYears <=
-              (year - configuration.startYear) /
-                  configuration.superRegionCycleYears)) {
-      development::updateSuperRegionPhases(year, nextYear, configuration, state,
-                                           append);
-    }
-    if (!(configuration.regionPhaseDurationYears <= 0 ||
-          (nextYear - configuration.startYear) /
-                  configuration.regionPhaseDurationYears <=
-              (year - configuration.startYear) /
-                  configuration.regionPhaseDurationYears)) {
-      development::updateRegionalPhases(year, nextYear, configuration,
-                                        normalized, append);
-    }
-    auto territories = territoriesByPolity(state);
-    development::updateProvinceGrowth(nextYear, centuries, configuration,
-                                      normalized, state, growthPotential,
-                                      baseCapacity, append, territories);
-    development::updatePolityStrengths(nextYear, state, append);
-    culture::integrate(nextYear, centuries, configuration, state, append);
-    /*expansion::colonize(nextYear, centuries, configuration, normalized, state,
-                          append, strongestPolityOf(state));*/
-    warfare::resolveWars(nextYear, centuries, configuration, normalized, state,
-                         append, result.wars, nextWarId, result.events,
-                         normalized.provinces);
-    // implodePolities(nextYear, centuries, configuration, normalized, state,
-    // append,
-    //                 nextPolity);
-    culture::evolveAndReligions(nextYear, centuries, configuration, normalized,
-                                state, append, nextCulture, nextReligion);
-    if (nextYear >= configuration.regionOwnershipYear) {
-      polity::consolidateRegions(nextYear, configuration, normalized, state,
-                                 append);
-    }
-    polity::dissolveEmpty(nextYear, state, append);
-    year = nextYear;
-  }
-
-  result.finalState = state;
-  result.errors = validate(state, configuration.targetYear, true);
-  State eventState;
-  Year previousYear = configuration.startYear;
-  for (const auto &event : result.events) {
-    if (event.year < configuration.startYear ||
-        event.year > configuration.targetYear)
-      result.errors.push_back(
-          {event.year, "Event year is outside the configured simulation range",
-           event.provinceId >= 0 ? std::optional<ProvinceId>(event.provinceId)
-                                 : std::nullopt,
-           event.regionId >= 0 ? std::optional<RegionId>(event.regionId)
-                               : std::nullopt});
-    if (event.year < previousYear)
-      result.errors.push_back(
-          {event.year, "Events are not ordered chronologically",
-           event.provinceId >= 0 ? std::optional<ProvinceId>(event.provinceId)
-                                 : std::nullopt,
-           event.regionId >= 0 ? std::optional<RegionId>(event.regionId)
-                               : std::nullopt});
-    previousYear = event.year;
-    events::apply(eventState, event);
-  }
-  return result;
+  detail::SimulationRun run;
+  if (!setup::prepareInput(configuration, input, provinceRegions,
+                           provinceNeighbours, run))
+    return run.result;
+  run.state.year = configuration.startYear;
+  setup::initializeWorld(configuration, run);
+  execution::simulateYears(configuration, run);
+  execution::finalize(configuration, provinceRegions, run);
+  return run.result;
 }
 
 State HistorySimulation::reconstruct(const std::vector<Event> &events,
