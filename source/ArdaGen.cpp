@@ -395,7 +395,7 @@ void ArdaGen::genCivilisationData() {
   ardaData.simulationExport =
       Arda::Simulation::SimulationExporter::exportFinalState(
           result.finalState, simulation.getProvinceRegions(),
-          result.polityHistory, provinceAreas);
+           result.polityHistory, result.events, result.wars, provinceAreas);
 
   Arda::Civilization::generateFullCivilisationData(
       ardaData.simulationExport, ardaRegions, ardaProvinces, civData,

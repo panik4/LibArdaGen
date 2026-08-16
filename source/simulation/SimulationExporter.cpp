@@ -58,7 +58,9 @@ void exportProvinceData(
 			province.development,
 			metrics.maximumDevelopment > 0.0
 				? province.development / metrics.maximumDevelopment
-				: 0.0});
+				: 0.0,
+			province.overseas,
+			province.colony});
 	if (regionId >= 0)
 	  exported.regions[regionId].push_back(provinceId);
   }
@@ -183,11 +185,13 @@ void exportSignificantPolities(SimulationExport &exported, const State &state) {
 SimulationExport SimulationExporter::exportFinalState(
 	const State &state, const std::map<ProvinceId, RegionId> &provinceRegions,
 	const SimulationPolityHistory &polityHistory,
+	const std::vector<Event> &events, const std::vector<WarEvent> &wars,
 	const std::map<ProvinceId, size_t> &provinceAreas) {
   SimulationExport exported;
   exported.year = state.year;
   exported.cultures = state.cultures;
   exported.religions = state.religions;
+	exported.wars = wars;
   exportActiveCivilizationLineages(exported, state);
 
   const auto metrics = calculateProvinceExportMetrics(state, provinceAreas);

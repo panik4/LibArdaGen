@@ -10,7 +10,9 @@ public:
   exportFinalState(const State &state,
 				   const std::map<ProvinceId, RegionId> &provinceRegions,
 					  const SimulationPolityHistory &polityHistory,
-				   const std::map<ProvinceId, size_t> &provinceAreas);
+			const std::vector<Event> &events,
+			const std::vector<WarEvent> &wars,
+			const std::map<ProvinceId, size_t> &provinceAreas);
 };
 
 } // namespace Arda::Simulation

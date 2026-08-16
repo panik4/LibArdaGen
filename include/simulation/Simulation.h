@@ -94,6 +94,11 @@ struct Configuration {
   double maritimeConquestMultiplier = 0.9;
   double islandPolityMaritimeMultiplier = 5.0;
   double landlockedPolityMaritimeMultiplier = 3.0;
+  double warChancePerCentury = 0.25;
+  double warMaximumDistance = 1200.0;
+  double warAllianceDistanceMultiplier = 0.5;
+  size_t maximumWarAllianceMembers = 3;
+  size_t maximumWarTransfers = 4;
   double religionSpreadChance = 0.35;
   double religionConversionChance = 0.40;
   double religionSplitChance = 0.0005;
@@ -161,6 +166,7 @@ enum class EventType {
   ConvertCulturePopulation,
   ColonizeProvince,
   ConsolidateRegion
+  , SetCapital
 };
 
 struct Event {
@@ -180,6 +186,9 @@ struct Event {
   double score = 0.0;
   bool coastal = false;
   bool island = false;
+  int warId = -1;
+  bool overseas = false;
+  bool colony = false;
 };
 
 struct Polity {
@@ -191,6 +200,7 @@ struct Polity {
   bool isTribe = true;
   Fwg::Gfx::Colour colour;
   CultureId primaryCulture = -1;
+  ProvinceId capitalProvince = -1;
 };
 
 struct CultureLineage {
@@ -219,6 +229,8 @@ struct ProvinceState {
   std::map<CultureId, double> culturePopulations;
   bool coastal = false;
   bool island = false;
+  bool overseas = false;
+  bool colony = false;
 };
 
 struct DevelopmentSuperRegion {
@@ -265,8 +277,19 @@ struct SimulationPolityHistory {
   std::map<RegionId, std::set<PolityId>> historicalRegionOwners;
 };
 
+struct WarEvent {
+  int id = -1;
+  Year year = StartYear;
+  std::vector<PolityId> attackers;
+  std::vector<PolityId> defenders;
+  std::vector<PolityId> winners;
+  std::vector<PolityId> losers;
+  std::vector<std::size_t> transferEventIndices;
+};
+
 struct Result {
   std::vector<Event> events;
+  std::vector<WarEvent> wars;
   std::map<EventType, std::size_t> eventCounts;
   std::vector<ValidationError> errors;
   SimulationPolityHistory polityHistory;
@@ -317,6 +340,8 @@ struct SimulationProvinceExport {
   double normalizedPopulation = 0.0;
   double development = 0.0;
   double normalizedDevelopment = 0.0;
+  bool overseas = false;
+  bool colony = false;
 };
 
 struct SimulationPolityExport {
@@ -340,6 +365,7 @@ struct SimulationExport {
   std::map<RegionId, std::vector<ProvinceId>> regions;
   std::map<RegionId, std::vector<PolityId>> historicalRegionOwners;
   std::map<PolityId, SimulationPolityPeakExport> historicalPolityPeaks;
+  std::vector<WarEvent> wars;
 };
 
 } // namespace Arda::Simulation
