@@ -9,7 +9,7 @@ public:
   [[nodiscard]] static SimulationExport
   exportFinalState(const State &state,
 				   const std::map<ProvinceId, RegionId> &provinceRegions,
-				   const std::vector<Event> &events,
+					  const SimulationPolityHistory &polityHistory,
 				   const std::map<ProvinceId, size_t> &provinceAreas);
 };
 

@@ -64,44 +64,40 @@ void exportProvinceData(
   }
 }
 
+void exportActiveCivilizationLineages(SimulationExport &exported,
+									  const State &state) {
+  std::set<CultureId> activeCultures;
+  std::set<ReligionId> activeReligions;
+  for (const auto &[provinceId, province] : state.provinces) {
+	if (province.culture >= 0)
+	  activeCultures.insert(province.culture);
+	if (province.religion != NoReligion)
+	  activeReligions.insert(province.religion);
+  }
+
+  for (auto culture = exported.cultures.begin();
+	   culture != exported.cultures.end();) {
+	if (!activeCultures.contains(culture->first))
+	  culture = exported.cultures.erase(culture);
+	else
+	  ++culture;
+  }
+  for (auto religion = exported.religions.begin();
+	   religion != exported.religions.end();) {
+	if (!activeReligions.contains(religion->first))
+	  religion = exported.religions.erase(religion);
+	else
+	  ++religion;
+  }
+}
+
 void exportHistoricalOwnership(
 	SimulationExport &exported, const State &state,
 	const std::map<ProvinceId, RegionId> &provinceRegions,
-	const std::vector<Event> &events) {
-  std::map<ProvinceId, PolityId> historicalProvinceOwners;
-  std::map<PolityId, std::vector<ProvinceId>> peakProvinceIds;
-  std::map<PolityId, size_t> peakSizes;
-  for (const auto &event : events) {
-	if (event.provinceId < 0)
-	  continue;
-	if (event.type == EventType::InitializeProvince ||
-		event.type == EventType::TransferProvince ||
-		event.type == EventType::ColonizeProvince ||
-		event.type == EventType::ConsolidateRegion)
-	  historicalProvinceOwners[event.provinceId] = event.polityId;
-
-	std::map<PolityId, size_t> currentSizes;
-	for (const auto &[provinceId, owner] : historicalProvinceOwners)
-	  if (owner != NoPolity)
-		++currentSizes[owner];
-	for (const auto &[polityId, size] : currentSizes) {
-	  if (size <= peakSizes[polityId])
-		continue;
-	  peakSizes[polityId] = size;
-	  peakProvinceIds[polityId].clear();
-	  for (const auto &[provinceId, owner] : historicalProvinceOwners)
-		if (owner == polityId)
-		  peakProvinceIds[polityId].push_back(provinceId);
-	}
-  }
-
-  for (const auto &[provinceId, polityId] : historicalProvinceOwners) {
-	const auto region = provinceRegions.find(provinceId);
-	if (region == provinceRegions.end() || polityId == NoPolity)
-	  continue;
-	auto &owners = exported.historicalRegionOwners[region->second];
-	if (std::find(owners.begin(), owners.end(), polityId) == owners.end())
-	  owners.push_back(polityId);
+	const SimulationPolityHistory &polityHistory) {
+	for (const auto &[regionId, owners] : polityHistory.historicalRegionOwners) {
+	  auto &exportedOwners = exported.historicalRegionOwners[regionId];
+	  exportedOwners.assign(owners.begin(), owners.end());
   }
 
   const auto lineageRoot = [&state](PolityId polityId) {
@@ -125,7 +121,7 @@ void exportHistoricalOwnership(
 	owners = std::move(consolidatedOwners);
   }
 
-  for (const auto &[polityId, provinceIds] : peakProvinceIds) {
+	for (const auto &[polityId, provinceIds] : polityHistory.peakProvinceIds) {
 	auto &peakExport = exported.historicalPolityPeaks[polityId];
 	peakExport.provinceIds = provinceIds;
 	for (const auto provinceId : provinceIds) {
@@ -186,16 +182,17 @@ void exportSignificantPolities(SimulationExport &exported, const State &state) {
 
 SimulationExport SimulationExporter::exportFinalState(
 	const State &state, const std::map<ProvinceId, RegionId> &provinceRegions,
-	const std::vector<Event> &events,
+	const SimulationPolityHistory &polityHistory,
 	const std::map<ProvinceId, size_t> &provinceAreas) {
   SimulationExport exported;
   exported.year = state.year;
   exported.cultures = state.cultures;
   exported.religions = state.religions;
+  exportActiveCivilizationLineages(exported, state);
 
   const auto metrics = calculateProvinceExportMetrics(state, provinceAreas);
   exportProvinceData(exported, state, provinceRegions, provinceAreas, metrics);
-  exportHistoricalOwnership(exported, state, provinceRegions, events);
+	exportHistoricalOwnership(exported, state, provinceRegions, polityHistory);
   exportSignificantPolities(exported, state);
   return exported;
 }

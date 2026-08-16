@@ -9,6 +9,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -48,10 +49,10 @@ struct Configuration {
   int targetDevelopmentSuperRegionCount = 10;
   int superRegionCycleYears = 500;
   Year persistentDevelopmentStartYear = 1000;
-  Year colonizationStartYear = 1500;
+  Year colonizationStartYear = 1450;
   Year polityAggressionStartYear = -3000;
   double superRegionNeighbourInfluence = 0.35;
-  double culturalIntegrationRatePerCentury = 0.01;
+  double culturalIntegrationRatePerCentury = 0.25;
   double colonialSettlementRatePerCentury = 0.03;
   double populationGrowthPerCentury = 0.06;
   double developmentGrowthPerCentury = 0.01;
@@ -81,17 +82,24 @@ struct Configuration {
   double postStabilizationFragmentationMultiplier = 0.35;
   double decayStrengthRatio = 0.35;
   double decayFragmentationChance = 0.20;
-  double religionEmergenceChance = 0.03;
-  Year maritimeExpansionStartYear = -1000;
-  double maritimeExpansionChance = 0.06;
-  double initialMaritimeRange = 150.0;
-  double maritimeRangeGrowthPerCentury = 0.08;
-  double maritimeColonizationMultiplier = 0.7;
-  double maritimeConquestMultiplier = 0.45;
-  double religionSpreadChance = 0.10;
-  double religionSplitChance = 0.01;
-  double cultureAssimilationChance = 0.03;
-  double cultureSplitChance = 0.01;
+  double religionEmergenceChance = 0.005;
+  Year maritimeExpansionStartYear = 1000;
+  double maritimeExpansionChance = 0.14;
+  double initialMaritimeRange = 100.0;
+  double maritimeRangeGrowthPerCentury = 0.12;
+  double renaissanceMaritimeRangeMultiplier = 4.0;
+  double renaissanceMaritimeRangeGrowthPerCentury = 0.35;
+  double maritimeColonizationMultiplier = 1.5;
+  double maritimeConquestMultiplier = 0.9;
+  double islandPolityMaritimeMultiplier = 5.0;
+  double landlockedPolityMaritimeMultiplier = 3.0;
+  double religionSpreadChance = 0.35;
+  double religionConversionChance = 0.40;
+  double religionSplitChance = 0.0005;
+  double cultureAssimilationChance = 0.35;
+  double cultureSplitChance = 0.001;
+  double primaryCultureChangeChance = 0.0001;
+  double overseasCultureAdoptionChance = 0.01;
   double minimumPopulation = 1.0;
   double defaultPopulation = 100.0;
   double defaultDevelopment = 0.01;
@@ -129,6 +137,7 @@ enum class EventType {
   DissolvePolity,
   CreateCulture,
   SetCulture,
+  SetPrimaryCulture,
   CreateReligion,
   SetReligion,
   UpdatePopulation,
@@ -161,6 +170,8 @@ struct Event {
   int parentId = -1;
   Fwg::Gfx::Colour colour;
   double score = 0.0;
+  bool coastal = false;
+  bool island = false;
 };
 
 struct Polity {
@@ -171,6 +182,7 @@ struct Polity {
   std::vector<PolityId> successorIds;
   bool isTribe = true;
   Fwg::Gfx::Colour colour;
+  CultureId primaryCulture = -1;
 };
 
 struct CultureLineage {
@@ -197,6 +209,8 @@ struct ProvinceState {
   double development = 0.0;
   double carryingCapacity = 0.0;
   std::map<CultureId, double> culturePopulations;
+  bool coastal = false;
+  bool island = false;
 };
 
 struct DevelopmentSuperRegion {
@@ -237,10 +251,17 @@ struct ValidationError {
   std::optional<RegionId> regionId;
 };
 
+struct SimulationPolityHistory {
+  std::map<PolityId, std::set<ProvinceId>> currentProvinceIds;
+  std::map<PolityId, std::vector<ProvinceId>> peakProvinceIds;
+  std::map<RegionId, std::set<PolityId>> historicalRegionOwners;
+};
+
 struct Result {
   std::vector<Event> events;
   std::map<EventType, std::size_t> eventCounts;
   std::vector<ValidationError> errors;
+  SimulationPolityHistory polityHistory;
   State finalState;
 
   [[nodiscard]] bool succeeded() const { return errors.empty(); }

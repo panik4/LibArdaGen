@@ -35,6 +35,7 @@ void deriveCultureData(
     std::vector<std::shared_ptr<Arda::ArdaRegion>> &regions,
     std::vector<std::shared_ptr<ArdaContinent>> &continents,
     std::vector<std::shared_ptr<SuperRegion>> &superRegions) {
+  Fwg::Utils::Logging::logLine("Deriving culture data");
   civData.religions.clear();
   civData.cultures.clear();
   for (auto &cultureGroup : civData.cultureGroups)
@@ -142,7 +143,8 @@ void generateFullCivilisationData(
   //                     superRegions);
 
   deriveDevelopment(simulationExport, ardaProvinces, regions, continents);
-  derivePopulation(simulationExport, civData, ardaProvinces, regions, continents, targetWorldPopulation);
+  derivePopulation(simulationExport, civData, ardaProvinces, regions,
+                   continents, targetWorldPopulation);
   generateEconomyData(civData, ardaProvinces, regions, continents,
                       targetWorldPopulation);
   deriveCultureData(simulationExport, civData, ardaProvinces, regions,
@@ -380,7 +382,6 @@ void derivePopulation(
   postProcessPopulation(provinces, regions, continents,
                         worldPopulationFactorSum, targetWorldPopulation);
   civData.worldPopulationFactorSum = worldPopulationFactorSum;
-
 }
 
 /* Very simple calculation of economic activity. The modules can override this
