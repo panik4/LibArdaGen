@@ -1,4 +1,9 @@
 #include "simulation/Simulation.h"
+#include "simulation/SimulationInternal.h"
+#include "simulation/SimulationGeography.h"
+#include "simulation/SimulationState.h"
+#include "simulation/SimulationValidation.h"
+#include "simulation/SimulationWarfare.h"
 
 #include "RandNum.h"
 #include "rendering/Png.h"
@@ -19,124 +24,10 @@
 namespace Arda::Simulation {
 namespace {
 
-struct NormalizedInput {
-  struct Environment {
-    double habitability = 0.5;
-    double arableLand = 0.5;
-    double inclination = 0.0;
-    bool coastal = false;
-    bool island = false;
-    size_t area = 0;
-  };
-
-  std::map<ProvinceId, std::shared_ptr<ArdaProvince>> provinces;
-  std::map<ProvinceId, RegionId> provinceRegions;
-  std::map<RegionId, std::vector<ProvinceId>> regions;
-  std::map<ProvinceId, std::vector<ProvinceId>> neighbours;
-  std::map<ProvinceId, int> provinceContinents;
-  std::set<RegionId> islandRegions;
-  SeaRouteMap seaRoutesFrom;
-  SeaRouteMap seaRoutesTo;
-  std::map<RegionId, int> regionContinents;
-  std::map<RegionId, std::vector<RegionId>> regionNeighbours;
-  std::map<ProvinceId, Environment> environments;
-  std::vector<ValidationError> errors;
-};
-
-SeaRouteMap buildWeightedSeaRoutes(
-    const std::vector<std::shared_ptr<ArdaContinent>> &continents,
-    const Fwg::Terrain::TerrainData *terrainData) {
-  std::map<ProvinceId, std::shared_ptr<ArdaProvince>> provinces;
-  for (const auto &continent : continents)
-    if (continent)
-      for (const auto &province : continent->ardaProvinces)
-        if (province)
-          provinces.emplace(province->ID, province);
-  std::map<ProvinceId, double> depths;
-  const auto seaLevel = static_cast<double>(Fwg::Cfg::Values().seaLevel);
-  for (const auto &[provinceId, province] : provinces) {
-    double depth = 0.0;
-    size_t samples = 0;
-    if (terrainData) {
-      for (const auto pixel : province->pixels) {
-        if (pixel < 0 ||
-            pixel >= static_cast<int>(terrainData->detailedHeightMap.size()))
-          continue;
-        depth += std::max(0.0, seaLevel -
-                                   static_cast<double>(
-                                       terrainData->detailedHeightMap[pixel]));
-        ++samples;
-      }
-    }
-    depths[provinceId] = samples == 0 ? 0.0 : depth / samples;
-  }
-
-  SeaRouteMap routes;
-  for (const auto &[sourceId, source] : provinces) {
-    if (!source->isCoastalToOcean())
-      continue;
-    std::priority_queue<std::pair<double, ProvinceId>,
-                        std::vector<std::pair<double, ProvinceId>>,
-                        std::greater<>>
-        queue;
-    std::map<ProvinceId, double> distances;
-    distances[sourceId] = 0.0;
-    queue.push({0.0, sourceId});
-    while (!queue.empty()) {
-      const auto [distance, provinceId] = queue.top();
-      queue.pop();
-      if (distance > distances.at(provinceId))
-        continue;
-      const auto currentIt = provinces.find(provinceId);
-      if (currentIt == provinces.end())
-        continue;
-      const auto &current = currentIt->second;
-      for (const auto &neighbour : current->provinceNeighbours) {
-        if (!neighbour || neighbour->isLake() ||
-            (!neighbour->isSea() && !neighbour->isCoastalToOcean()))
-          continue;
-        const auto neighbourId = neighbour->ID;
-        const auto neighbourIt = provinces.find(neighbourId);
-        if (neighbourIt == provinces.end())
-          continue;
-        const auto dx = static_cast<double>(current->position.widthCenter -
-                                            neighbour->position.widthCenter);
-        const auto dy = static_cast<double>(current->position.heightCenter -
-                                            neighbour->position.heightCenter);
-        const auto transitionDistance = std::sqrt(dx * dx + dy * dy);
-        const auto depthIt = depths.find(neighbourId);
-        const auto normalizedDepth = seaLevel > 0.0 && depthIt != depths.end()
-                                         ? depthIt->second / seaLevel
-                                         : 0.0;
-        const auto cost = transitionDistance *
-                          (neighbour->isSea() ? 1.0 + normalizedDepth : 1.0);
-        const auto candidateDistance = distance + cost;
-        if (const auto existing = distances.find(neighbourId);
-            existing != distances.end() &&
-            existing->second <= candidateDistance)
-          continue;
-        distances[neighbourId] = candidateDistance;
-        queue.push({candidateDistance, neighbourId});
-      }
-    }
-    for (const auto &[targetId, distance] : distances) {
-      const auto targetIt = provinces.find(targetId);
-      if (targetIt == provinces.end())
-        continue;
-      const auto &target = targetIt->second;
-      if (targetId != sourceId && target->isCoastalToOcean() &&
-          !target->isSea())
-        routes[sourceId].push_back({targetId, distance});
-    }
-    std::sort(routes[sourceId].begin(), routes[sourceId].end(),
-              [](const auto &left, const auto &right) {
-                if (left.distance != right.distance)
-                  return left.distance < right.distance;
-                return left.provinceId < right.provinceId;
-              });
-  }
-  return routes;
-}
+using detail::NormalizedInput;
+using geography::normalize;
+using state::relocateCapital;
+using state::refreshDominantCulture;
 
 std::vector<PolityId> contiguousSuccessorAssignments(
     const std::vector<ProvinceId> &provinceIds, size_t successorCount,
@@ -203,25 +94,6 @@ std::vector<PolityId> contiguousSuccessorAssignments(
   return assignments;
 }
 
-bool isEligible(const std::shared_ptr<ArdaProvince> &province) {
-  return province && !province->isSea() && !province->isLake() &&
-         !province->topographyTypes.contains(
-             Civilization::TopographyType::WASTELAND);
-}
-
-void refreshDominantCulture(ProvinceState &province) {
-  if (province.culturePopulations.empty()) {
-    province.culture = -1;
-    return;
-  }
-  province.culture = std::max_element(province.culturePopulations.begin(),
-                                      province.culturePopulations.end(),
-                                      [](const auto &left, const auto &right) {
-                                        return left.second < right.second;
-                                      })
-                         ->first;
-}
-
 double capacityEraMultiplier(const Configuration &configuration, Year year) {
   const auto compound = [](double multiplier, double rate, Year years) {
     return multiplier *
@@ -255,188 +127,6 @@ double phaseMultiplier(RegionalPhase phase) {
     return 1.0;
   }
   return 1.0;
-}
-
-NormalizedInput normalize(const Input &input) {
-  NormalizedInput normalized;
-  std::map<ProvinceId, RegionId> allProvinceRegions;
-
-  for (const auto &continent : input.continents) {
-    if (!continent) {
-      normalized.errors.push_back(
-          {StartYear, "Input contains a null continent", {}, {}});
-      continue;
-    }
-    for (const auto &ardaRegion : continent->ardaRegions) {
-      if (!ardaRegion) {
-        normalized.errors.push_back(
-            {StartYear, "Input contains a null region", {}, {}});
-        continue;
-      }
-      normalized.regionContinents[ardaRegion->ID] = continent->ID;
-      if (ardaRegion->areaSubType == Fwg::Areas::AreaSubType::Island ||
-          ardaRegion->areaSubType == Fwg::Areas::AreaSubType::CoastalIsland ||
-          ardaRegion->areaSubType == Fwg::Areas::AreaSubType::LakeIsland)
-        normalized.islandRegions.insert(ardaRegion->ID);
-      for (const auto &neighbour : ardaRegion->neighbourRegions) {
-        if (neighbour)
-          normalized.regionNeighbours[ardaRegion->ID].push_back(neighbour->ID);
-      }
-      for (const auto &province : ardaRegion->ardaProvinces) {
-        if (!province) {
-          normalized.errors.push_back({StartYear,
-                                       "Region contains a null province",
-                                       {},
-                                       ardaRegion->ID});
-          continue;
-        }
-        const auto [it, inserted] =
-            allProvinceRegions.emplace(province->ID, ardaRegion->ID);
-        if (!inserted && it->second != ardaRegion->ID) {
-          normalized.errors.push_back({StartYear,
-                                       "Province belongs to multiple regions",
-                                       province->ID, ardaRegion->ID});
-          continue;
-        }
-        if (!isEligible(province))
-          continue;
-        const auto [provinceIt, provinceInserted] =
-            normalized.provinces.emplace(province->ID, province);
-        if (!provinceInserted && provinceIt->second != province) {
-          normalized.errors.push_back({StartYear,
-                                       "Input contains duplicate province IDs",
-                                       province->ID, ardaRegion->ID});
-          continue;
-        }
-        normalized.provinceRegions[province->ID] = ardaRegion->ID;
-        normalized.provinceContinents[province->ID] = continent->ID;
-        normalized.regions[ardaRegion->ID].push_back(province->ID);
-      }
-    }
-  }
-
-  for (auto &[regionId, provinceIds] : normalized.regions)
-    std::sort(provinceIds.begin(), provinceIds.end());
-  if (input.climateData && (input.climateData->habitabilities.empty() ||
-                            input.climateData->arableLand.empty())) {
-    normalized.errors.push_back(
-        {StartYear,
-         "Climate input must provide habitability and arable-land data",
-         {},
-         {}});
-  }
-  if (input.terrainData && input.terrainData->inclination.empty()) {
-    normalized.errors.push_back(
-        {StartYear, "Terrain input must provide inclination data", {}, {}});
-  }
-
-  for (const auto &[provinceId, province] : normalized.provinces) {
-    auto &neighbours = normalized.neighbours[provinceId];
-    for (const auto &baseNeighbour : province->provinceNeighbours) {
-      auto neighbour = std::dynamic_pointer_cast<ArdaProvince>(baseNeighbour);
-      if (neighbour && normalized.provinces.contains(neighbour->ID))
-        neighbours.push_back(neighbour->ID);
-    }
-    std::sort(neighbours.begin(), neighbours.end());
-    neighbours.erase(std::unique(neighbours.begin(), neighbours.end()),
-                     neighbours.end());
-    NormalizedInput::Environment environment;
-    environment.coastal = province->isCoastalToOcean();
-    const auto regionId = normalized.provinceRegions.at(provinceId);
-    const auto regionIsIsland = normalized.islandRegions.contains(regionId);
-    const auto provinceIsIslandSubtype =
-        province->areaSubType == Fwg::Areas::AreaSubType::Island ||
-        province->areaSubType == Fwg::Areas::AreaSubType::CoastalIsland ||
-        province->areaSubType == Fwg::Areas::AreaSubType::LakeIsland;
-    environment.island = regionIsIsland || provinceIsIslandSubtype;
-    environment.area = province->pixels.size();
-    if (input.climateData || input.terrainData) {
-      double habitability = 0.0;
-      double arableLand = 0.0;
-      double inclination = 0.0;
-      size_t samples = 0;
-      for (const auto pixel : province->pixels) {
-        if (pixel < 0)
-          continue;
-        const auto index = static_cast<size_t>(pixel);
-        if (input.climateData &&
-            index < input.climateData->habitabilities.size())
-          habitability += input.climateData->habitabilities[index];
-        if (input.climateData && index < input.climateData->arableLand.size())
-          arableLand += input.climateData->arableLand[index];
-        if (input.terrainData && index < input.terrainData->inclination.size())
-          inclination += input.terrainData->inclination[index];
-        ++samples;
-      }
-      if (samples > 0) {
-        environment.habitability = std::clamp(habitability / samples, 0.0, 1.0);
-        environment.arableLand = std::clamp(arableLand / samples, 0.0, 1.0);
-        environment.inclination = std::max(0.0, inclination / samples);
-      }
-    }
-    if (!input.climateData && province->habitability > 0.0f)
-      environment.habitability =
-          std::clamp(static_cast<double>(province->habitability), 0.0, 1.0);
-    normalized.environments[provinceId] = environment;
-  }
-
-  const auto weightedRoutes =
-      buildWeightedSeaRoutes(input.continents, input.terrainData);
-  size_t weightedRouteCount = 0;
-  double weightedMinimumDistance = std::numeric_limits<double>::max();
-  double weightedMaximumDistance = 0.0;
-  for (const auto &[sourceId, routes] : weightedRoutes) {
-    weightedRouteCount += routes.size();
-    for (const auto &route : routes) {
-      weightedMinimumDistance =
-          std::min(weightedMinimumDistance, route.distance);
-      weightedMaximumDistance = std::max(weightedMaximumDistance, route.distance);
-    }
-  }
-  {
-    std::ostringstream message;
-    message << "Maritime routes built: sources=" << weightedRoutes.size()
-            << " routes=" << weightedRouteCount << " minDistance="
-            << (weightedRouteCount == 0 ? 0.0 : weightedMinimumDistance)
-            << " maxDistance=" << weightedMaximumDistance;
-    Fwg::Utils::Logging::logLine(message.str());
-  }
-  size_t normalizedRouteCount = 0;
-  size_t normalizedCrossLandmassRoutes = 0;
-  for (const auto &[sourceId, routes] : weightedRoutes) {
-    const auto sourceProvince = normalized.provinces.find(sourceId);
-    if (sourceProvince == normalized.provinces.end() ||
-        !sourceProvince->second)
-      continue;
-    for (const auto &route : routes) {
-      const auto environment = normalized.environments.find(route.provinceId);
-      const auto targetProvince = normalized.provinces.find(route.provinceId);
-      if (environment == normalized.environments.end() ||
-          targetProvince == normalized.provinces.end() ||
-          !targetProvince->second)
-        continue;
-      normalized.seaRoutesFrom[sourceId].push_back(route);
-      normalized.seaRoutesTo[route.provinceId].push_back(
-          {sourceId, route.distance});
-      ++normalizedRouteCount;
-      if (sourceProvince->second->landMassID >= 0 &&
-          targetProvince->second->landMassID >= 0 &&
-          sourceProvince->second->landMassID !=
-              targetProvince->second->landMassID)
-        ++normalizedCrossLandmassRoutes;
-    }
-  }
-  {
-    std::ostringstream message;
-    message << "Maritime routes normalized: sources="
-            << normalized.seaRoutesFrom.size() << " targets="
-            << normalized.seaRoutesTo.size() << " routes="
-            << normalizedRouteCount << " crossLandmassRoutes="
-            << normalizedCrossLandmassRoutes;
-    Fwg::Utils::Logging::logLine(message.str());
-  }
-
-  return normalized;
 }
 
 bool chance(double probability) {
@@ -568,24 +258,6 @@ bool remainsContiguousAfterConquest(
     }
   }
   return unvisited.empty();
-}
-
-void relocateCapital(State &state, PolityId polityId) {
-  const auto polity = state.polities.find(polityId);
-  if (polity == state.polities.end())
-    return;
-  const auto capital = state.provinces.find(polity->second.capitalProvince);
-  if (capital != state.provinces.end() && capital->second.owner == polityId)
-    return;
-  ProvinceId replacement = NoPolity;
-  for (const auto &[provinceId, province] : state.provinces) {
-    if (province.owner != polityId)
-      continue;
-    if (replacement == NoPolity ||
-        province.population > state.provinces.at(replacement).population)
-      replacement = provinceId;
-  }
-  polity->second.capitalProvince = replacement;
 }
 
 void applyEvent(State &state, const Event &event) {
@@ -848,109 +520,11 @@ const char *eventTypeName(EventType type) {
   return "Unknown";
 }
 
-using AppendEvent = std::function<void(Event &&)>;
-
-double provinceCenterDistance(const ArdaProvince &left,
-                              const ArdaProvince &right) {
-  const auto dx = static_cast<double>(left.position.widthCenter -
-                                      right.position.widthCenter);
-  const auto dy = static_cast<double>(left.position.heightCenter -
-                                      right.position.heightCenter);
-  return std::sqrt(dx * dx + dy * dy);
-}
-
-double polityDistance(
-    PolityId left, PolityId right, const State &state,
-    const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces) {
-  const auto leftPolity = state.polities.find(left);
-  const auto rightPolity = state.polities.find(right);
-  if (leftPolity == state.polities.end() ||
-      rightPolity == state.polities.end() ||
-      leftPolity->second.capitalProvince < 0 ||
-      rightPolity->second.capitalProvince < 0)
-    return std::numeric_limits<double>::max();
-
-  const auto leftProvince = provinces.find(leftPolity->second.capitalProvince);
-  const auto rightProvince =
-      provinces.find(rightPolity->second.capitalProvince);
-  if (leftProvince == provinces.end() || rightProvince == provinces.end())
-    return std::numeric_limits<double>::max();
-
-  return provinceCenterDistance(*leftProvince->second, *rightProvince->second);
-}
-
-double maritimeRangeForYear(const Year year,
-                            const Configuration &configuration) {
-  if (year < configuration.maritimeExpansionStartYear)
-    return 0.0;
-  const auto centuriesSinceStart = std::max(
-      0.0,
-      static_cast<double>(year - configuration.maritimeExpansionStartYear) /
-          100.0);
-  const auto preRenaissanceRange =
-      configuration.initialMaritimeRange *
-      std::pow(1.0 + configuration.maritimeRangeGrowthPerCentury,
-               centuriesSinceStart);
-  if (year < configuration.renaissanceStartYear)
-    return std::max(1.0, preRenaissanceRange);
-  const auto renaissanceYears = std::max(
-      0.0,
-      static_cast<double>(year - configuration.renaissanceStartYear) / 100.0);
-  return std::max(
-      1.0,
-      preRenaissanceRange * configuration.renaissanceMaritimeRangeMultiplier *
-          std::pow(1.0 + configuration.renaissanceMaritimeRangeGrowthPerCentury,
-                   renaissanceYears));
-}
-
-bool hasMaritimeWarConnectionOneWay(PolityId left, PolityId right,
-                                    const State &state,
-                                    const NormalizedInput &normalized,
-                                    double maritimeRange) {
-  for (const auto &[sourceId, routes] : normalized.seaRoutesFrom) {
-    const auto source = state.provinces.find(sourceId);
-    if (source == state.provinces.end() || source->second.owner != left ||
-        !source->second.coastal)
-      continue;
-    for (const auto &route : routes) {
-      if (route.distance > maritimeRange)
-        break;
-      const auto target = state.provinces.find(route.provinceId);
-      if (target != state.provinces.end() && target->second.owner == right)
-        return true;
-    }
-  }
-  return false;
-}
-
-bool hasMaritimeWarConnection(PolityId left, PolityId right, const State &state,
-                              const NormalizedInput &normalized,
-                              double maritimeRange) {
-  return hasMaritimeWarConnectionOneWay(left, right, state, normalized,
-                                        maritimeRange) ||
-         hasMaritimeWarConnectionOneWay(right, left, state, normalized,
-                                        maritimeRange);
-}
-
-bool capitalsShareLandMass(
-    PolityId left, PolityId right, const State &state,
-    const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces) {
-  const auto leftPolity = state.polities.find(left);
-  const auto rightPolity = state.polities.find(right);
-  if (leftPolity == state.polities.end() || rightPolity == state.polities.end())
-    return false;
-
-  const auto leftProvince = provinces.find(leftPolity->second.capitalProvince);
-  const auto rightProvince =
-      provinces.find(rightPolity->second.capitalProvince);
-  if (leftProvince == provinces.end() || rightProvince == provinces.end() ||
-      !leftProvince->second || !rightProvince->second ||
-      leftProvince->second->landMassID < 0 ||
-      rightProvince->second->landMassID < 0)
-    return false;
-
-  return leftProvince->second->landMassID == rightProvince->second->landMassID;
-}
+using detail::AppendEvent;
+using warfare::capitalsShareLandMass;
+using warfare::hasMaritimeWarConnection;
+using warfare::maritimeRangeForYear;
+using warfare::polityDistance;
 
 void resolveWars(
     const Year nextYear, double centuries, const Configuration &configuration,
@@ -2023,10 +1597,9 @@ void evolveCultureAndReligion(const Year nextYear, double centuries,
               ? preRenaissanceRange
               : preRenaissanceRange *
                     configuration.renaissanceMaritimeRangeMultiplier *
-                    std::pow(1.0 +
-                                 configuration
+                    std::pow(1.0 + configuration
                                      .renaissanceMaritimeRangeGrowthPerCentury,
-                             renaissanceYears));
+                           renaissanceYears));
       if (closestSeaDistance <= maritimeRange &&
           chance(configuration.overseasCultureAdoptionChance * centuries *
                  std::exp(-closestSeaDistance / maritimeRange)))
@@ -2392,72 +1965,8 @@ State HistorySimulation::reconstruct(const std::vector<Event> &events,
 std::vector<ValidationError>
 HistorySimulation::validate(const State &state, Year year,
                             bool requireWholeRegions) const {
-  std::vector<ValidationError> errors;
-  std::map<PolityId, size_t> territorySizes;
-  for (const auto &[provinceId, province] : state.provinces) {
-    if (province.owner == NoPolity || !state.polities.contains(province.owner))
-      errors.push_back({year, "Province has no valid owner", provinceId, {}});
-    if (province.culture < 0 || !state.cultures.contains(province.culture))
-      errors.push_back({year, "Province has no valid culture", provinceId, {}});
-    if (province.religion != NoReligion &&
-        !state.religions.contains(province.religion))
-      errors.push_back(
-          {year, "Province has no valid religion", provinceId, {}});
-    if (province.population < configuration.minimumPopulation)
-      errors.push_back({year,
-                        "Province population is below the configured minimum",
-                        provinceId,
-                        {}});
-    ++territorySizes[province.owner];
-    if (province.development < 0.0)
-      errors.push_back(
-          {year, "Province development is negative", provinceId, {}});
-    if (province.carryingCapacity < configuration.minimumPopulation)
-      errors.push_back(
-          {year,
-           "Province carrying capacity is below the configured minimum",
-           provinceId,
-           {}});
-    const auto culturalPopulation = std::accumulate(
-        province.culturePopulations.begin(), province.culturePopulations.end(),
-        0.0,
-        [](double total, const auto &entry) { return total + entry.second; });
-    if (std::abs(culturalPopulation - province.population) >
-        std::max(0.001, province.population * 0.001))
-      errors.push_back(
-          {year,
-           "Cultural populations do not sum to province population",
-           provinceId,
-           {}});
-  }
-  for (const auto &[polityId, polity] : state.polities) {
-    if (polity.dissolvedYear || territorySizes[polityId] == 0)
-      continue;
-    const auto capital = state.provinces.find(polity.capitalProvince);
-    if (capital == state.provinces.end() || capital->second.owner != polityId)
-      errors.push_back({year, "Living polity has no valid capital", {}, {}});
-  }
-  const auto boomingSuperRegions =
-      std::count_if(state.superRegions.begin(), state.superRegions.end(),
-                    [](const auto &entry) {
-                      return entry.second.phase == SuperRegionPhase::Booming;
-                    });
-  if (boomingSuperRegions > 2)
-    errors.push_back({year, "More than two superregions are booming", {}, {}});
-  if (requireWholeRegions) {
-    std::map<RegionId, PolityId> owners;
-    for (const auto &[provinceId, province] : state.provinces) {
-      const auto region = provinceRegions.find(provinceId);
-      if (region == provinceRegions.end())
-        continue;
-      const auto [owner, inserted] =
-          owners.emplace(region->second, province.owner);
-      if (!inserted && owner->second != province.owner)
-        errors.push_back(
-            {year, "Region has split ownership", {}, region->second});
-    }
-  }
-  return errors;
+  return validation::validateState(state, configuration, provinceRegions, year,
+                                   requireWholeRegions);
 }
 
 std::optional<ArtifactPaths>
@@ -2575,8 +2084,7 @@ HistorySimulation::writeArtifacts(const Input &input, const Result &result,
         // for (const auto &[cultureId, culturePopulation] :
         //      provinceState.culturePopulations) {
         //   const auto &culture = state.cultures.at(cultureId);
-        //   cultureLog << year << '\t' << provinceId << '\t' << cultureId <<
-        //   '\t'
+        //   cultureLog << year << '\t' << provinceId << '\t' << cultureId << '\t'
         //              << culturePopulation << '\t'
         //              << (cultureId == state.dominantCultureOf(provinceId) ? 1
         //                                                                   :
