@@ -178,7 +178,6 @@ detail::NormalizedInput normalize(const Input &input) {
           continue;
         }
         normalized.provinceRegions[province->ID] = ardaRegion->ID;
-        normalized.provinceContinents[province->ID] = continent->ID;
         normalized.regions[ardaRegion->ID].push_back(province->ID);
       }
     }

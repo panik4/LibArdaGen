@@ -75,7 +75,7 @@ void simulateYears(const Configuration &configuration,
                        run.append);
     warfare::resolveWars(nextYear, centuries, configuration, run.normalized,
                          run.state, run.append, run.result.wars, run.nextWarId,
-                         run.result.events, run.normalized.provinces);
+                          run.result.events);
     culture::evolveAndReligions(nextYear, centuries, configuration,
                                 run.normalized, run.state, run.append,
                                 run.nextCulture, run.nextReligion);

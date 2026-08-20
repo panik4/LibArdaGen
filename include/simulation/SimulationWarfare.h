@@ -7,9 +7,7 @@ namespace Arda::Simulation::warfare {
 double provinceCenterDistance(const ArdaProvince &left,
                               const ArdaProvince &right);
 
-double polityDistance(
-    PolityId left, PolityId right, const State &state,
-    const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces);
+double polityDistance(PolityId left, PolityId right, const State &state);
 
 double maritimeRangeForYear(Year year, const Configuration &configuration);
 
@@ -30,15 +28,12 @@ bool remainsContiguousAfterConquest(
 bool hasMaritimeWarConnection(PolityId left, PolityId right, const State &state,
                                const std::vector<std::vector<bool>> &reachability);
 
-bool capitalsShareLandMass(
-    PolityId left, PolityId right, const State &state,
-    const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &provinces);
+bool capitalsShareLandMass(PolityId left, PolityId right, const State &state);
 
 void resolveWars(
     Year nextYear, double centuries, const Configuration &configuration,
     const detail::NormalizedInput &normalized, State &state,
     const detail::AppendEvent &append, std::vector<WarEvent> &wars,
-    int &nextWarId, const std::vector<Event> &events,
-    const std::map<ProvinceId, std::shared_ptr<ArdaProvince>> &inputProvinces);
+    int &nextWarId, const std::vector<Event> &events);
 
 } // namespace Arda::Simulation::warfare

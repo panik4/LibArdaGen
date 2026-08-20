@@ -57,9 +57,10 @@ void colonize(const Year nextYear, double centuries,
     const auto targetSuperRegion = state.regionSuperRegions.at(targetRegion);
     const bool lagging = state.superRegions.at(targetSuperRegion).phase ==
                          SuperRegionPhase::Lagging;
-    const bool reachableByLand =
-        normalized.provinceContinents.at(provinceId) ==
-        normalized.provinceContinents.at(sourceProvince);
+     const auto *source = state::findProvince(state, sourceProvince);
+     const bool reachableByLand =
+         source && province->continentId >= 0 &&
+         province->continentId == source->continentId;
     const auto maritimeRange = maritimeRangeForYear(nextYear, configuration);
     const auto routesToProvince = normalized.seaRoutesTo.find(provinceId);
     const bool reachableBySea =
@@ -101,11 +102,15 @@ void maritime(const Year nextYear, double centuries,
               const Configuration &configuration,
               const NormalizedInput &normalized, State &state,
               const AppendEvent &append,
-              const std::map<PolityId, std::vector<ProvinceId>> &territories) {
+              const std::vector<std::vector<ProvinceId>> &territories) {
   if (nextYear < configuration.maritimeExpansionStartYear)
     return;
   const auto maritimeRange = maritimeRangeForYear(nextYear, configuration);
-  for (const auto &[polityId, provinceIds] : territories) {
+  for (PolityId polityId = 0;
+       polityId < static_cast<PolityId>(territories.size()); ++polityId) {
+    const auto &provinceIds = territories[static_cast<std::size_t>(polityId)];
+    if (provinceIds.empty())
+      continue;
     const auto strength = state.polityStrengths.find(polityId);
     if (strength == state.polityStrengths.end())
       continue;

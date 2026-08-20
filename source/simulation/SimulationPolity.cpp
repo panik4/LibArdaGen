@@ -92,7 +92,9 @@ void implode(const Year nextYear, double centuries,
              const NormalizedInput &normalized, State &state,
              const AppendEvent &append, PolityId &nextPolity) {
   const auto territories = state::territoriesByPolity(state);
-  const auto currentPolityCount = static_cast<double>(territories.size());
+  const auto currentPolityCount = static_cast<double>(std::count_if(
+      territories.begin(), territories.end(),
+      [](const auto &provinceIds) { return !provinceIds.empty(); }));
   const auto initialPolityCount =
       static_cast<double>(normalized.provinces.size());
   const double simulationProgress =
@@ -138,7 +140,11 @@ void implode(const Year nextYear, double centuries,
       strongestScore = strength.score;
     }
   }
-  for (const auto &[polityId, provinceIds] : territories) {
+  for (PolityId polityId = 0;
+       polityId < static_cast<PolityId>(territories.size()); ++polityId) {
+    const auto &provinceIds = territories[static_cast<std::size_t>(polityId)];
+    if (provinceIds.empty())
+      continue;
     if (provinceIds.size() < 2 || !state::findPolity(state, polityId) ||
         !state.polityStrengths.contains(polityId))
       continue;
@@ -258,7 +264,8 @@ void dissolveEmpty(const Year nextYear, State &state,
   for (PolityId polityId = 0;
        polityId < static_cast<PolityId>(state.polities.size()); ++polityId) {
     const auto *polity = state::findPolity(state, polityId);
-    if (polity && !polity->dissolvedYear && !territories.contains(polityId))
+    if (polity && !polity->dissolvedYear &&
+        territories[static_cast<std::size_t>(polityId)].empty())
       append({nextYear, EventType::DissolvePolity, -1, -1, polityId, NoPolity,
               -1, NoReligion, 0.0, 0.0, "annexed or dissolved"});
   }

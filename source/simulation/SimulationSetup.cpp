@@ -159,6 +159,8 @@ void initializeWorld(const Configuration &configuration,
               random::colour()};
     initializeProvince.coastal = environment.coastal;
     initializeProvince.island = environment.island;
+    initializeProvince.landMassID = province->landMassID;
+    initializeProvince.continentId = province->continent->ID;
     run.append(std::move(initializeProvince));
     run.append({configuration.startYear, EventType::UpdateCarryingCapacity,
                 provinceId, run.normalized.provinceRegions.at(provinceId),

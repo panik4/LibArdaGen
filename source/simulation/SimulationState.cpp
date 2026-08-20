@@ -72,15 +72,15 @@ Polity &ensurePolity(State &state, PolityId polityId) {
   return state.polities[index];
 }
 
-std::map<PolityId, std::vector<ProvinceId>>
-territoriesByPolity(const State &state) {
-  std::map<PolityId, std::vector<ProvinceId>> territories;
+std::vector<std::vector<ProvinceId>> territoriesByPolity(const State &state) {
+  std::vector<std::vector<ProvinceId>> territories(state.polities.size());
   for (ProvinceId provinceId = 0;
        provinceId < static_cast<ProvinceId>(state.provinces.size());
        ++provinceId)
     if (const auto *province = findProvince(state, provinceId);
-        province && province->owner != NoPolity)
-      territories[province->owner].push_back(provinceId);
+        province && province->owner >= 0 &&
+        static_cast<std::size_t>(province->owner) < territories.size())
+      territories[static_cast<std::size_t>(province->owner)].push_back(provinceId);
   return territories;
 }
 

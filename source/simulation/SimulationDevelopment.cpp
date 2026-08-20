@@ -130,7 +130,7 @@ void updateProvinceGrowth(
     const NormalizedInput &normalized, State &state,
     const std::map<ProvinceId, double> &growthPotential,
     const std::map<ProvinceId, double> &baseCapacity, const AppendEvent &append,
-    std::map<PolityId, std::vector<ProvinceId>> &territories) {
+    std::vector<std::vector<ProvinceId>> &territories) {
   for (ProvinceId provinceId = 0;
        provinceId < static_cast<ProvinceId>(state.provinces.size()); ++provinceId) {
     const auto *province = state::findProvince(state, provinceId);
@@ -205,7 +205,9 @@ void updateProvinceGrowth(
               NoPolity, -1, NoReligion, development, 0.0,
               "development growth"});
     }
-    territories[province->owner].push_back(provinceId);
+    if (province->owner >= 0 &&
+        static_cast<std::size_t>(province->owner) < territories.size())
+      territories[static_cast<std::size_t>(province->owner)].push_back(provinceId);
   }
 }
 

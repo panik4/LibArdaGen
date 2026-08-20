@@ -66,6 +66,8 @@ void apply(State &state, const Event &event) {
       province.population = event.value;
       province.development = event.secondaryValue;
       province.culturePopulations[event.cultureId] = event.value;
+      province.landMassID = event.landMassID;
+      province.continentId = event.continentId;
       province.coastal = event.coastal;
       province.island = event.island;
       province.overseas = event.overseas;

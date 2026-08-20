@@ -23,7 +23,7 @@ void updateProvinceGrowth(
     const std::map<ProvinceId, double> &growthPotential,
     const std::map<ProvinceId, double> &baseCapacity,
     const detail::AppendEvent &append,
-    std::map<PolityId, std::vector<ProvinceId>> &territories);
+    std::vector<std::vector<ProvinceId>> &territories);
 void updatePolityStrengths(Year nextYear, State &state,
                            const detail::AppendEvent &append);
 

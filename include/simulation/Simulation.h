@@ -95,6 +95,8 @@ struct Configuration {
   double islandPolityMaritimeMultiplier = 5.0;
   double landlockedPolityMaritimeMultiplier = 3.0;
   double warChancePerCentury = 0.25;
+  double initialLandWarRange = 100.0;
+  double landWarRangeGrowthPerCentury = 0.12;
   double warMaximumDistance = 1200.0;
   double warAllianceDistanceMultiplier = 0.5;
   size_t maximumWarAllianceMembers = 3;
@@ -191,6 +193,8 @@ struct Event {
   int warId = -1;
   bool overseas = false;
   bool colony = false;
+  int landMassID = -1;
+  int continentId = -1;
 };
 
 struct Polity {
@@ -232,6 +236,8 @@ struct ProvinceState {
   double development = 0.0;
   double carryingCapacity = 0.0;
   std::map<CultureId, double> culturePopulations;
+  int landMassID = -1;
+  int continentId = -1;
   bool coastal = false;
   bool island = false;
   bool overseas = false;

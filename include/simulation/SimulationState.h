@@ -13,8 +13,7 @@ Polity *findPolity(State &state, PolityId polityId);
 ProvinceState &ensureProvince(State &state, ProvinceId provinceId);
 Polity &ensurePolity(State &state, PolityId polityId);
 
-std::map<PolityId, std::vector<ProvinceId>>
-territoriesByPolity(const State &state);
+std::vector<std::vector<ProvinceId>> territoriesByPolity(const State &state);
 
 const std::set<ProvinceId> &coastalProvincesOf(const State &state,
 											   PolityId polityId);

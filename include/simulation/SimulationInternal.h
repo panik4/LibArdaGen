@@ -19,7 +19,6 @@ struct NormalizedInput {
   std::map<ProvinceId, RegionId> provinceRegions;
   std::map<RegionId, std::vector<ProvinceId>> regions;
   std::map<ProvinceId, std::vector<ProvinceId>> neighbours;
-  std::map<ProvinceId, int> provinceContinents;
   std::set<RegionId> islandRegions;
   SeaRouteMap seaRoutesFrom;
   SeaRouteMap seaRoutesTo;
