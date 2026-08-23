@@ -4,6 +4,7 @@
 #include "climate/ClimateData.h"
 #include "entities/Colour.h"
 #include "terrain/TerrainData.h"
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <map>
@@ -44,6 +45,7 @@ struct Configuration {
   Year modernStartYear = 1700;
   Year renaissanceStartYear = 1450;
   Year industrialRevolutionStartYear = 1760;
+  Year ideologicalTransitionStartYear = 1850;
   int targetEndPolityCount = 100;
   int targetDevelopmentSuperRegionCount = 10;
   int superRegionCycleYears = 500;
@@ -113,6 +115,62 @@ struct Configuration {
   double minimumPopulation = 1.0;
   double defaultPopulation = 100.0;
   double defaultDevelopment = 0.01;
+  double initialPolityStability = 0.5;
+  double stabilityMean = 0.5;
+  double stabilityMeanReversionPerCentury = 0.12;
+  double stabilityVolatilityPerCentury = 0.35;
+  double stabilityWarVictoryImpact = 0.30;
+  double stabilityWarDefeatImpact = -0.40;
+  double stabilityRandomEventChancePerCentury = 0.45;
+  double stabilityRandomEventMinimumImpact = 0.05;
+  double stabilityRandomEventMaximumImpact = 0.35;
+  double successorPoliticalInheritance = 0.7;
+  double governmentTransitionChancePerCentury = 0.20;
+  Year governmentTransitionCooldownYears = 150;
+  Year modernGovernmentTransitionCooldownYears = 25;
+  double governmentTransitionRandomness = 0.35;
+  Year tribalGovernmentEndYear = 1000;
+  Year tradeRepublicEndYear = 1800;
+  double tribalGovernmentWeight = 0.15;
+  double kingdomGovernmentWeight = 1.0;
+  Year kingdomWeightReductionStartYear = 1600;
+  Year kingdomWeightReductionEndYear = 1936;
+  double lateKingdomGovernmentWeight = 0.25;
+  double tradeRepublicGovernmentWeight = 0.8;
+  double theocracyGovernmentWeight = 0.05;
+  Year theocracyEndYear = 1800;
+  double absolutismGovernmentWeight = 0.9;
+  double constitutionalMonarchyGovernmentWeight = 1.0;
+  double democracyGovernmentWeight = 1.0;
+  double communismGovernmentWeight = 0.8;
+  double fascismGovernmentWeight = 0.8;
+  double centralizationMaximum = 0.9;
+  double centralizationDevelopmentScale = 1.0;
+  double centralizationConvergencePerCentury = 0.08;
+  double centralizationVariation = 0.025;
+  double centralizationAffinityMinimum = 0.75;
+  double centralizationAffinityMaximum = 1.25;
+  double tradeRepublicChancePerCentury = 0.20;
+  double theocracyChancePerCentury = 0.12;
+  double absolutismChancePerCentury = 0.18;
+  double constitutionalMonarchyChancePerCentury = 0.16;
+  double ideologicalTransitionChancePerCentury = 0.12;
+  Year theocracyStartYear = -2000;
+  Year absolutismStartYear = 1600;
+  Year constitutionalMonarchyStartYear = 1800;
+  Year democracyStartYear = 1800;
+  Year communismStartYear = 1880;
+  Year fascismStartYear = 1880;
+  double democracyChancePerCentury = 0.14;
+  double communismChancePerCentury = 0.12;
+  double fascismChancePerCentury = 0.12;
+  double modernGovernmentDevelopmentThreshold = 1.0;
+  double modernGovernmentDevelopmentScale = 1.0;
+  double modernGovernmentMinimumPressure = 0.25;
+  double postIndustrialModernGovernmentMultiplier = 1.75;
+  Year postIndustrialModernGovernmentStartYear = 1880;
+  double fascismMilitaryTraditionScale = 1.0;
+  double fascismWarPressureScale = 1.0;
 };
 
 struct ArtifactPaths {
@@ -127,6 +185,7 @@ struct ArtifactPaths {
   std::filesystem::path religionLog;
   std::vector<std::filesystem::path> religionMaps;
   std::filesystem::path superRegionLog;
+  std::filesystem::path polityStateLog;
 };
 
 struct Input {
@@ -145,6 +204,18 @@ using SeaRouteMap = std::map<ProvinceId, std::vector<SeaRoute>>;
 enum class RegionalPhase { Bust = -1, Neutral = 0, Boom = 1 };
 
 enum class SuperRegionPhase { Lagging = -1, Neutral = 0, Booming = 1 };
+
+enum class GovernmentForm {
+  Tribal,
+  Kingdom,
+  TradeRepublic,
+  Theocracy,
+  Absolutism,
+  ConstitutionalMonarchy,
+  Democracy,
+  Communism,
+  Fascism
+};
 
 enum class EventType {
   InitializeProvince,
@@ -170,7 +241,8 @@ enum class EventType {
   ConvertCulturePopulation,
   ColonizeProvince,
   ConsolidateRegion,
-  SetCapital
+  SetCapital,
+  PolityUpdate
 };
 
 struct Event {
@@ -195,6 +267,14 @@ struct Event {
   bool colony = false;
   int landMassID = -1;
   int continentId = -1;
+  double armyTradition = 0.0;
+  double navyTradition = 0.0;
+  double stability = 0.5;
+  double centralization = 0.0;
+  GovernmentForm governmentForm = GovernmentForm::Tribal;
+  double centralizationAffinity = 1.0;
+  Year lastGovernmentTransitionYear = StartYear;
+  std::map<int, double> politicalMovements;
 };
 
 struct Polity {
@@ -209,6 +289,14 @@ struct Polity {
   CultureId primaryCulture = -1;
   ProvinceId capitalProvince = -1;
   std::shared_ptr<ArdaProvince> capital;
+  GovernmentForm governmentForm = GovernmentForm::Tribal;
+  double centralization = 0.0;
+  double centralizationAffinity = 1.0;
+  Year lastGovernmentTransitionYear = StartYear;
+  double armyTradition = 0.0;
+  double navyTradition = 0.0;
+  double stability = 0.5;
+  std::map<int, double> politicalMovements;
 };
 
 struct CultureLineage {
@@ -233,7 +321,7 @@ struct ProvinceState {
   CultureId culture = -1;
   ReligionId religion = NoReligion;
   double population = 0.0;
-  double development = 0.0;
+  double development = 0.0; // Average development per province.
   double carryingCapacity = 0.0;
   std::map<CultureId, double> culturePopulations;
   int landMassID = -1;
@@ -290,6 +378,20 @@ struct SimulationPolityHistory {
   std::map<RegionId, std::set<PolityId>> historicalRegionOwners;
 };
 
+struct PolityTimelineSnapshot {
+  Year year = StartYear;
+  PolityId polityId = NoPolity;
+  GovernmentForm governmentForm = GovernmentForm::Tribal;
+  double centralization = 0.0;
+  double armyTradition = 0.0;
+  double navyTradition = 0.0;
+  double stability = 0.5;
+  std::map<int, double> politicalMovements;
+  double population = 0.0;
+  double development = 0.0;
+  double populationDensity = 0.0;
+};
+
 struct WarEvent {
   int id = -1;
   Year year = StartYear;
@@ -300,12 +402,27 @@ struct WarEvent {
   std::vector<std::size_t> transferEventIndices;
 };
 
+inline constexpr std::size_t GovernmentFormCount = 9;
+
+struct GovernmentTransitionDiagnostics {
+  std::size_t transitionChecks = 0;
+  std::size_t transitionSuccesses = 0;
+  std::size_t emptyCandidatePools = 0;
+  std::size_t selectedTransitions = 0;
+  std::size_t reversions = 0;
+  std::array<std::size_t, GovernmentFormCount> checksBySource{};
+  std::array<std::size_t, GovernmentFormCount> candidatePoolsBySource{};
+  std::array<std::size_t, GovernmentFormCount> selectionsByDestination{};
+};
+
 struct Result {
   std::vector<Event> events;
   std::vector<WarEvent> wars;
   std::map<EventType, std::size_t> eventCounts;
   std::vector<ValidationError> errors;
   SimulationPolityHistory polityHistory;
+  std::map<PolityId, std::vector<PolityTimelineSnapshot>> polityTimeline;
+  GovernmentTransitionDiagnostics governmentTransitions;
   State finalState;
 
   [[nodiscard]] bool succeeded() const { return errors.empty(); }

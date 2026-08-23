@@ -54,6 +54,8 @@ const char *eventTypeName(EventType type) {
     return "ConsolidateRegion";
   case EventType::SetCapital:
     return "SetCapital";
+  case EventType::PolityUpdate:
+    return "PolityUpdate";
   }
   return "Unknown";
 }
@@ -68,8 +70,10 @@ bool writeEventLog(const std::filesystem::path &path,
     return false;
   }
   eventLog << "year\ttype\tprovince\tregion\tpolity\tprevious_"
-              "polity\tculture\treligion\tparent\tvalue\tsecondary_"
-              "value\tscore\tred\tgreen\tblue\tdescription\n";
+               "polity\tculture\treligion\tparent\tvalue\tsecondary_"
+               "value\tscore\tred\tgreen\tblue\tarmy_tradition\t"
+               "navy_tradition\tstability\tcentralization\tgovernment_form\t"
+               "description\n";
   for (const auto &event : events) {
     eventLog << event.year << '\t' << eventTypeName(event.type) << '\t'
              << event.provinceId << '\t' << event.regionId << '\t'
@@ -80,6 +84,9 @@ bool writeEventLog(const std::filesystem::path &path,
              << static_cast<int>(event.colour.getRed()) << '\t'
              << static_cast<int>(event.colour.getGreen()) << '\t'
              << static_cast<int>(event.colour.getBlue()) << '\t'
+              << event.armyTradition << '\t' << event.navyTradition << '\t'
+              << event.stability << '\t' << event.centralization << '\t'
+              << static_cast<int>(event.governmentForm) << '\t'
              << event.description << '\n';
   }
   return true;

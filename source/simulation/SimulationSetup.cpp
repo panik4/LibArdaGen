@@ -140,9 +140,29 @@ void initializeWorld(const Configuration &configuration,
                                     ? province->averageDevelopment
                                     : configuration.defaultDevelopment) *
                                potential;
-    run.append({configuration.startYear, EventType::CreatePolity, -1, -1,
-                polityId, NoPolity, -1, NoReligion, 0.0, 0.0, "tribe", -1,
-                random::colour()});
+    auto createPolity = Event{configuration.startYear,
+                              EventType::CreatePolity,
+                              -1,
+                              -1,
+                              polityId,
+                              NoPolity,
+                              -1,
+                              NoReligion,
+                              0.0,
+                              0.0,
+                              "tribe",
+                              -1,
+                              random::colour()};
+    createPolity.governmentForm = GovernmentForm::Tribal;
+    createPolity.stability = configuration.initialPolityStability;
+    createPolity.lastGovernmentTransitionYear = configuration.startYear;
+    createPolity.centralizationAffinity = std::clamp(
+        configuration.centralizationAffinityMinimum +
+            RandNum::getRandom<double>(1.0) *
+                (configuration.centralizationAffinityMaximum -
+                 configuration.centralizationAffinityMinimum),
+        0.0, 2.0);
+    run.append(std::move(createPolity));
     auto initializeProvince =
         Event{configuration.startYear,
               EventType::InitializeProvince,

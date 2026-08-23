@@ -16,4 +16,14 @@ void consolidateRegions(Year nextYear, const Configuration &configuration,
 void dissolveEmpty(Year nextYear, State &state,
                    const detail::AppendEvent &append);
 
+void updatePoliticalStates(Year nextYear, double centuries,
+                           const Configuration &configuration, State &state,
+                           const detail::AppendEvent &append,
+                           const std::vector<WarEvent> &wars,
+                           GovernmentTransitionDiagnostics &diagnostics);
+
+void captureTimelineSnapshot(Year year, const detail::NormalizedInput &normalized,
+                             const State &state,
+                             std::map<PolityId, std::vector<PolityTimelineSnapshot>> &timeline);
+
 } // namespace Arda::Simulation::polity

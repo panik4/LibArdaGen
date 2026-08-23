@@ -47,6 +47,8 @@ void logYearProgress(Year year, Year targetYear,
 
 void simulateYears(const Configuration &configuration,
                    detail::SimulationRun &run) {
+  polity::captureTimelineSnapshot(configuration.startYear, run.normalized,
+                                  run.state, run.result.polityTimeline);
   for (Year year = configuration.startYear; year < configuration.targetYear;) {
     const Year nextYear =
         std::min(year + stepFor(configuration, year), configuration.targetYear);
@@ -75,7 +77,10 @@ void simulateYears(const Configuration &configuration,
                        run.append);
     warfare::resolveWars(nextYear, centuries, configuration, run.normalized,
                          run.state, run.append, run.result.wars, run.nextWarId,
-                          run.result.events);
+                         run.result.events);
+    polity::updatePoliticalStates(nextYear, centuries, configuration, run.state,
+                                  run.append, run.result.wars,
+                                  run.result.governmentTransitions);
     culture::evolveAndReligions(nextYear, centuries, configuration,
                                 run.normalized, run.state, run.append,
                                 run.nextCulture, run.nextReligion);
@@ -83,6 +88,8 @@ void simulateYears(const Configuration &configuration,
       polity::consolidateRegions(nextYear, configuration, run.normalized,
                                  run.state, run.append);
     polity::dissolveEmpty(nextYear, run.state, run.append);
+    polity::captureTimelineSnapshot(nextYear, run.normalized, run.state,
+                                    run.result.polityTimeline);
     year = nextYear;
   }
 }

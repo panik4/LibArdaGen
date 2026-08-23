@@ -15,8 +15,16 @@ void apply(State &state, const Event &event) {
       polity.initialized = true;
       polity.id = event.polityId;
       polity.foundedYear = event.year;
-      polity.isTribe = event.description == "tribe";
-      polity.colour = event.colour;
+       polity.isTribe = event.description == "tribe";
+       polity.colour = event.colour;
+       polity.governmentForm = event.governmentForm;
+       polity.centralizationAffinity = event.centralizationAffinity;
+       polity.lastGovernmentTransitionYear = event.lastGovernmentTransitionYear;
+       polity.centralization = event.centralization;
+       polity.armyTradition = event.armyTradition;
+       polity.navyTradition = event.navyTradition;
+       polity.stability = event.stability;
+       polity.politicalMovements = event.politicalMovements;
     }
     break;
   case EventType::CreateSuccessorPolity:
@@ -31,12 +39,35 @@ void apply(State &state, const Event &event) {
                                  ? std::optional<PolityId>(event.parentId)
                                  : std::nullopt;
       polity.colour = event.colour;
+       polity.isTribe = event.governmentForm == GovernmentForm::Tribal;
+       polity.governmentForm = event.governmentForm;
+       polity.centralizationAffinity = event.centralizationAffinity;
+       polity.lastGovernmentTransitionYear = event.lastGovernmentTransitionYear;
+       polity.centralization = event.centralization;
+       polity.armyTradition = event.armyTradition;
+       polity.navyTradition = event.navyTradition;
+       polity.stability = event.stability;
+       polity.politicalMovements = event.politicalMovements;
       if (const auto *parent =
               ::Arda::Simulation::state::findPolity(state, event.parentId)) {
         polity.primaryCulture = parent->primaryCulture;
         ::Arda::Simulation::state::findPolity(state, event.parentId)
             ->successorIds.push_back(event.polityId);
       }
+    }
+    break;
+  case EventType::PolityUpdate:
+    if (auto *polity = ::Arda::Simulation::state::findPolity(
+            state, event.polityId)) {
+      polity->governmentForm = event.governmentForm;
+      polity->centralizationAffinity = event.centralizationAffinity;
+      polity->lastGovernmentTransitionYear = event.lastGovernmentTransitionYear;
+      polity->isTribe = event.governmentForm == GovernmentForm::Tribal;
+      polity->centralization = event.centralization;
+      polity->armyTradition = event.armyTradition;
+      polity->navyTradition = event.navyTradition;
+      polity->stability = event.stability;
+      polity->politicalMovements = event.politicalMovements;
     }
     break;
   case EventType::ConvertCulturePopulation:
