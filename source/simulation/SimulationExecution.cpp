@@ -90,6 +90,8 @@ void simulateYears(const Configuration &configuration,
     polity::dissolveEmpty(nextYear, run.state, run.append);
     polity::captureTimelineSnapshot(nextYear, run.normalized, run.state,
                                     run.result.polityTimeline);
+    polity::implode(nextYear, centuries, configuration, run.normalized,
+                    run.state, run.append, run.nextPolity);
     year = nextYear;
   }
 }

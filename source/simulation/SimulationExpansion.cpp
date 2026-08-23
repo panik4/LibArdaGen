@@ -15,9 +15,7 @@ namespace {
 using detail::AppendEvent;
 using detail::NormalizedInput;
 using development::capacityExpansionMultiplier;
-using warfare::expansionTargetWeakness;
 using warfare::maritimeRangeForYear;
-using warfare::remainsContiguousAfterConquest;
 
 bool chance(double probability) {
   return probability > 0.0 && RandNum::getRandom<double>(1.0) < probability;
@@ -96,104 +94,6 @@ void colonize(const Year nextYear, double centuries,
           state::findProvince(state, targetProvince)->owner, -1, NoReligion,
           1.0, 0.0,
           "colonial settlement"});
-}
-
-void maritime(const Year nextYear, double centuries,
-              const Configuration &configuration,
-              const NormalizedInput &normalized, State &state,
-              const AppendEvent &append,
-              const std::vector<std::vector<ProvinceId>> &territories) {
-  if (nextYear < configuration.maritimeExpansionStartYear)
-    return;
-  const auto maritimeRange = maritimeRangeForYear(nextYear, configuration);
-  for (PolityId polityId = 0;
-       polityId < static_cast<PolityId>(territories.size()); ++polityId) {
-    const auto &provinceIds = territories[static_cast<std::size_t>(polityId)];
-    if (provinceIds.empty())
-      continue;
-    const auto strength = state.polityStrengths.find(polityId);
-    if (strength == state.polityStrengths.end())
-      continue;
-    const auto coastalProvinceCount = static_cast<size_t>(std::count_if(
-        provinceIds.begin(), provinceIds.end(), [&](const auto provinceId) {
-           const auto *province = state::findProvince(state, provinceId);
-           return province && province->coastal;
-        }));
-    const auto coastalProvinceShare =
-        provinceIds.empty()
-            ? 0.0
-            : static_cast<double>(coastalProvinceCount) / provinceIds.size();
-    const auto maritimePressure =
-        coastalProvinceShare * configuration.islandPolityMaritimeMultiplier;
-    const auto capacityMultiplier = capacityExpansionMultiplier(
-        configuration, nextYear, provinceIds.size());
-    if (!chance(configuration.maritimeExpansionChance * centuries *
-                capacityMultiplier * 2.0 * maritimePressure))
-      continue;
-    ProvinceId sourceProvince = -1;
-    ProvinceId targetProvince = -1;
-    double targetDistance = std::numeric_limits<double>::max();
-    double targetScore = -std::numeric_limits<double>::max();
-    for (const auto sourceId : provinceIds) {
-      const auto *source = state::findProvince(state, sourceId);
-      if (!source || !source->coastal)
-        continue;
-      const auto routesFromSource = normalized.seaRoutesFrom.find(sourceId);
-      if (routesFromSource == normalized.seaRoutesFrom.end())
-        continue;
-      for (const auto &route : routesFromSource->second) {
-        if (route.distance > maritimeRange)
-          continue;
-        const auto candidateId = route.provinceId;
-        const auto *candidate = state::findProvince(state, candidateId);
-        if (!candidate || candidate->owner == polityId)
-          continue;
-        if (candidate->owner != NoPolity &&
-            !remainsContiguousAfterConquest(candidate->owner, candidateId,
-                                            normalized.neighbours,
-                                            state.provinces))
-          continue;
-        const auto weakness = expansionTargetWeakness(polityId, candidate->owner,
-                                                      state.polityStrengths);
-        const auto candidateScore =
-            weakness - route.distance / std::max(1.0, maritimeRange);
-        if (candidateScore > targetScore) {
-          sourceProvince = sourceId;
-          targetProvince = candidateId;
-          targetDistance = route.distance;
-          targetScore = candidateScore;
-        }
-      }
-    }
-    if (sourceProvince < 0 || targetProvince < 0)
-      continue;
-    const auto distanceMultiplier =
-        std::exp(-targetDistance / std::max(1.0, maritimeRange));
-    const auto *target = state::findProvince(state, targetProvince);
-    if (!target)
-      continue;
-    const auto attacker = std::max(1.0, strength->second.score);
-    const auto defender = state.polityStrengths.contains(target->owner)
-                              ? state.polityStrengths.at(target->owner).score
-                              : 0.0;
-    if (target->owner != NoPolity) {
-      if (chance(std::clamp(configuration.maritimeConquestMultiplier * 2.0 *
-                                maritimePressure * centuries *
-                                distanceMultiplier * attacker /
-                                std::max(1.0, attacker + defender),
-                            0.0, 1.0)))
-        append({nextYear, EventType::TransferProvince, targetProvince,
-                normalized.provinceRegions.at(targetProvince), polityId,
-                target->owner, -1, NoReligion, 0.0, 0.0,
-                "maritime island conquest"});
-    } else if (nextYear >= configuration.renaissanceStartYear &&
-               chance(configuration.maritimeColonizationMultiplier *
-                      maritimePressure * centuries * distanceMultiplier)) {
-      append({nextYear, EventType::ColonizeProvince, targetProvince,
-              normalized.provinceRegions.at(targetProvince), polityId, NoPolity,
-              -1, NoReligion, 1.0, 0.0, "maritime island colonization"});
-    }
-  }
 }
 
 } // namespace Arda::Simulation::expansion

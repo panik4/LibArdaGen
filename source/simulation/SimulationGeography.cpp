@@ -26,11 +26,25 @@ SeaRouteMap buildWeightedSeaRoutes(
     const std::vector<std::shared_ptr<ArdaContinent>> &continents,
     const Fwg::Terrain::TerrainData *terrainData) {
   std::map<ProvinceId, std::shared_ptr<ArdaProvince>> provinces;
-  for (const auto &continent : continents)
-    if (continent)
-      for (const auto &province : continent->ardaProvinces)
-        if (province)
-          provinces.emplace(province->ID, province);
+  std::queue<std::shared_ptr<ArdaProvince>> pending;
+  for (const auto &continent : continents) {
+    if (!continent)
+      continue;
+    for (const auto &province : continent->ardaProvinces) {
+      if (province && provinces.emplace(province->ID, province).second)
+        pending.push(province);
+    }
+  }
+  while (!pending.empty()) {
+    const auto province = pending.front();
+    pending.pop();
+    for (const auto &baseNeighbour : province->provinceNeighbours) {
+      const auto neighbour =
+          std::dynamic_pointer_cast<ArdaProvince>(baseNeighbour);
+      if (neighbour && provinces.emplace(neighbour->ID, neighbour).second)
+        pending.push(neighbour);
+    }
+  }
 
   std::map<ProvinceId, double> depths;
   const auto seaLevel = static_cast<double>(Fwg::Cfg::Values().seaLevel);
@@ -51,9 +65,14 @@ SeaRouteMap buildWeightedSeaRoutes(
     depths[provinceId] = samples == 0 ? 0.0 : depth / samples;
   }
 
+  std::set<ProvinceId> coastalEndpoints;
+  for (const auto &[provinceId, province] : provinces)
+    if (isEligible(province) && province->isCoastalToOcean())
+      coastalEndpoints.insert(provinceId);
+
   SeaRouteMap routes;
-  for (const auto &[sourceId, source] : provinces) {
-    if (!source->isCoastalToOcean())
+  for (const auto sourceId : coastalEndpoints) {
+    if (!provinces.contains(sourceId))
       continue;
     std::priority_queue<std::pair<double, ProvinceId>,
                         std::vector<std::pair<double, ProvinceId>>,
@@ -71,9 +90,13 @@ SeaRouteMap buildWeightedSeaRoutes(
       if (currentIt == provinces.end())
         continue;
       const auto &current = currentIt->second;
+      if (provinceId != sourceId && !current->isSea())
+        continue;
       for (const auto &neighbour : current->provinceNeighbours) {
         if (!neighbour || neighbour->isLake() ||
-            (!neighbour->isSea() && !neighbour->isCoastalToOcean()))
+            (!neighbour->isSea() &&
+             (neighbour->ID != sourceId &&
+              !coastalEndpoints.contains(neighbour->ID))))
           continue;
         const auto neighbourId = neighbour->ID;
         const auto neighbourIt = provinces.find(neighbourId);
@@ -97,8 +120,8 @@ SeaRouteMap buildWeightedSeaRoutes(
             current->isSea() ? 1.0 + currentNormalizedDepth : 1.0;
         const auto neighbourMultiplier =
             neighbour->isSea() ? 1.0 + normalizedDepth : 1.0;
-        const auto cost =
-            transitionDistance * std::max(currentMultiplier, neighbourMultiplier);
+        const auto cost = transitionDistance *
+                          std::max(currentMultiplier, neighbourMultiplier);
         const auto candidateDistance = distance + cost;
         if (const auto existing = distances.find(neighbourId);
             existing != distances.end() &&
