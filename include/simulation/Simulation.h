@@ -29,6 +29,9 @@ inline constexpr Year TargetYear = 1936;
 inline constexpr PolityId NoPolity = -1;
 inline constexpr ReligionId NoReligion = -1;
 
+inline constexpr std::size_t PoliticalBlocCount = 4;
+using PoliticalPowerDistribution = std::array<double, PoliticalBlocCount>;
+
 // The global RandNum sequence controls reproducibility. This primitive model is
 // intentionally independent of Country, Culture, CultureGroup, and Religion;
 // consumers materialize those domain objects from a reconstructed State.
@@ -171,6 +174,48 @@ struct Configuration {
   Year postIndustrialModernGovernmentStartYear = 1880;
   double fascismMilitaryTraditionScale = 1.0;
   double fascismWarPressureScale = 1.0;
+  PoliticalPowerDistribution politicalPowerPersistence{0.55, 0.55, 0.55, 0.55};
+  double politicalPowerConvergencePerCentury = 0.35;
+  double politicalPowerVariation = 0.04;
+  double militaryInfluencePersistence = 0.55;
+  double militaryInfluenceConvergencePerCentury = 0.30;
+  double militaryInfluenceVariation = 0.04;
+  double partyControlPersistence = 0.55;
+  double partyControlConvergencePerCentury = 0.30;
+  double modernPartyControlConvergenceMultiplier = 4.0;
+  double modernGovernmentPopularityDriftMultiplier = 8.0;
+  double partyControlVariation = 0.04;
+  double militaryInfluenceWarVictoryPressure = 0.12;
+  double militaryInfluenceWarDefeatPressure = 0.08;
+  double partyControlModernPressure = 0.10;
+  double militaryGovernmentThreshold = 0.65;
+  double partyStateThreshold = 0.65;
+  double governmentPopularityDriftPerCentury = 0.18;
+  double governmentPopularityVariation = 0.025;
+  double governmentPopularityHysteresis = 0.04;
+  double preModernMonarchyTargetMultiplier = 1.0;
+  double modernMonarchyTargetMultiplier = 0.75;
+  double preModernTheocracyTargetMultiplier = 1.0;
+  double modernTheocracyTargetMultiplier = 0.75;
+  double modernDemocracyTargetMultiplier = 1.0;
+  double modernCommunismTargetMultiplier = 1.0;
+  double modernFascismTargetMultiplier = 1.0;
+  double directDemocracyPeopleThreshold = 0.72;
+  double directDemocracyLeadThreshold = 0.20;
+  double modernGovernmentMinimumPopularity = 0.05;
+  double politicalGenericShockChancePerCentury = 0.12;
+  double politicalGenericShockStrength = 0.25;
+  Year politicalPressureDurationYears = 75;
+  double politicalGovernmentHysteresis = 0.08;
+  double eraTraitChance = 0.8;
+  double randomTraitShockChancePerCentury = 0.015;
+  double warLossTraitChancePerCentury = 0.04;
+  double olderEraTraitMultiplier = 0.15;
+  double traitInitialStrength = 0.5;
+  double traitShockStrength = 0.45;
+  double traitAcquisitionPressure = 1.0;
+  double traitRemovalThreshold = 0.05;
+  double traitStrengthConvergencePerCentury = 0.20;
 };
 
 struct ArtifactPaths {
@@ -186,6 +231,15 @@ struct ArtifactPaths {
   std::vector<std::filesystem::path> religionMaps;
   std::filesystem::path superRegionLog;
   std::filesystem::path polityStateLog;
+};
+
+enum class PoliticalEra {
+  AncientClassical,
+  Medieval,
+  EarlyModern,
+  EnlightenmentRevolutionary,
+  Industrial,
+  Modern
 };
 
 struct Input {
@@ -207,14 +261,118 @@ enum class SuperRegionPhase { Lagging = -1, Neutral = 0, Booming = 1 };
 
 enum class GovernmentForm {
   Tribal,
-  Kingdom,
-  TradeRepublic,
-  Theocracy,
-  Absolutism,
+  AbsoluteMonarchy,
+  FeudalMonarchy,
   ConstitutionalMonarchy,
-  Democracy,
-  Communism,
-  Fascism
+  ParliamentaryMonarchy,
+  AristocraticMonarchy,
+  ElectiveMonarchy,
+  TheocraticMonarchy,
+  Theocracy,
+  AristocraticRepublic,
+  OligarchicRepublic,
+  ConstitutionalRepublic,
+  ParliamentaryRepublic,
+  DirectDemocracy,
+  MilitaryGovernment,
+  CommunistState,
+  FascistState
+};
+inline constexpr std::size_t GovernmentFormCount =
+    static_cast<std::size_t>(GovernmentForm::FascistState) + 1;
+
+enum class PoliticalBloc {
+  CentralAuthority,
+  Nobility,
+  ReligiousInstitutions,
+  People
+};
+
+enum class PoliticalTrait {
+  DivineRulership,
+  AristocraticRepublic,
+  CivicTradition,
+  PriestlyAuthority,
+  MilitaryStrongman,
+  LocalAutonomy,
+  FeudalOrder,
+  PowerfulCrown,
+  EcclesiasticalAuthority,
+  FragmentedRealm,
+  MerchantPrivileges,
+  CommunalTraditions,
+  WarriorAristocracy,
+  ImperialBureaucracy,
+  RoyalAbsolutism,
+  CentralizedAdministration,
+  StrongEstates,
+  ReligiousEstablishment,
+  CommercialElite,
+  ColonialAdministration,
+  EnlightenedReform,
+  MilitaryState,
+  ConstitutionalTradition,
+  EnlightenedAbsolutism,
+  RepublicanTradition,
+  AristocraticResistance,
+  Secularization,
+  RevolutionarySentiment,
+  NationalAwakening,
+  ReactionaryOrder,
+  ConstitutionalMonarchy,
+  LiberalReform,
+  ParliamentaryTradition,
+  ConservativeEstablishment,
+  Nationalism,
+  SocialReform,
+  SocialistMovement,
+  RevolutionaryMovement,
+  AuthoritarianModernization,
+  LiberalDemocracy,
+  SocialDemocracy,
+  CommunistMovement,
+  FascistMovement,
+  MilitaryAuthoritarianism,
+  OnePartyState,
+  ReligiousConservatism,
+  PopulistMovement,
+  TechnocraticGovernment
+};
+
+inline constexpr std::size_t PoliticalTraitCount =
+    static_cast<std::size_t>(PoliticalTrait::TechnocraticGovernment) + 1;
+
+struct PoliticalTraitDefinition {
+  PoliticalTrait trait = PoliticalTrait::DivineRulership;
+  PoliticalEra era = PoliticalEra::AncientClassical;
+  PoliticalPowerDistribution powerModifier{};
+  double militaryInfluenceModifier = 0.0;
+  double partyControlModifier = 0.0;
+};
+
+struct PoliticalTraitState {
+  PoliticalTrait trait = PoliticalTrait::DivineRulership;
+  double strength = 1.0;
+  Year acquiredYear = StartYear;
+  std::optional<Year> expiryYear;
+};
+
+enum class PoliticalPressureType {
+  WarVictory,
+  WarDefeat,
+  Conquest,
+  Fragmentation,
+  ReligiousChange,
+  Development,
+  GenericShock
+};
+
+struct PoliticalPressureState {
+  PoliticalPressureType type = PoliticalPressureType::GenericShock;
+  PoliticalPowerDistribution effect{};
+  double strength = 0.0;
+  Year acquiredYear = StartYear;
+  std::optional<Year> expiryYear;
 };
 
 enum class EventType {
@@ -274,6 +432,16 @@ struct Event {
   GovernmentForm governmentForm = GovernmentForm::Tribal;
   double centralizationAffinity = 1.0;
   Year lastGovernmentTransitionYear = StartYear;
+  PoliticalPowerDistribution politicalPower{0.25, 0.25, 0.25, 0.25};
+  PoliticalPowerDistribution desiredPoliticalPower{0.25, 0.25, 0.25, 0.25};
+  std::vector<PoliticalTraitState> politicalTraits;
+  std::vector<PoliticalPressureState> politicalPressures;
+  std::array<double, GovernmentFormCount> governmentPopularity{};
+  PoliticalEra lastTraitEra = PoliticalEra::AncientClassical;
+  double militaryInfluence = 0.0;
+  double desiredMilitaryInfluence = 0.0;
+  double partyControl = 0.0;
+  double desiredPartyControl = 0.0;
   std::map<int, double> politicalMovements;
 };
 
@@ -293,6 +461,16 @@ struct Polity {
   double centralization = 0.0;
   double centralizationAffinity = 1.0;
   Year lastGovernmentTransitionYear = StartYear;
+  PoliticalPowerDistribution politicalPower{0.25, 0.25, 0.25, 0.25};
+  PoliticalPowerDistribution desiredPoliticalPower{0.25, 0.25, 0.25, 0.25};
+  std::vector<PoliticalTraitState> politicalTraits;
+  std::vector<PoliticalPressureState> politicalPressures;
+  std::array<double, GovernmentFormCount> governmentPopularity{};
+  PoliticalEra lastTraitEra = PoliticalEra::AncientClassical;
+  double militaryInfluence = 0.0;
+  double desiredMilitaryInfluence = 0.0;
+  double partyControl = 0.0;
+  double desiredPartyControl = 0.0;
   double armyTradition = 0.0;
   double navyTradition = 0.0;
   double stability = 0.5;
@@ -387,6 +565,16 @@ struct PolityTimelineSnapshot {
   double navyTradition = 0.0;
   double stability = 0.5;
   std::map<int, double> politicalMovements;
+  PoliticalPowerDistribution politicalPower{0.25, 0.25, 0.25, 0.25};
+  PoliticalPowerDistribution desiredPoliticalPower{0.25, 0.25, 0.25, 0.25};
+  std::vector<PoliticalTraitState> politicalTraits;
+  std::vector<PoliticalPressureState> politicalPressures;
+  std::array<double, GovernmentFormCount> governmentPopularity{};
+  PoliticalEra lastTraitEra = PoliticalEra::AncientClassical;
+  double militaryInfluence = 0.0;
+  double desiredMilitaryInfluence = 0.0;
+  double partyControl = 0.0;
+  double desiredPartyControl = 0.0;
   double population = 0.0;
   double development = 0.0;
   double populationDensity = 0.0;
@@ -401,8 +589,6 @@ struct WarEvent {
   std::vector<PolityId> losers;
   std::vector<std::size_t> transferEventIndices;
 };
-
-inline constexpr std::size_t GovernmentFormCount = 9;
 
 struct GovernmentTransitionDiagnostics {
   std::size_t transitionChecks = 0;

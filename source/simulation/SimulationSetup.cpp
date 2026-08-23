@@ -4,10 +4,26 @@
 #include "simulation/SimulationRandom.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <set>
 
 namespace Arda::Simulation::setup {
+namespace {
+
+PoliticalPowerDistribution initialPoliticalPower() {
+  PoliticalPowerDistribution power{};
+  double total = 0.0;
+  for (auto &value : power) {
+    value = 0.5 + RandNum::getRandom<double>(1.0);
+    total += value;
+  }
+  for (auto &value : power)
+    value /= total;
+  return power;
+}
+
+} // namespace
 
 bool prepareInput(
     const Configuration &configuration, const Input &input,
@@ -162,6 +178,18 @@ void initializeWorld(const Configuration &configuration,
                 (configuration.centralizationAffinityMaximum -
                  configuration.centralizationAffinityMinimum),
         0.0, 2.0);
+    createPolity.politicalPower = initialPoliticalPower();
+    createPolity.desiredPoliticalPower = createPolity.politicalPower;
+    createPolity.governmentPopularity.fill(0.0);
+    createPolity.governmentPopularity[static_cast<std::size_t>(GovernmentForm::Tribal)] = 1.0;
+    createPolity.militaryInfluence = RandNum::getRandom<double>(0.25);
+    createPolity.desiredMilitaryInfluence = createPolity.militaryInfluence;
+    createPolity.partyControl = RandNum::getRandom<double>(0.15);
+    createPolity.desiredPartyControl = createPolity.partyControl;
+    createPolity.politicalTraits.push_back(
+        {PoliticalTrait::DivineRulership, configuration.traitInitialStrength,
+         configuration.startYear, std::nullopt});
+    createPolity.lastTraitEra = PoliticalEra::AncientClassical;
     run.append(std::move(createPolity));
     auto initializeProvince =
         Event{configuration.startYear,

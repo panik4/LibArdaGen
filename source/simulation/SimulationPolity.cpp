@@ -4,6 +4,7 @@
 #include "simulation/SimulationState.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <set>
 
@@ -17,10 +18,181 @@ bool chance(double probability) {
   return probability > 0.0 && RandNum::getRandom<double>(1.0) < probability;
 }
 
+PoliticalEra eraFor(Year year, const Configuration &configuration);
+double traitAgeMultiplier(PoliticalEra traitEra, PoliticalEra currentEra,
+                          const Configuration &configuration);
+PoliticalTraitDefinition traitDefinition(PoliticalTrait trait);
+
+double communistTraitPressure(const Polity &polity, PoliticalEra currentEra,
+                              const Configuration &configuration) {
+  double pressure = 0.0;
+  for (const auto &traitState : polity.politicalTraits) {
+    const auto definition = traitDefinition(traitState.trait);
+    const auto multiplier =
+        traitAgeMultiplier(definition.era, currentEra, configuration);
+    switch (traitState.trait) {
+    case PoliticalTrait::CommunistMovement:
+      pressure += 1.8 * traitState.strength * multiplier;
+      break;
+    case PoliticalTrait::RevolutionaryMovement:
+    case PoliticalTrait::RevolutionarySentiment:
+      pressure += 0.85 * traitState.strength * multiplier;
+      break;
+    case PoliticalTrait::SocialReform:
+    case PoliticalTrait::SocialDemocracy:
+      pressure += 0.30 * traitState.strength * multiplier;
+      break;
+    case PoliticalTrait::SocialistMovement:
+      pressure += 0.75 * traitState.strength * multiplier;
+      break;
+    default:
+      break;
+    }
+  }
+  return pressure;
+}
+
+PoliticalEra eraFor(Year year, const Configuration &configuration) {
+  if (year >= configuration.ideologicalTransitionStartYear)
+    return PoliticalEra::Modern;
+  if (year >= configuration.industrialRevolutionStartYear)
+    return PoliticalEra::Industrial;
+  if (year >= configuration.renaissanceStartYear)
+    return PoliticalEra::EarlyModern;
+  if (year >= configuration.medievalStartYear)
+    return PoliticalEra::Medieval;
+  return PoliticalEra::AncientClassical;
+}
+
+double traitAgeMultiplier(PoliticalEra traitEra, PoliticalEra currentEra,
+                          const Configuration &configuration) {
+  const auto traitEraIndex = static_cast<int>(traitEra);
+  const auto currentEraIndex = static_cast<int>(currentEra);
+  const auto eraDistance = std::max(0, currentEraIndex - traitEraIndex);
+  if (eraDistance == 0)
+    return 1.0;
+  return std::pow(std::clamp(configuration.olderEraTraitMultiplier, 0.0, 1.0),
+                  static_cast<double>(eraDistance));
+}
+
+PoliticalTraitDefinition traitDefinition(PoliticalTrait trait) {
+  using B = PoliticalBloc;
+  const auto modifier = [](double central, double noble, double religious,
+                           double people) {
+    return PoliticalPowerDistribution{central, noble, religious, people};
+  };
+  switch (trait) {
+  case PoliticalTrait::DivineRulership: return {trait, PoliticalEra::AncientClassical, modifier(20, -5, 10, -25)};
+  case PoliticalTrait::AristocraticRepublic: return {trait, PoliticalEra::AncientClassical, modifier(-15, 30, -5, -10)};
+  case PoliticalTrait::CivicTradition: return {trait, PoliticalEra::AncientClassical, modifier(-10, -5, 0, 15)};
+  case PoliticalTrait::PriestlyAuthority: return {trait, PoliticalEra::AncientClassical, modifier(-5, -5, 30, -20)};
+  case PoliticalTrait::MilitaryStrongman: return {trait, PoliticalEra::AncientClassical, modifier(20, -10, -5, -5), 0.15};
+  case PoliticalTrait::LocalAutonomy: return {trait, PoliticalEra::AncientClassical, modifier(-15, 15, 0, 0)};
+  case PoliticalTrait::FeudalOrder: return {trait, PoliticalEra::Medieval, modifier(-10, 30, 5, -25)};
+  case PoliticalTrait::PowerfulCrown: return {trait, PoliticalEra::Medieval, modifier(25, -15, 0, -10)};
+  case PoliticalTrait::EcclesiasticalAuthority: return {trait, PoliticalEra::Medieval, modifier(-5, -5, 30, -20)};
+  case PoliticalTrait::FragmentedRealm: return {trait, PoliticalEra::Medieval, modifier(-15, 20, 5, -10)};
+  case PoliticalTrait::MerchantPrivileges: return {trait, PoliticalEra::Medieval, modifier(-5, -5, -5, 15)};
+  case PoliticalTrait::CommunalTraditions: return {trait, PoliticalEra::Medieval, modifier(-10, -10, 0, 20)};
+  case PoliticalTrait::WarriorAristocracy: return {trait, PoliticalEra::Medieval, modifier(-5, 25, -5, -15), 0.10};
+  case PoliticalTrait::ImperialBureaucracy: return {trait, PoliticalEra::Medieval, modifier(20, -15, 5, -10), 0.05};
+  case PoliticalTrait::RoyalAbsolutism: return {trait, PoliticalEra::EarlyModern, modifier(35, -15, -5, -15)};
+  case PoliticalTrait::CentralizedAdministration: return {trait, PoliticalEra::EarlyModern, modifier(20, -15, 0, -5)};
+  case PoliticalTrait::StrongEstates: return {trait, PoliticalEra::EarlyModern, modifier(-10, 20, 0, 5)};
+  case PoliticalTrait::ReligiousEstablishment: return {trait, PoliticalEra::EarlyModern, modifier(5, -5, 20, -20)};
+  case PoliticalTrait::CommercialElite: return {trait, PoliticalEra::EarlyModern, modifier(5, -10, -5, 10)};
+  case PoliticalTrait::ColonialAdministration: return {trait, PoliticalEra::EarlyModern, modifier(15, 5, -5, -15)};
+  case PoliticalTrait::EnlightenedReform: return {trait, PoliticalEra::EarlyModern, modifier(10, -10, -5, 15)};
+  case PoliticalTrait::MilitaryState: return {trait, PoliticalEra::EarlyModern, modifier(20, 5, -10, -15), 0.20};
+  case PoliticalTrait::ConstitutionalTradition: return {trait, PoliticalEra::EnlightenmentRevolutionary, modifier(-10, -10, -5, 25)};
+  case PoliticalTrait::EnlightenedAbsolutism: return {trait, PoliticalEra::EnlightenmentRevolutionary, modifier(20, -10, -10, 0)};
+  case PoliticalTrait::RepublicanTradition: return {trait, PoliticalEra::EnlightenmentRevolutionary, modifier(-20, -15, -5, 40)};
+  case PoliticalTrait::AristocraticResistance: return {trait, PoliticalEra::EnlightenmentRevolutionary, modifier(-10, 30, 5, -25)};
+  case PoliticalTrait::Secularization: return {trait, PoliticalEra::EnlightenmentRevolutionary, modifier(0, 0, -25, 10)};
+  case PoliticalTrait::RevolutionarySentiment: return {trait, PoliticalEra::EnlightenmentRevolutionary, modifier(-20, -20, -10, 50), 0.05, 0.10};
+  case PoliticalTrait::NationalAwakening: return {trait, PoliticalEra::EnlightenmentRevolutionary, modifier(-5, -5, -5, 20)};
+  case PoliticalTrait::ReactionaryOrder: return {trait, PoliticalEra::EnlightenmentRevolutionary, modifier(15, 20, 10, -45)};
+  case PoliticalTrait::ConstitutionalMonarchy: return {trait, PoliticalEra::Industrial, modifier(5, -10, -10, 25)};
+  case PoliticalTrait::LiberalReform: return {trait, PoliticalEra::Industrial, modifier(-5, -15, -20, 35)};
+  case PoliticalTrait::ParliamentaryTradition: return {trait, PoliticalEra::Industrial, modifier(-10, -10, -15, 35)};
+  case PoliticalTrait::ConservativeEstablishment: return {trait, PoliticalEra::Industrial, modifier(10, 15, 5, -25)};
+  case PoliticalTrait::Nationalism: return {trait, PoliticalEra::Industrial, modifier(10, 0, -10, 20)};
+  case PoliticalTrait::SocialReform: return {trait, PoliticalEra::Industrial, modifier(-5, -10, -20, 35)};
+  case PoliticalTrait::SocialistMovement: return {trait, PoliticalEra::Industrial, modifier(-30, -25, -25, 70), 0.05, 0.50};
+  case PoliticalTrait::RevolutionaryMovement: return {trait, PoliticalEra::Industrial, modifier(-30, -20, -25, 70), 0.05, 0.25};
+  case PoliticalTrait::AuthoritarianModernization: return {trait, PoliticalEra::Industrial, modifier(25, -5, -15, -5), 0.15, 0.15};
+  case PoliticalTrait::LiberalDemocracy: return {trait, PoliticalEra::Modern, modifier(-15, -20, -30, 60)};
+  case PoliticalTrait::SocialDemocracy: return {trait, PoliticalEra::Modern, modifier(-15, -20, -30, 60), 0.0, 0.20};
+  case PoliticalTrait::CommunistMovement: return {trait, PoliticalEra::Modern, modifier(-45, -30, -30, 85), 0.15, 0.55};
+  case PoliticalTrait::FascistMovement: return {trait, PoliticalEra::Modern, modifier(20, -5, -20, 15), 0.20, 0.15};
+  case PoliticalTrait::MilitaryAuthoritarianism: return {trait, PoliticalEra::Modern, modifier(30, 5, -20, -25), 0.25, 0.10};
+  case PoliticalTrait::OnePartyState: return {trait, PoliticalEra::Modern, modifier(30, -20, -20, 15), 0.10, 0.40};
+  case PoliticalTrait::ReligiousConservatism: return {trait, PoliticalEra::Modern, modifier(5, 5, 30, -20)};
+  case PoliticalTrait::PopulistMovement: return {trait, PoliticalEra::Modern, modifier(-20, -15, -20, 55), 0.05, 0.20};
+  case PoliticalTrait::TechnocraticGovernment: return {trait, PoliticalEra::Modern, modifier(25, -10, -20, 10), 0.10, 0.15};
+  }
+  return {trait, PoliticalEra::AncientClassical, {0.0, 0.0, 0.0, 0.0}};
+}
+
+bool hasTrait(const Polity &polity, PoliticalTrait trait) {
+  return std::any_of(polity.politicalTraits.begin(), polity.politicalTraits.end(),
+                     [trait](const auto &state) { return state.trait == trait; });
+}
+
+bool addRandomTrait(Polity &polity, PoliticalEra era, Year year,
+                    double strength) {
+  std::vector<PoliticalTrait> candidates;
+  for (std::size_t index = 0; index < PoliticalTraitCount; ++index) {
+    const auto trait = static_cast<PoliticalTrait>(index);
+    if (traitDefinition(trait).era == era && !hasTrait(polity, trait))
+      candidates.push_back(trait);
+  }
+  if (!candidates.empty()) {
+    const auto selected = candidates[static_cast<std::size_t>(
+        RandNum::getRandom<int>(static_cast<int>(candidates.size())))];
+    polity.politicalTraits.push_back(
+        {selected, strength, year, std::nullopt});
+    return true;
+  }
+  return false;
+}
+
+PoliticalPowerDistribution randomizedPoliticalPower() {
+  PoliticalPowerDistribution power{};
+  double total = 0.0;
+  for (auto &value : power) {
+    value = 0.5 + RandNum::getRandom<double>(1.0);
+    total += value;
+  }
+  for (auto &value : power)
+    value /= total;
+  return power;
+}
+
 struct PolityDevelopmentTotal {
   std::size_t provinceCount = 0;
   double development = 0.0;
 };
+
+PoliticalPowerDistribution normalizedPower(PoliticalPowerDistribution power) {
+  double total = 0.0;
+  for (auto &value : power) {
+    value = std::max(0.0, value);
+    total += value;
+  }
+  if (total <= 0.0)
+    return {0.25, 0.25, 0.25, 0.25};
+  for (auto &value : power)
+    value /= total;
+  return power;
+}
+
+void addPoliticalPressure(Polity &polity, PoliticalPressureType type,
+                          const PoliticalPowerDistribution &effect, double strength,
+                          Year year, Year duration) {
+  polity.politicalPressures.push_back(
+      {type, effect, strength, year, year + std::max<Year>(0, duration)});
+}
 
 std::vector<double>
 calculateCentralizationTargets(const State &state,
@@ -71,179 +243,158 @@ double nextCentralization(double current, double target, double centuries,
   return std::clamp(deterministic + noise, 0.0, maximum);
 }
 
-GovernmentForm governmentFor(const Polity &polity, Year year,
+GovernmentForm governmentFor(Polity &polity, Year year,
                              const Configuration &configuration,
                              bool hasCoastalProvince,
                              double stability, double navyTradition,
                              double armyTradition, double development,
                              double warPressure, double centuries,
                              GovernmentTransitionDiagnostics &diagnostics) {
-  if (polity.governmentForm == GovernmentForm::Tribal) {
-    const auto form = year >= configuration.classicalStartYear
-                          ? GovernmentForm::Kingdom
-                          : GovernmentForm::Tribal;
-    if (form != polity.governmentForm) {
-      ++diagnostics.transitionSuccesses;
-      ++diagnostics.selectedTransitions;
-      ++diagnostics.selectionsByDestination[static_cast<std::size_t>(form)];
-    }
-    return form;
-  }
-
-  ++diagnostics.transitionChecks;
-  const auto sourceIndex = static_cast<std::size_t>(polity.governmentForm);
-  if (sourceIndex < diagnostics.checksBySource.size())
-    ++diagnostics.checksBySource[sourceIndex];
-
-  const auto elapsedYears = std::max(0, year - polity.lastGovernmentTransitionYear);
-  const auto normalCooldown = std::max<Year>(
-      1, configuration.governmentTransitionCooldownYears);
-  const auto modernCooldown = std::max<Year>(
-      1, configuration.modernGovernmentTransitionCooldownYears);
-  const auto modernProgress = std::clamp(
-      static_cast<double>(year - configuration.modernStartYear) / 100.0, 0.0,
-      1.0);
-  const auto cooldown = static_cast<double>(normalCooldown) +
-                        (static_cast<double>(modernCooldown) - normalCooldown) *
-                            modernProgress;
-  const auto recencyPressure = std::clamp(
-      static_cast<double>(elapsedYears) / cooldown, 0.0, 1.0);
-  const auto stabilityVolatility =
-      1.0 + 0.8 * std::abs(std::clamp(stability, 0.0, 1.0) - 0.5) * 2.0;
-  const auto randomness = std::max(0.0, configuration.governmentTransitionRandomness);
-  const auto randomFactor =
-      1.0 + (RandNum::getRandom<double>(2.0) - 1.0) * randomness;
-  const auto transitionHazard =
-      std::max(0.0, configuration.governmentTransitionChancePerCentury) *
-      recencyPressure * stabilityVolatility * randomFactor;
-  if (!chance(1.0 - std::exp(-transitionHazard * std::max(centuries, 0.0))))
-    return polity.governmentForm;
-  ++diagnostics.transitionSuccesses;
-
-  std::vector<std::pair<GovernmentForm, double>> candidates;
-  const auto addCandidate = [&candidates](GovernmentForm form, double weight) {
-    if (weight > 0.0)
-      candidates.emplace_back(form, weight);
+  const auto &power = polity.politicalPower;
+  const auto central = power[static_cast<std::size_t>(PoliticalBloc::CentralAuthority)];
+  const auto nobility = power[static_cast<std::size_t>(PoliticalBloc::Nobility)];
+  const auto religion = power[static_cast<std::size_t>(PoliticalBloc::ReligiousInstitutions)];
+  const auto people = power[static_cast<std::size_t>(PoliticalBloc::People)];
+  const auto instability = std::abs(std::clamp(stability, 0.0, 1.0) -
+                                    configuration.stabilityMean);
+  const auto era = eraFor(year, configuration);
+  std::array<double, GovernmentFormCount> scores{};
+  const auto setScore = [&scores](GovernmentForm form, double score) {
+    scores[static_cast<std::size_t>(form)] = std::max(0.0, score);
   };
-  const auto developmentPressure = std::clamp(
-      (development - configuration.modernGovernmentDevelopmentThreshold) *
-          configuration.modernGovernmentDevelopmentScale,
-      0.0, 1.0);
-  const auto modernPressure = development <= 0.0
-                                  ? 0.0
-                                  : std::max(
-                                        developmentPressure,
-                                        std::clamp(configuration.modernGovernmentMinimumPressure,
-                                                   0.0, 1.0));
+  if (year < configuration.classicalStartYear)
+    return GovernmentForm::Tribal;
 
-  if (year < configuration.tribalGovernmentEndYear)
-    addCandidate(GovernmentForm::Tribal,
-                 configuration.tribalGovernmentWeight *
-                     std::clamp((configuration.tribalGovernmentEndYear - year) /
-                                    1000.0,
-                                0.0, 1.0));
-  if (polity.governmentForm != GovernmentForm::Kingdom)
-    addCandidate(
-        GovernmentForm::Kingdom,
-        configuration.kingdomGovernmentWeight +
-            (configuration.lateKingdomGovernmentWeight -
-             configuration.kingdomGovernmentWeight) *
-                std::clamp(static_cast<double>(
-                               year - configuration.kingdomWeightReductionStartYear) /
-                               static_cast<double>(std::max<Year>(
-                                   1, configuration.kingdomWeightReductionEndYear -
-                                          configuration.kingdomWeightReductionStartYear)),
-                           0.0, 1.0));
-  if (year < configuration.tradeRepublicEndYear && hasCoastalProvince &&
-      navyTradition >= 0.2)
-    addCandidate(GovernmentForm::TradeRepublic,
-                 configuration.tradeRepublicGovernmentWeight *
-                     std::clamp((navyTradition - 0.2) * 2.0, 0.0, 1.0));
-  const auto postIndustrialMultiplier =
-      year >= configuration.postIndustrialModernGovernmentStartYear
-          ? std::max(1.0, configuration.postIndustrialModernGovernmentMultiplier)
-          : 1.0;
-  if (year >= configuration.theocracyStartYear &&
-      year <= configuration.theocracyEndYear &&
-      (polity.governmentForm == GovernmentForm::Kingdom ||
-       polity.governmentForm == GovernmentForm::TradeRepublic))
-    addCandidate(GovernmentForm::Theocracy,
-                 configuration.theocracyGovernmentWeight *
-                     std::clamp(static_cast<double>(configuration.theocracyEndYear - year) /
-                                    static_cast<double>(std::max<Year>(
-                                        1, configuration.theocracyEndYear -
-                                            configuration.theocracyStartYear)),
-                                0.0, 1.0));
-  if (year >= configuration.absolutismStartYear &&
-      (polity.governmentForm == GovernmentForm::Kingdom ||
-       polity.governmentForm == GovernmentForm::TradeRepublic))
-    addCandidate(GovernmentForm::Absolutism,
-                 configuration.absolutismGovernmentWeight);
-  if (year >= configuration.constitutionalMonarchyStartYear &&
-      (polity.governmentForm == GovernmentForm::Kingdom ||
-       polity.governmentForm == GovernmentForm::Absolutism ||
-       polity.governmentForm == GovernmentForm::Theocracy))
-    addCandidate(GovernmentForm::ConstitutionalMonarchy,
-                 configuration.constitutionalMonarchyGovernmentWeight);
-  if (year >= configuration.democracyStartYear &&
-      (polity.governmentForm == GovernmentForm::Kingdom ||
-       polity.governmentForm == GovernmentForm::Absolutism ||
-       polity.governmentForm == GovernmentForm::TradeRepublic ||
-       polity.governmentForm == GovernmentForm::ConstitutionalMonarchy ||
-       polity.governmentForm == GovernmentForm::Theocracy))
-    addCandidate(GovernmentForm::Democracy,
-                 configuration.democracyGovernmentWeight * modernPressure *
-                     postIndustrialMultiplier);
-  if (year >= configuration.communismStartYear &&
-      (polity.governmentForm == GovernmentForm::Kingdom ||
-       polity.governmentForm == GovernmentForm::Absolutism ||
-       polity.governmentForm == GovernmentForm::ConstitutionalMonarchy ||
-       polity.governmentForm == GovernmentForm::Democracy ||
-       polity.governmentForm == GovernmentForm::Theocracy))
-    addCandidate(GovernmentForm::Communism,
-                 configuration.communismGovernmentWeight * modernPressure *
-                     postIndustrialMultiplier);
-  if (year >= configuration.fascismStartYear &&
-      (polity.governmentForm == GovernmentForm::Kingdom ||
-       polity.governmentForm == GovernmentForm::Absolutism ||
-       polity.governmentForm == GovernmentForm::ConstitutionalMonarchy ||
-       polity.governmentForm == GovernmentForm::Democracy ||
-       polity.governmentForm == GovernmentForm::Theocracy))
-    addCandidate(GovernmentForm::Fascism,
-                 configuration.fascismGovernmentWeight * modernPressure *
-                     postIndustrialMultiplier);
-
-  candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
-                                  [&polity](const auto &candidate) {
-                                    return candidate.first == polity.governmentForm;
-                                  }),
-                   candidates.end());
-  if (sourceIndex < diagnostics.candidatePoolsBySource.size())
-    ++diagnostics.candidatePoolsBySource[sourceIndex];
-  double totalWeight = 0.0;
-  for (const auto &[form, weight] : candidates)
-    totalWeight += weight;
-  if (totalWeight <= 0.0)
-    {
-      ++diagnostics.emptyCandidatePools;
-    return polity.governmentForm;
-    }
-  auto selection = RandNum::getRandom<double>(totalWeight);
-  for (const auto &[form, weight] : candidates) {
-    if (selection < weight)
-      ++diagnostics.selectedTransitions;
-      ++diagnostics.selectionsByDestination[static_cast<std::size_t>(form)];
-      if (static_cast<int>(form) < static_cast<int>(polity.governmentForm))
-        ++diagnostics.reversions;
-      return form;
-    selection -= weight;
+  setScore(GovernmentForm::AbsoluteMonarchy,
+           central * (1.0 - nobility) * (1.0 - people));
+  setScore(GovernmentForm::FeudalMonarchy, central + nobility * 1.25);
+  setScore(GovernmentForm::AristocraticMonarchy,
+           nobility * 1.35 + central * 0.7);
+  setScore(GovernmentForm::ElectiveMonarchy,
+           nobility * 1.4 + central * 0.35);
+  setScore(GovernmentForm::TheocraticMonarchy,
+           central * 0.8 + religion * 1.4);
+  setScore(GovernmentForm::Theocracy, religion * 1.7);
+  setScore(GovernmentForm::AristocraticRepublic,
+           nobility * 1.5 + (1.0 - central) * 0.5);
+  setScore(GovernmentForm::OligarchicRepublic,
+           nobility * 1.3 + (1.0 - people) * 0.7);
+  if (year >= configuration.modernStartYear) {
+    setScore(GovernmentForm::ConstitutionalMonarchy, central * 0.9 + people * 1.1);
+    setScore(GovernmentForm::ParliamentaryMonarchy, people * 1.5 + central * 0.35);
+    setScore(GovernmentForm::ConstitutionalRepublic, people * 1.15 + central * 0.75);
+    setScore(GovernmentForm::ParliamentaryRepublic, people * 1.65 + central * 0.2);
+    if (people >= configuration.directDemocracyPeopleThreshold &&
+        people >= nobility + configuration.directDemocracyLeadThreshold &&
+        people >= religion + configuration.directDemocracyLeadThreshold)
+      setScore(GovernmentForm::DirectDemocracy, people * 1.8);
   }
-  const auto form = candidates.back().first;
-  ++diagnostics.selectedTransitions;
-  ++diagnostics.selectionsByDestination[static_cast<std::size_t>(form)];
-  if (static_cast<int>(form) < static_cast<int>(polity.governmentForm))
-    ++diagnostics.reversions;
-  return form;
+  if (year >= configuration.ideologicalTransitionStartYear) {
+    setScore(GovernmentForm::MilitaryGovernment,
+             central * 1.15 + polity.militaryInfluence * 1.8 +
+                 armyTradition * 0.4 * configuration.fascismMilitaryTraditionScale);
+    setScore(GovernmentForm::CommunistState,
+             polity.partyControl * 1.55 + people * 1.05 + instability * 0.45 +
+                 std::max(0.0, warPressure) * 0.35 +
+                 std::max(0.0, 0.6 - central) * 0.35 +
+                 communistTraitPressure(polity, era, configuration) * 1.10);
+    setScore(GovernmentForm::FascistState,
+             central * 1.15 + polity.militaryInfluence * 1.05 +
+                 polity.partyControl * 0.55 + people * 0.35 +
+                 nobility * 0.25 +
+                 polity.militaryInfluence * armyTradition *
+                     configuration.fascismMilitaryTraditionScale * 0.45 +
+                 instability * 0.35 +
+                 std::max(0.0, warPressure) *
+                     configuration.fascismWarPressureScale * 0.85);
+    for (std::size_t index = static_cast<std::size_t>(GovernmentForm::MilitaryGovernment);
+         index < GovernmentFormCount; ++index)
+      if (scores[index] > 0.0)
+        scores[index] = std::max(scores[index],
+                                 configuration.modernGovernmentMinimumPopularity);
+  }
+  if (hasCoastalProvince && navyTradition >= 0.2)
+    setScore(GovernmentForm::OligarchicRepublic,
+             people * 0.6 + nobility * 1.1 + navyTradition * 0.35);
+
+  const auto targetMultiplier = [&configuration, year](GovernmentForm form) {
+    const auto modern = year >= configuration.modernStartYear;
+    const auto ideological = year >= configuration.ideologicalTransitionStartYear;
+    switch (form) {
+    case GovernmentForm::AbsoluteMonarchy:
+    case GovernmentForm::FeudalMonarchy:
+    case GovernmentForm::AristocraticMonarchy:
+    case GovernmentForm::ElectiveMonarchy:
+      return modern ? configuration.modernMonarchyTargetMultiplier
+                    : configuration.preModernMonarchyTargetMultiplier;
+    case GovernmentForm::TheocraticMonarchy:
+      return (modern ? configuration.modernMonarchyTargetMultiplier
+                     : configuration.preModernMonarchyTargetMultiplier) *
+             (modern ? configuration.modernTheocracyTargetMultiplier
+                     : configuration.preModernTheocracyTargetMultiplier);
+    case GovernmentForm::Theocracy:
+      return modern ? configuration.modernTheocracyTargetMultiplier
+                    : configuration.preModernTheocracyTargetMultiplier;
+    case GovernmentForm::ConstitutionalMonarchy:
+    case GovernmentForm::ParliamentaryMonarchy:
+    case GovernmentForm::ConstitutionalRepublic:
+    case GovernmentForm::ParliamentaryRepublic:
+    case GovernmentForm::DirectDemocracy:
+      return modern ? configuration.modernDemocracyTargetMultiplier : 1.0;
+    case GovernmentForm::CommunistState:
+      return ideological ? configuration.modernCommunismTargetMultiplier : 1.0;
+    case GovernmentForm::FascistState:
+      return ideological ? configuration.modernFascismTargetMultiplier : 1.0;
+    default:
+      return 1.0;
+    }
+  };
+  for (std::size_t index = 0; index < GovernmentFormCount; ++index)
+    scores[index] *= targetMultiplier(static_cast<GovernmentForm>(index));
+
+  const auto current = static_cast<std::size_t>(polity.governmentForm);
+  const auto modernMultiplier =
+      year >= configuration.modernStartYear
+          ? std::max(1.0, configuration.modernGovernmentPopularityDriftMultiplier)
+          : 1.0;
+  const auto drift = std::clamp(
+      std::max(0.0, configuration.governmentPopularityDriftPerCentury) *
+          std::max(centuries, 0.0) *
+          modernMultiplier *
+          (1.0 + 2.0 * instability),
+      0.0, 1.0);
+  for (std::size_t index = 0; index < GovernmentFormCount; ++index) {
+    const auto target = scores[index] > 0.0 ? scores[index] : 0.0;
+    polity.governmentPopularity[index] += (target - polity.governmentPopularity[index]) * drift;
+    polity.governmentPopularity[index] = std::max(0.0, polity.governmentPopularity[index]);
+  }
+  const auto variation = std::max(0.0, configuration.governmentPopularityVariation) *
+                        std::sqrt(std::max(centuries, 0.0));
+  for (auto &value : polity.governmentPopularity)
+    value = std::max(0.0, value + (RandNum::getRandom<double>(2.0) - 1.0) * variation);
+
+  auto best = current;
+  for (std::size_t index = 0; index < GovernmentFormCount; ++index) {
+    if (polity.governmentPopularity[index] > polity.governmentPopularity[best])
+      best = index;
+  }
+  if (best != current && polity.governmentPopularity[best] <=
+                              polity.governmentPopularity[current] +
+                                  std::max(0.0, configuration.governmentPopularityHysteresis))
+    best = current;
+  ++diagnostics.transitionChecks;
+  if (current < diagnostics.checksBySource.size())
+    ++diagnostics.checksBySource[current];
+  if (current < diagnostics.candidatePoolsBySource.size())
+    ++diagnostics.candidatePoolsBySource[current];
+  if (best != current) {
+    ++diagnostics.transitionSuccesses;
+    ++diagnostics.selectedTransitions;
+    ++diagnostics.selectionsByDestination[best];
+    if (best < current)
+      ++diagnostics.reversions;
+  }
+  return static_cast<GovernmentForm>(best);
 }
 
 Fwg::Gfx::Colour randomColour() {
@@ -343,6 +494,15 @@ void captureTimelineSnapshot(
     snapshot.navyTradition = polity->navyTradition;
     snapshot.stability = polity->stability;
     snapshot.politicalMovements = polity->politicalMovements;
+    snapshot.politicalPower = polity->politicalPower;
+    snapshot.desiredPoliticalPower = polity->desiredPoliticalPower;
+    snapshot.politicalTraits = polity->politicalTraits;
+    snapshot.politicalPressures = polity->politicalPressures;
+    snapshot.governmentPopularity = polity->governmentPopularity;
+    snapshot.militaryInfluence = polity->militaryInfluence;
+    snapshot.desiredMilitaryInfluence = polity->desiredMilitaryInfluence;
+    snapshot.partyControl = polity->partyControl;
+    snapshot.desiredPartyControl = polity->desiredPartyControl;
 
     double area = 0.0;
     for (const auto provinceId : territories[static_cast<size_t>(polityId)]) {
@@ -451,6 +611,135 @@ void updatePoliticalStates(Year nextYear, double centuries,
         polity->stability + stabilityReversion +
             stabilityWarEffects[index] + randomEvent + randomVariation,
         0.0, 1.0);
+    polity->politicalPressures.erase(
+        std::remove_if(polity->politicalPressures.begin(),
+                       polity->politicalPressures.end(),
+                       [nextYear](const auto &pressure) {
+                         return pressure.expiryYear &&
+                                *pressure.expiryYear < nextYear;
+                       }),
+        polity->politicalPressures.end());
+    if (stabilityWarEffects[index] > 0.0)
+      addPoliticalPressure(
+          *polity, PoliticalPressureType::WarVictory,
+          {0.25, 0.0, 0.0, -0.10}, 1.0, nextYear,
+          configuration.politicalPressureDurationYears);
+    if (stabilityWarEffects[index] < 0.0)
+      addPoliticalPressure(
+          *polity, PoliticalPressureType::WarDefeat,
+          {-0.20, 0.20, 0.0, 0.15}, 1.0, nextYear,
+          configuration.politicalPressureDurationYears);
+    if (developmentProvinceCounts[index] > 0)
+      addPoliticalPressure(
+          *polity, PoliticalPressureType::Development,
+          {0.10, 0.0, 0.0, 0.10},
+          std::clamp(developmentTotals[index] /
+                         static_cast<double>(developmentProvinceCounts[index]),
+                     0.0, 1.0),
+          nextYear, configuration.politicalPressureDurationYears);
+    if (chance(std::max(0.0, configuration.politicalGenericShockChancePerCentury) *
+               centuries)) {
+      const auto direction = RandNum::getRandom<double>(2.0) - 1.0;
+      addPoliticalPressure(
+          *polity, PoliticalPressureType::GenericShock,
+          {direction, -direction * 0.5, direction * 0.25, -direction * 0.5},
+          std::max(0.0, configuration.politicalGenericShockStrength), nextYear,
+          configuration.politicalPressureDurationYears);
+    }
+    const auto era = eraFor(nextYear, configuration);
+    if (era != polity->lastTraitEra) {
+      if (chance(configuration.eraTraitChance))
+        addRandomTrait(*polity, era, nextYear, configuration.traitInitialStrength);
+      polity->lastTraitEra = era;
+    }
+    if (stabilityWarEffects[index] < 0.0 &&
+        chance(configuration.warLossTraitChancePerCentury * centuries))
+      addRandomTrait(*polity, era, nextYear, configuration.traitShockStrength);
+    if (chance(configuration.randomTraitShockChancePerCentury * centuries))
+      addRandomTrait(*polity, era, nextYear, configuration.traitShockStrength);
+    auto desiredMilitaryInfluence = polity->militaryInfluence *
+                                    configuration.militaryInfluencePersistence;
+    auto desiredPartyControl = polity->partyControl *
+                               configuration.partyControlPersistence;
+    if (stabilityWarEffects[index] > 0.0)
+      desiredMilitaryInfluence += configuration.militaryInfluenceWarVictoryPressure;
+    if (stabilityWarEffects[index] < 0.0)
+      desiredMilitaryInfluence += configuration.militaryInfluenceWarDefeatPressure;
+    if (nextYear >= configuration.ideologicalTransitionStartYear)
+      desiredPartyControl += configuration.partyControlModernPressure;
+    for (const auto &pressure : polity->politicalPressures) {
+      desiredMilitaryInfluence += pressure.effect[static_cast<std::size_t>(PoliticalBloc::CentralAuthority)] *
+                                  pressure.strength * 0.25;
+      desiredPartyControl += pressure.effect[static_cast<std::size_t>(PoliticalBloc::People)] *
+                             pressure.strength * 0.15;
+    }
+    if (chance(std::max(0.0, configuration.politicalGenericShockChancePerCentury) *
+               centuries)) {
+      desiredMilitaryInfluence += (RandNum::getRandom<double>(2.0) - 1.0) *
+                                  configuration.politicalGenericShockStrength;
+      desiredPartyControl += (RandNum::getRandom<double>(2.0) - 1.0) *
+                             configuration.politicalGenericShockStrength;
+    }
+    polity->desiredMilitaryInfluence = std::clamp(desiredMilitaryInfluence, 0.0, 1.0);
+    polity->desiredPartyControl = std::clamp(desiredPartyControl, 0.0, 1.0);
+    const auto militaryConvergence = std::clamp(
+        1.0 - std::exp(-std::max(0.0, configuration.militaryInfluenceConvergencePerCentury) *
+                       std::max(centuries, 0.0)), 0.0, 1.0);
+    const auto partyConvergence = std::clamp(
+        1.0 - std::exp(-std::max(0.0, configuration.partyControlConvergencePerCentury) *
+                       std::max(centuries, 0.0) *
+                       (nextYear >= configuration.ideologicalTransitionStartYear
+                            ? std::max(0.0, configuration.modernPartyControlConvergenceMultiplier)
+                            : 1.0)),
+        0.0, 1.0);
+    polity->militaryInfluence = std::clamp(
+        polity->militaryInfluence +
+            (polity->desiredMilitaryInfluence - polity->militaryInfluence) *
+                militaryConvergence +
+            (RandNum::getRandom<double>(2.0) - 1.0) *
+                configuration.militaryInfluenceVariation * std::sqrt(std::max(centuries, 0.0)),
+        0.0, 1.0);
+    polity->partyControl = std::clamp(
+        polity->partyControl +
+            (polity->desiredPartyControl - polity->partyControl) * partyConvergence +
+            (RandNum::getRandom<double>(2.0) - 1.0) * configuration.partyControlVariation *
+                std::sqrt(std::max(centuries, 0.0)),
+        0.0, 1.0);
+    PoliticalPowerDistribution desired{0.25, 0.25, 0.25, 0.25};
+    for (const auto &traitState : polity->politicalTraits) {
+      const auto definition = traitDefinition(traitState.trait);
+      const auto ageMultiplier =
+          traitAgeMultiplier(definition.era, era, configuration);
+      for (std::size_t bloc = 0; bloc < PoliticalBlocCount; ++bloc)
+        desired[bloc] += definition.powerModifier[bloc] * traitState.strength *
+                         ageMultiplier;
+      desiredMilitaryInfluence += definition.militaryInfluenceModifier *
+                                  traitState.strength * ageMultiplier;
+      desiredPartyControl += definition.partyControlModifier * traitState.strength *
+                             ageMultiplier;
+    }
+    for (const auto &pressure : polity->politicalPressures)
+      for (std::size_t bloc = 0; bloc < PoliticalBlocCount; ++bloc)
+        desired[bloc] += pressure.effect[bloc] * pressure.strength;
+    for (std::size_t bloc = 0; bloc < PoliticalBlocCount; ++bloc)
+      desired[bloc] += polity->desiredPoliticalPower[bloc] *
+                       configuration.politicalPowerPersistence[bloc];
+    polity->desiredPoliticalPower = normalizedPower(desired);
+    const auto powerConvergence = std::clamp(
+        1.0 - std::exp(-std::max(0.0,
+                                 configuration.politicalPowerConvergencePerCentury) *
+                       std::max(centuries, 0.0) *
+                           (1.0 + std::abs(stability - configuration.stabilityMean))),
+        0.0, 1.0);
+    for (std::size_t bloc = 0; bloc < PoliticalBlocCount; ++bloc)
+      polity->politicalPower[bloc] +=
+          (polity->desiredPoliticalPower[bloc] - polity->politicalPower[bloc]) *
+          powerConvergence;
+    for (auto &value : polity->politicalPower)
+      value += (RandNum::getRandom<double>(2.0) - 1.0) *
+               std::max(0.0, configuration.politicalPowerVariation) *
+               std::sqrt(std::max(centuries, 0.0));
+    polity->politicalPower = normalizedPower(polity->politicalPower);
     Event update{nextYear, EventType::PolityUpdate};
     update.polityId = polityId;
     update.centralizationAffinity = polity->centralizationAffinity;
@@ -463,6 +752,16 @@ void updatePoliticalStates(Year nextYear, double centuries,
                   static_cast<double>(developmentProvinceCounts[index]),
         std::clamp(warPressure[index], 0.0, 1.0), centuries, diagnostics);
     update.lastGovernmentTransitionYear = polity->lastGovernmentTransitionYear;
+    update.lastTraitEra = polity->lastTraitEra;
+    update.politicalPower = polity->politicalPower;
+    update.desiredPoliticalPower = polity->desiredPoliticalPower;
+    update.politicalTraits = polity->politicalTraits;
+    update.politicalPressures = polity->politicalPressures;
+    update.governmentPopularity = polity->governmentPopularity;
+    update.militaryInfluence = polity->militaryInfluence;
+    update.desiredMilitaryInfluence = polity->desiredMilitaryInfluence;
+    update.partyControl = polity->partyControl;
+    update.desiredPartyControl = polity->desiredPartyControl;
     if (update.governmentForm != polity->governmentForm)
       update.lastGovernmentTransitionYear = nextYear;
     update.centralization = centralization;
@@ -600,6 +899,16 @@ void implode(const Year nextYear, double centuries,
           successor.centralizationAffinity = parent->centralizationAffinity;
           successor.lastGovernmentTransitionYear =
               parent->lastGovernmentTransitionYear;
+           successor.lastTraitEra = parent->lastTraitEra;
+          successor.politicalPower = parent->politicalPower;
+          successor.desiredPoliticalPower = parent->desiredPoliticalPower;
+          successor.politicalTraits = parent->politicalTraits;
+          successor.politicalPressures = parent->politicalPressures;
+          successor.governmentPopularity = parent->governmentPopularity;
+          successor.militaryInfluence = parent->militaryInfluence;
+          successor.desiredMilitaryInfluence = parent->desiredMilitaryInfluence;
+          successor.partyControl = parent->partyControl;
+          successor.desiredPartyControl = parent->desiredPartyControl;
           const auto inheritance =
               std::clamp(configuration.successorPoliticalInheritance, 0.0, 1.0);
           successor.centralization = parent->centralization * inheritance;
@@ -628,6 +937,19 @@ void implode(const Year nextYear, double centuries,
     split.description = "tribe";
     split.colour = randomColour();
     split.centralizationAffinity = randomCentralizationAffinity(configuration);
+    split.politicalPower = randomizedPoliticalPower();
+    split.desiredPoliticalPower = split.politicalPower;
+    split.governmentPopularity.fill(0.0);
+    split.governmentPopularity[static_cast<std::size_t>(GovernmentForm::Tribal)] = 1.0;
+    split.militaryInfluence = RandNum::getRandom<double>(0.25);
+    split.desiredMilitaryInfluence = split.militaryInfluence;
+    split.partyControl = RandNum::getRandom<double>(0.15);
+    split.desiredPartyControl = split.partyControl;
+    if (const auto *parent = ::Arda::Simulation::state::findPolity(state,
+                                                                     polityId)) {
+      split.politicalTraits = parent->politicalTraits;
+      split.lastTraitEra = parent->lastTraitEra;
+    }
     append(std::move(split));
     const auto splitProvince = provinceIds.back();
     append({nextYear, EventType::TransferProvince, splitProvince,

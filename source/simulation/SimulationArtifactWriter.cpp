@@ -10,6 +10,7 @@
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <map>
 #include <sstream>
 
@@ -66,13 +67,30 @@ bool writePolityStateCsvFile(const Result &result, const std::filesystem::path &
 	return false;
   }
 
+	constexpr const char *formNames[] = {
+	  "tribal", "absolute_monarchy", "feudal_monarchy",
+	  "constitutional_monarchy", "parliamentary_monarchy",
+	  "aristocratic_monarchy", "elective_monarchy", "theocratic_monarchy",
+			"theocracy", "aristocratic_republic", "oligarchic_republic",
+		  "constitutional_republic", "parliamentary_republic", "direct_democracy",
+		  "military_government", "communist_state", "fascist_state"};
+
 	output << "year,polity_count,average_centralization,average_army_tradition,"
 			"average_navy_tradition,average_stability,"
 			"average_population,average_development,average_population_density,"
-			"tribal_count,"
-			"kingdom_count,trade_republic_count,theocracy_count,"
-			"absolutism_count,constitutional_monarchy_count,democracy_count,"
-			"communism_count,fascism_count\n";
+			"current_central_authority,current_nobility,current_religious_institutions,current_people,"
+			"desired_central_authority,desired_nobility,desired_religious_institutions,desired_people,"
+			"average_military_influence,average_desired_military_influence,"
+			"average_party_control,average_desired_party_control,"
+			"average_trait_count,average_trait_strength,";
+	for (std::size_t index = 0; index < std::size(formNames); ++index) {
+	  if (index != 0)
+		output << ',';
+	  output << formNames[index] << "_count";
+	}
+	for (std::size_t index = 0; index < std::size(formNames); ++index)
+		output << ',' << "average_" << formNames[index] << "_popularity";
+	output << '\n';
 
   struct Aggregate {
 	std::size_t polityCount = 0;
@@ -83,7 +101,16 @@ bool writePolityStateCsvFile(const Result &result, const std::filesystem::path &
 	double population = 0.0;
 	double development = 0.0;
 	double populationDensity = 0.0;
-	std::array<std::size_t, 9> governmentCounts{};
+	PoliticalPowerDistribution politicalPower{};
+	PoliticalPowerDistribution desiredPoliticalPower{};
+	double militaryInfluence = 0.0;
+	double desiredMilitaryInfluence = 0.0;
+	double partyControl = 0.0;
+	double desiredPartyControl = 0.0;
+	double traitCount = 0.0;
+	double traitStrength = 0.0;
+	std::array<std::size_t, GovernmentFormCount> governmentCounts{};
+	std::array<double, GovernmentFormCount> governmentPopularity{};
   };
   std::map<Year, Aggregate> aggregates;
   for (const auto &[polityId, snapshots] : result.polityTimeline) {
@@ -98,9 +125,22 @@ bool writePolityStateCsvFile(const Result &result, const std::filesystem::path &
 	  aggregate.population += snapshot.population;
 	  aggregate.development += snapshot.development;
 	  aggregate.populationDensity += snapshot.populationDensity;
+	  for (std::size_t bloc = 0; bloc < PoliticalBlocCount; ++bloc) {
+		aggregate.politicalPower[bloc] += snapshot.politicalPower[bloc];
+		aggregate.desiredPoliticalPower[bloc] += snapshot.desiredPoliticalPower[bloc];
+	  }
+	  aggregate.militaryInfluence += snapshot.militaryInfluence;
+	  aggregate.desiredMilitaryInfluence += snapshot.desiredMilitaryInfluence;
+	  aggregate.partyControl += snapshot.partyControl;
+	  aggregate.desiredPartyControl += snapshot.desiredPartyControl;
+	  aggregate.traitCount += static_cast<double>(snapshot.politicalTraits.size());
+	  for (const auto &trait : snapshot.politicalTraits)
+		aggregate.traitStrength += trait.strength;
 	  const auto government = static_cast<std::size_t>(snapshot.governmentForm);
 	  if (government < aggregate.governmentCounts.size())
 		++aggregate.governmentCounts[government];
+	  for (std::size_t index = 0; index < GovernmentFormCount; ++index)
+		aggregate.governmentPopularity[index] += snapshot.governmentPopularity[index];
 	}
   }
 
@@ -114,14 +154,23 @@ bool writePolityStateCsvFile(const Result &result, const std::filesystem::path &
 		   << aggregate.population / count << ','
 		   << aggregate.development / count << ','
 		   << aggregate.populationDensity / count;
+	for (const auto value : aggregate.politicalPower)
+	  output << ',' << value / count;
+	for (const auto value : aggregate.desiredPoliticalPower)
+	  output << ',' << value / count;
+	output << ',' << aggregate.militaryInfluence / count << ','
+		   << aggregate.desiredMilitaryInfluence / count << ','
+		   << aggregate.partyControl / count << ','
+		   << aggregate.desiredPartyControl / count << ','
+		   << aggregate.traitCount / count << ','
+		   << aggregate.traitStrength / count;
 	for (const auto governmentCount : aggregate.governmentCounts)
 	  output << ',' << governmentCount;
+	for (const auto popularity : aggregate.governmentPopularity)
+	  output << ',' << popularity / count;
 	output << '\n';
   }
 	const auto &diagnostics = result.governmentTransitions;
-	constexpr std::array<const char *, GovernmentFormCount> formNames{
-	  "tribal", "kingdom", "trade_republic", "theocracy", "absolutism",
-	  "constitutional_monarchy", "democracy", "communism", "fascism"};
   output << '\n'
 		 << "government_transition_diagnostics\n"
 		 << "metric,value\n"
