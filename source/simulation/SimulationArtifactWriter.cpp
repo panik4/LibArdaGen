@@ -327,6 +327,36 @@ bool writePolityStateCsv(const Result &result, const std::filesystem::path &path
   return writePolityStateCsvFile(result, path, errorYear, errors);
 }
 
+bool writePolityStatisticsCsv(const SimulationExport &simulationExport,
+							  const std::filesystem::path &path, Year errorYear,
+							  std::vector<ValidationError> &errors) {
+  std::ofstream output(path);
+  if (!output) {
+	errors.push_back({errorYear, "Unable to open polity statistics CSV", {}, {}});
+	return false;
+  }
+
+  output << "polity_id,core_count,non_core_count,claim_count,formable_count,"
+			"formable_counts_by_required_province_count\n";
+  for (const auto &[polityId, polityExport] : simulationExport.polities) {
+	const auto &statistics = polityExport.statistics;
+	output << polityId << ',' << statistics.coreProvinceCount << ','
+		   << statistics.nonCoreProvinceCount << ','
+		   << statistics.claimProvinceCount << ',' << statistics.formableCount
+		   << ',';
+	bool first = true;
+	for (const auto &[size, count] :
+		 statistics.formableCountsByRequiredProvinceCount) {
+	  if (!first)
+		output << ';';
+	  output << size << ':' << count;
+	  first = false;
+	}
+	output << '\n';
+  }
+  return true;
+}
+
 std::optional<ArtifactPaths>
 writeSimulationArtifacts(const Configuration &configuration,
 					   const Input &input, const Result &result,

@@ -10,7 +10,8 @@ public:
       const State &state, const std::map<ProvinceId, RegionId> &provinceRegions,
       const SimulationPolityHistory &polityHistory,
       const std::vector<Event> &events, const std::vector<WarEvent> &wars,
-      const std::map<ProvinceId, size_t> &provinceAreas);
+      const std::map<ProvinceId, size_t> &provinceAreas,
+      const Configuration &configuration = {});
 };
 
 } // namespace Arda::Simulation

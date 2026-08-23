@@ -28,9 +28,13 @@ void generateCountries(
   countries.clear();
   // return state of disallowed tokens to original, as we might have modified it
   nData.disallowedTokens = nData.originalDisallowedTokens;
-  for (auto &region : ardaRegions) {
+  for (const auto &region : ardaRegions) {
+    if (!region)
+      continue;
     region->assigned = false;
     region->owner = nullptr;
+    region->cores.clear();
+    region->claims.clear();
   }
   Fwg::Utils::Logging::logLine("Generating Countries");
 
@@ -88,6 +92,7 @@ void distributeCountries(
     }
     for (auto &region : country->ownedRegions) {
       region->owner = country;
+      region->cores.push_back(country);
     }
   }
   Fwg::Utils::Logging::logLine("Distributing Assigning Regions");
@@ -102,6 +107,7 @@ void distributeCountries(
             ardaRegions, ardaRegion, config.width, config.height);
         gR->owner->addRegion(ardaRegion);
         ardaRegion->owner = gR->owner;
+        ardaRegion->cores.push_back(gR->owner);
       }
     }
   }
@@ -219,6 +225,14 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
                    const Fwg::Gfx::Image &inputImage) {
   int counter = 0;
   countries.clear();
+  for (const auto &region : ardaRegions) {
+    if (!region)
+      continue;
+    region->assigned = false;
+    region->owner = nullptr;
+    region->cores.clear();
+    region->claims.clear();
+  }
   // return state of disallowed tokens to original, as we might have modified it
   nData.disallowedTokens = nData.originalDisallowedTokens;
   Fwg::Utils::ColourTMap<std::vector<std::shared_ptr<Arda::ArdaRegion>>>
@@ -287,6 +301,7 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
         language->getAdjectiveForm(country.second->name);
     for (auto &region : country.second->ownedRegions) {
       region->owner = country.second;
+      region->cores.push_back(country.second);
     }
     generateCountrySpecifics(generationAge, countries);
   }
@@ -309,6 +324,8 @@ void deriveCountries(
       continue;
     region->assigned = false;
     region->owner = nullptr;
+    region->cores.clear();
+    region->claims.clear();
   }
 
   std::map<int, std::shared_ptr<Arda::ArdaProvince>> provincesById;
@@ -325,6 +342,7 @@ void deriveCountries(
   for (const auto &[polityId, polityExport] : simulationExport.polities) {
     auto country = factory();
     country->ID = polityId;
+    country->polityID = polityId;
     country->tag = "P" + std::to_string(polityId);
     country->name = "Polity " + std::to_string(polityId);
     country->adjective = country->name;
@@ -355,6 +373,20 @@ void deriveCountries(
       country->second->ownedRegions.push_back(region->second);
       region->second->owner = country->second;
       region->second->assigned = true;
+    }
+  }
+
+  for (const auto &[polityId, territory] : simulationExport.cores) {
+    const auto country = countriesByPolity.find(polityId);
+    if (country == countriesByPolity.end())
+      continue;
+    for (const auto regionId : territory.regionIds) {
+      const auto region = regionsById.find(regionId);
+      if (region == regionsById.end())
+        continue;
+      if (std::find(region->second->cores.begin(), region->second->cores.end(),
+                    country->second) == region->second->cores.end())
+        region->second->cores.push_back(country->second);
     }
   }
 

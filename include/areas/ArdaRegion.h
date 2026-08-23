@@ -15,11 +15,12 @@ namespace Arda {
 class Country;
 enum class LocatorType { NONE, CITY, FARM, MINE, PORT, WOOD };
 class ArdaRegion : public Fwg::Areas::Region {
-  std::vector<std::string> cores;
 
 public:
   // member variables
   std::shared_ptr<Country> owner;
+  std::vector<std::shared_ptr<Country>> cores;
+  std::vector<std::shared_ptr<Country>> claims;
   int superRegionID = -1;
   // calculate this for the scenario in general
   double worldPopulationShare = 0.0;
@@ -70,10 +71,9 @@ public:
   std::map<std::shared_ptr<Arda::Religion>, double> gatherReligions() const;
 
   // serialisation
-  template<class Archive>
+  template <class Archive>
   void serialize(Archive &ar, const unsigned int /*version*/);
 };
 } // namespace Arda
 
 BOOST_CLASS_EXPORT_KEY(Arda::ArdaRegion)
-

@@ -31,6 +31,7 @@ public:
   double technologyLevel = 0.0;
   double gdp = 0.0;
   bool landlocked = true;
+  int polityID = -1;
   Arda::Utils::Ideology ideology = Arda::Utils::Ideology::NEUTRALITY;
 
   Rank rank = Rank::Unranked;

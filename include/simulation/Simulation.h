@@ -200,6 +200,10 @@ struct Configuration {
   double modernDemocracyTargetMultiplier = 1.0;
   double modernCommunismTargetMultiplier = 1.0;
   double modernFascismTargetMultiplier = 1.0;
+  Year coreOwnershipYears = 100;
+  Year industrialCoreOwnershipYears = 50;
+  Year modernCoreOwnershipYears = 30;
+  Year coreClaimYears = 100;
   double directDemocracyPeopleThreshold = 0.72;
   double directDemocracyLeadThreshold = 0.20;
   double modernGovernmentMinimumPopularity = 0.05;
@@ -632,6 +636,7 @@ public:
                  std::vector<ValidationError> &errors) const;
 
   State getFinalState() const { return finalState; }
+  const Configuration &getConfiguration() const { return configuration; }
   std::map<ProvinceId, RegionId> getProvinceRegions() const {
     return provinceRegions;
   }
@@ -660,16 +665,37 @@ struct SimulationProvinceExport {
   bool colony = false;
 };
 
+struct SimulationPolityPeakExport {
+  std::vector<ProvinceId> provinceIds;
+  std::vector<RegionId> regionIds;
+};
+
+struct SimulationTerritorySetExport {
+  std::vector<ProvinceId> provinceIds;
+  std::vector<RegionId> regionIds;
+};
+
+struct SimulationPolityStatistics {
+  size_t coreProvinceCount = 0;
+  size_t nonCoreProvinceCount = 0;
+  size_t claimProvinceCount = 0;
+  size_t formableCount = 0;
+  std::map<size_t, size_t> formableCountsByRequiredProvinceCount;
+};
+
 struct SimulationPolityExport {
   Polity polity;
   PolityStrength strength;
   std::vector<ProvinceId> provinceIds;
   std::vector<RegionId> regionIds;
+  SimulationPolityStatistics statistics;
 };
 
-struct SimulationPolityPeakExport {
-  std::vector<ProvinceId> provinceIds;
-  std::vector<RegionId> regionIds;
+struct SimulationFormableExport {
+  PolityId historicalPolityId = NoPolity;
+  std::vector<ProvinceId> requiredProvinceIds;
+  std::vector<RegionId> requiredRegionIds;
+  PolityId currentOwnerId = NoPolity;
 };
 
 struct SimulationExport {
@@ -681,6 +707,9 @@ struct SimulationExport {
   std::map<RegionId, std::vector<ProvinceId>> regions;
   std::map<RegionId, std::vector<PolityId>> historicalRegionOwners;
   std::map<PolityId, SimulationPolityPeakExport> historicalPolityPeaks;
+  std::map<PolityId, SimulationTerritorySetExport> cores;
+  std::map<PolityId, SimulationTerritorySetExport> claims;
+  std::map<PolityId, SimulationFormableExport> formables;
   std::vector<WarEvent> wars;
 };
 

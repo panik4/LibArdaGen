@@ -1,5 +1,6 @@
 #include "ArdaGen.h"
 #include "simulation/SimulationExporter.h"
+#include "simulation/SimulationArtifactWriter.h"
 namespace Logging = Fwg::Utils::Logging;
 namespace Arda {
 using namespace Fwg::Gfx;
@@ -395,7 +396,12 @@ void ArdaGen::genCivilisationData() {
   ardaData.simulationExport =
       Arda::Simulation::SimulationExporter::exportFinalState(
           result.finalState, simulation.getProvinceRegions(),
-           result.polityHistory, result.events, result.wars, provinceAreas);
+            result.polityHistory, result.events, result.wars, provinceAreas,
+            simulation.getConfiguration());
+  Arda::Simulation::artifacts::writePolityStatisticsCsv(
+      ardaData.simulationExport,
+      Fwg::Cfg::Values().mapsPath + "simulation/polity_statistics.csv",
+      simulation.getConfiguration().startYear, exportErrors);
 
   Arda::Civilization::generateFullCivilisationData(
       ardaData.simulationExport, ardaRegions, ardaProvinces, civData,
