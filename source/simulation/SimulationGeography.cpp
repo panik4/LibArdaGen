@@ -315,6 +315,13 @@ detail::NormalizedInput normalize(const Input &input) {
         ++normalizedCrossLandmassRoutes;
     }
   }
+  for (auto &[targetId, routes] : normalized.seaRoutesTo)
+    std::sort(routes.begin(), routes.end(),
+              [](const auto &left, const auto &right) {
+                if (left.distance != right.distance)
+                  return left.distance < right.distance;
+                return left.provinceId < right.provinceId;
+              });
   {
     std::ostringstream message;
     message << "Maritime routes normalized: sources="

@@ -82,8 +82,7 @@ struct Configuration {
   double overCapacityExpansionPenalty = 0.25;
   Year polityStabilizationStartYear = 1500;
   double postStabilizationFragmentationMultiplier = 0.35;
-  double decayStrengthRatio = 0.35;
-  double decayFragmentationChance = 0.01;
+  double decayFragmentationChance = 0.001;
   size_t lateSmallPolitySize = 2;
   double lateSmallPolityConquestMultiplier = 3.0;
   double religionEmergenceChance = 0.005;
@@ -101,8 +100,6 @@ struct Configuration {
   double warMaximumDistance = 1200.0;
   double warAllianceDistanceMultiplier = 0.5;
   size_t maximumWarAllianceMembers = 3;
-  size_t maximumWarTransfers = 4;
-  size_t maximumWarLandTransfers = 3;
   size_t maximumWarMaritimeTransfers = 2;
   double religionSpreadChance = 0.35;
   double religionConversionChance = 0.40;

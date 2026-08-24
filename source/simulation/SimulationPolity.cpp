@@ -913,14 +913,6 @@ void implode(const Year nextYear, double centuries,
   const double stabilizationMultiplier =
       1.0 - postStabilizationProgress *
                 (1.0 - configuration.postStabilizationFragmentationMultiplier);
-  PolityId strongestPolity = NoPolity;
-  double strongestScore = 0.0;
-  for (const auto &[polityId, strength] : state.polityStrengths) {
-    if (strength.score > strongestScore) {
-      strongestPolity = polityId;
-      strongestScore = strength.score;
-    }
-  }
   for (PolityId polityId = 0;
        polityId < static_cast<PolityId>(territories.size()); ++polityId) {
     const auto &provinceIds = territories[static_cast<std::size_t>(polityId)];
@@ -929,7 +921,6 @@ void implode(const Year nextYear, double centuries,
     if (provinceIds.size() < 2 || !state::findPolity(state, polityId) ||
         !state.polityStrengths.contains(polityId))
       continue;
-    const auto polityScore = state.polityStrengths.at(polityId).score;
     const auto foundedYear = state::findPolity(state, polityId)->foundedYear;
     const auto maturationProgress =
         configuration.successorMaturationYears <= 0
@@ -970,13 +961,10 @@ void implode(const Year nextYear, double centuries,
             : std::clamp((static_cast<double>(provinceIds.size()) - capacity) /
                              capacity,
                          0.0, 1.0);
-    const bool decaying =
-        strongestScore > 0.0 &&
-        polityScore <= strongestScore * configuration.decayStrengthRatio;
     const auto decayPressure =
         1.0 + 2.0 * stabilityPressure + 6.0 * overCapacityPressure;
     const bool decaySplit =
-        (decaying || stabilityPressure > 0.0 || overCapacityPressure > 0.0) &&
+        (stabilityPressure > 0.0 || overCapacityPressure > 0.0) &&
         chance(configuration.decayFragmentationChance * centuries *
               decayPressure * stabilizationMultiplier * maturationMultiplier *
               smallPolityMultiplier);

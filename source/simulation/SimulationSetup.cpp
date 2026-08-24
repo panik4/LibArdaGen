@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <numeric>
 #include <set>
 
 namespace Arda::Simulation::setup {
@@ -128,34 +129,65 @@ void initializeWorld(const Configuration &configuration,
                                  superRegion.neighbours.end());
   }
 
-  for (const auto &[provinceId, province] : run.normalized.provinces) {
-    const auto polityId = run.nextPolity++;
-    const auto cultureId = run.nextCulture++;
-    const auto habitability =
-        province->habitability > 0.0f
-            ? std::clamp(static_cast<double>(province->habitability), 0.0, 1.0)
-            : 0.5;
-    const auto connectivity =
-        std::min(run.normalized.neighbours.at(provinceId).size(), size_t{6});
-    const auto potential = 0.65 + habitability * 0.45 +
-                           static_cast<double>(connectivity) * 0.04 +
-                           RandNum::getRandom<double>(0.25);
-    run.growthPotential.emplace(provinceId, potential);
-    const auto &environment = run.normalized.environments.at(provinceId);
-    const double environmentalCapacity =
-        std::max(configuration.minimumPopulation,
-                 configuration.defaultPopulation *
-                     (0.5 + environment.habitability + environment.arableLand +
-                      (environment.coastal ? 0.25 : 0.0)) *
-                     std::sqrt(std::max(
-                         1.0, static_cast<double>(environment.area) / 100.0)) /
-                     (1.0 + environment.inclination));
-    run.baseCapacity.emplace(provinceId, environmentalCapacity);
-    const double population = 1.0;
-    const double development = (province->averageDevelopment > 0.0
-                                    ? province->averageDevelopment
-                                    : configuration.defaultDevelopment) *
-                               potential;
+  std::vector<ProvinceId> provinceIds;
+  provinceIds.reserve(run.normalized.provinces.size());
+  for (const auto &[provinceId, province] : run.normalized.provinces)
+    provinceIds.push_back(provinceId);
+  std::vector<ProvinceId> shuffledProvinceIds = provinceIds;
+  for (size_t index = shuffledProvinceIds.size(); index > 1; --index) {
+    const auto swapIndex =
+        static_cast<size_t>(RandNum::getRandom<int>(static_cast<int>(index)));
+    std::swap(shuffledProvinceIds[index - 1], shuffledProvinceIds[swapIndex]);
+  }
+  const auto seedCount = std::min<size_t>(1000, shuffledProvinceIds.size());
+  std::map<ProvinceId, PolityId> provinceOwners;
+  std::vector<std::vector<ProvinceId>> polityProvinces(seedCount);
+  for (size_t index = 0; index < seedCount; ++index) {
+    const auto provinceId = shuffledProvinceIds[index];
+    const auto polityId = static_cast<PolityId>(index);
+    provinceOwners[provinceId] = polityId;
+    polityProvinces[index].push_back(provinceId);
+  }
+  std::set<ProvinceId> unassigned(shuffledProvinceIds.begin() + seedCount,
+                                  shuffledProvinceIds.end());
+  while (!unassigned.empty()) {
+    std::vector<ProvinceId> expandable;
+    for (const auto &[provinceId, polityId] : provinceOwners) {
+      (void)polityId;
+      for (const auto neighbourId : run.normalized.neighbours.at(provinceId))
+        if (unassigned.contains(neighbourId)) {
+          expandable.push_back(provinceId);
+          break;
+        }
+    }
+    if (expandable.empty())
+      break;
+    const auto source = expandable[static_cast<size_t>(RandNum::getRandom<int>(
+        static_cast<int>(expandable.size())))];
+    std::vector<ProvinceId> candidates;
+    const auto owner = provinceOwners.at(source);
+    for (const auto neighbourId : run.normalized.neighbours.at(source))
+      if (unassigned.contains(neighbourId))
+        candidates.push_back(neighbourId);
+    if (candidates.empty())
+      continue;
+    const auto assigned = candidates[static_cast<size_t>(RandNum::getRandom<int>(
+        static_cast<int>(candidates.size())))];
+    provinceOwners[assigned] = owner;
+    polityProvinces[static_cast<size_t>(owner)].push_back(assigned);
+    unassigned.erase(assigned);
+  }
+  for (const auto provinceId : unassigned) {
+    const auto polityId = static_cast<PolityId>(polityProvinces.size());
+    provinceOwners[provinceId] = polityId;
+    polityProvinces.push_back({provinceId});
+  }
+  run.nextPolity = static_cast<PolityId>(polityProvinces.size());
+
+  for (size_t index = 0; index < polityProvinces.size(); ++index) {
+    const auto polityId = static_cast<PolityId>(index);
+    const auto provinceId = polityProvinces[index].front();
+    const auto &province = run.normalized.provinces.at(provinceId);
     auto createPolity = Event{configuration.startYear,
                               EventType::CreatePolity,
                               -1,
@@ -191,6 +223,35 @@ void initializeWorld(const Configuration &configuration,
          configuration.startYear, std::nullopt});
     createPolity.lastTraitEra = PoliticalEra::AncientClassical;
     run.append(std::move(createPolity));
+  }
+  for (const auto &[provinceId, province] : run.normalized.provinces) {
+    const auto polityId = provinceOwners.at(provinceId);
+    const auto cultureId = run.nextCulture++;
+    const auto habitability =
+        province->habitability > 0.0f
+            ? std::clamp(static_cast<double>(province->habitability), 0.0, 1.0)
+            : 0.5;
+    const auto connectivity =
+        std::min(run.normalized.neighbours.at(provinceId).size(), size_t{6});
+    const auto potential = 0.65 + habitability * 0.45 +
+                           static_cast<double>(connectivity) * 0.04 +
+                           RandNum::getRandom<double>(0.25);
+    run.growthPotential.emplace(provinceId, potential);
+    const auto &environment = run.normalized.environments.at(provinceId);
+    const double environmentalCapacity =
+        std::max(configuration.minimumPopulation,
+                 configuration.defaultPopulation *
+                     (0.5 + environment.habitability + environment.arableLand +
+                      (environment.coastal ? 0.25 : 0.0)) *
+                     std::sqrt(std::max(
+                         1.0, static_cast<double>(environment.area) / 100.0)) /
+                     (1.0 + environment.inclination));
+    run.baseCapacity.emplace(provinceId, environmentalCapacity);
+    const double population = 1.0;
+    const double development = (province->averageDevelopment > 0.0
+                                    ? province->averageDevelopment
+                                    : configuration.defaultDevelopment) *
+                               potential;
     auto initializeProvince =
         Event{configuration.startYear,
               EventType::InitializeProvince,
