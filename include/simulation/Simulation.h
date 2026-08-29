@@ -1,6 +1,7 @@
 #pragma once
 
 #include "areas/ArdaContinent.h"
+#include "areas/Claim.h"
 #include "climate/ClimateData.h"
 #include "entities/Colour.h"
 #include "terrain/TerrainData.h"
@@ -213,6 +214,12 @@ struct Configuration {
   double traitAcquisitionPressure = 1.0;
   double traitRemovalThreshold = 0.05;
   double traitStrengthConvergencePerCentury = 0.20;
+};
+
+struct SimulationClaimExport {
+  PolityId polityId = NoPolity;
+  RegionId regionId = -1;
+  ClaimSource source = ClaimSource::HistoricalOwnership;
 };
 
 struct ArtifactPaths {
@@ -676,6 +683,12 @@ struct SimulationPolityStatistics {
   std::map<size_t, size_t> formableCountsByRequiredProvinceCount;
 };
 
+struct SimulationGovernmentFormStrength {
+  double population = 0.0;
+  double development = 0.0;
+  double score = 0.0;
+};
+
 struct SimulationPolityExport {
   Polity polity;
   PolityStrength strength;
@@ -702,7 +715,10 @@ struct SimulationExport {
   std::map<PolityId, SimulationPolityPeakExport> historicalPolityPeaks;
   std::map<PolityId, SimulationTerritorySetExport> cores;
   std::map<PolityId, SimulationTerritorySetExport> claims;
+  std::vector<SimulationClaimExport> claimRecords;
   std::map<PolityId, SimulationFormableExport> formables;
+  std::map<GovernmentForm, SimulationGovernmentFormStrength>
+      governmentFormStrength;
   std::vector<WarEvent> wars;
 };
 

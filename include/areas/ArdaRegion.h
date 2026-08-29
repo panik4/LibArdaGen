@@ -1,5 +1,6 @@
 #pragma once
 #include "areas/ArdaProvince.h"
+#include "areas/Claim.h"
 #include "areas/Region.h"
 #include "culture/Culture.h"
 #include "culture/Religion.h"
@@ -17,10 +18,15 @@ enum class LocatorType { NONE, CITY, FARM, MINE, PORT, WOOD };
 class ArdaRegion : public Fwg::Areas::Region {
 
 public:
+  struct Claim {
+    std::shared_ptr<Country> country;
+    ClaimSource source = ClaimSource::HistoricalOwnership;
+  };
+
   // member variables
   std::shared_ptr<Country> owner;
   std::vector<std::shared_ptr<Country>> cores;
-  std::vector<std::shared_ptr<Country>> claims;
+  std::vector<Claim> claims;
   int superRegionID = -1;
   // calculate this for the scenario in general
   double worldPopulationShare = 0.0;

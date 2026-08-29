@@ -93,6 +93,8 @@ void distributeCountries(
     for (auto &region : country->ownedRegions) {
       region->owner = country;
       region->cores.push_back(country);
+      region->claims.push_back(
+          {country, ClaimSource::HistoricalOwnership});
     }
   }
   Fwg::Utils::Logging::logLine("Distributing Assigning Regions");
@@ -107,7 +109,9 @@ void distributeCountries(
             ardaRegions, ardaRegion, config.width, config.height);
         gR->owner->addRegion(ardaRegion);
         ardaRegion->owner = gR->owner;
-        ardaRegion->cores.push_back(gR->owner);
+         ardaRegion->cores.push_back(gR->owner);
+         ardaRegion->claims.push_back(
+             {gR->owner, ClaimSource::HistoricalOwnership});
       }
     }
   }
@@ -301,7 +305,9 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
         language->getAdjectiveForm(country.second->name);
     for (auto &region : country.second->ownedRegions) {
       region->owner = country.second;
-      region->cores.push_back(country.second);
+       region->cores.push_back(country.second);
+       region->claims.push_back(
+           {country.second, ClaimSource::HistoricalOwnership});
     }
     generateCountrySpecifics(generationAge, countries);
   }
@@ -388,6 +394,21 @@ void deriveCountries(
                     country->second) == region->second->cores.end())
         region->second->cores.push_back(country->second);
     }
+  }
+
+  for (const auto &claim : simulationExport.claimRecords) {
+    const auto country = countriesByPolity.find(claim.polityId);
+    const auto region = regionsById.find(claim.regionId);
+    if (country == countriesByPolity.end() || region == regionsById.end())
+      continue;
+    const auto duplicate = std::find_if(
+        region->second->claims.begin(), region->second->claims.end(),
+        [&country, &claim](const auto &existing) {
+          return existing.country == country->second &&
+                 existing.source == claim.source;
+        });
+    if (duplicate == region->second->claims.end())
+      region->second->claims.push_back({country->second, claim.source});
   }
 
   for (auto &[polityId, country] : countriesByPolity) {

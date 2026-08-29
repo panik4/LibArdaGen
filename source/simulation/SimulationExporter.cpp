@@ -149,6 +149,21 @@ void exportCoresAndClaims(SimulationExport &exported, const State &state,
                           const std::vector<Event> &events,
                           const SimulationPolityHistory &polityHistory,
                           const Configuration &configuration) {
+  const auto addClaim = [&exported](PolityId polityId, RegionId regionId,
+                                    ClaimSource source) {
+    if (polityId == NoPolity || regionId < 0)
+      return;
+    auto &records = exported.claimRecords;
+    if (std::none_of(records.begin(), records.end(),
+                     [polityId, regionId, source](const auto &record) {
+                       return record.polityId == polityId &&
+                              record.regionId == regionId &&
+                              record.source == source;
+                     }))
+      records.push_back({polityId, regionId, source});
+    appendRegion(exported.claims[polityId], regionId);
+  };
+
   const auto episodes = buildOwnershipEpisodes(state, events);
   Year coreDuration = configuration.coreOwnershipYears;
   if (state.year >= configuration.ideologicalTransitionStartYear)
@@ -170,8 +185,8 @@ void exportCoresAndClaims(SimulationExport &exported, const State &state,
       if (episode.endYear < state.year &&
           state.year - episode.endYear <= claimDuration &&
           (!province || province->owner != episode.polityId)) {
-        auto &claims = exported.claims[episode.polityId];
-        appendRegion(claims, region->second);
+        addClaim(episode.polityId, region->second,
+                 ClaimSource::HistoricalOwnership);
       }
     }
   }
@@ -200,7 +215,7 @@ void exportCoresAndClaims(SimulationExport &exported, const State &state,
       if (currentOwner != currentRegionOwners.end() &&
           historicalOwner == currentOwner->second)
         continue;
-      appendRegion(exported.claims[historicalOwner], regionId);
+      addClaim(historicalOwner, regionId, ClaimSource::HistoricalOwnership);
     }
   }
 
@@ -211,9 +226,65 @@ void exportCoresAndClaims(SimulationExport &exported, const State &state,
     const auto cores = exported.cores.find(polity.id);
     if (cores == exported.cores.end())
       continue;
-    auto &claims = exported.claims[polity.id];
     for (const auto regionId : cores->second.regionIds)
-      appendRegion(claims, regionId);
+      addClaim(polity.id, regionId, ClaimSource::HistoricalOwnership);
+  }
+
+  std::map<PolityId, std::set<int>> landMasses;
+  std::map<PolityId, std::set<int>> continents;
+  std::map<PolityId, int> capitalLandMass;
+  std::map<PolityId, CultureId> primaryCultures;
+  for (const auto &[polityId, polityExport] : exported.polities) {
+    primaryCultures[polityId] = polityExport.polity.primaryCulture;
+    for (const auto provinceId : polityExport.provinceIds) {
+      const auto *province = state::findProvince(state, provinceId);
+      if (!province)
+        continue;
+      if (province->landMassID >= 0)
+        landMasses[polityId].insert(province->landMassID);
+      if (province->continentId >= 0)
+        continents[polityId].insert(province->continentId);
+    }
+    const auto *capital = state::findProvince(
+        state, polityExport.polity.capitalProvince);
+    if (capital)
+      capitalLandMass[polityId] = capital->landMassID;
+  }
+  for (const auto &[regionId, provinceIds] : exported.regions) {
+    for (const auto &[polityId, polityExport] : exported.polities) {
+      bool cultureMatch = false;
+      bool capitalLandMassMatch = false;
+      bool detachedLandMassMatch = false;
+      bool continentMatch = false;
+      for (const auto provinceId : provinceIds) {
+        const auto *province = state::findProvince(state, provinceId);
+        if (!province)
+          continue;
+        cultureMatch |= primaryCultures[polityId] >= 0 &&
+                        province->culture == primaryCultures[polityId];
+        capitalLandMassMatch |= capitalLandMass.contains(polityId) &&
+                                province->landMassID >= 0 &&
+                                province->landMassID == capitalLandMass[polityId];
+        detachedLandMassMatch |=
+            province->landMassID >= 0 &&
+            capitalLandMass.contains(polityId) &&
+            province->landMassID != capitalLandMass[polityId] &&
+            landMasses[polityId].contains(province->landMassID);
+        continentMatch |= province->continentId >= 0 &&
+                          continents[polityId].contains(province->continentId);
+      }
+      if (cultureMatch)
+        addClaim(polityId, regionId, ClaimSource::CultureUnification);
+      if (capitalLandMassMatch)
+        addClaim(polityId, regionId,
+                 ClaimSource::CapitalLandmassUnification);
+      if (detachedLandMassMatch)
+        addClaim(polityId, regionId,
+                 ClaimSource::DetachedLandmassUnification);
+      if (continentMatch)
+        addClaim(polityId, regionId, ClaimSource::ContinentUnification);
+      (void)polityExport;
+    }
   }
 }
 
@@ -375,7 +446,16 @@ void exportSignificantPolities(SimulationExport &exported, const State &state) {
                     province.regionId) == polityExport.regionIds.end())
         polityExport.regionIds.push_back(province.regionId);
     }
-    exported.polities.emplace(polityId, std::move(polityExport));
+    const auto [exportedPolity, inserted] =
+        exported.polities.emplace(polityId, std::move(polityExport));
+    if (inserted) {
+      auto &formStrength =
+          exported.governmentFormStrength[
+              exportedPolity->second.polity.governmentForm];
+      formStrength.population += exportedPolity->second.strength.population;
+      formStrength.development += exportedPolity->second.strength.development;
+      formStrength.score += exportedPolity->second.strength.score;
+    }
   }
 }
 

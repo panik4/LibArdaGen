@@ -161,7 +161,8 @@ PoliticalTraitDefinition traitDefinition(PoliticalTrait trait) {
   case PoliticalTrait::ConservativeEstablishment:
     return {trait, PoliticalEra::Industrial, modifier(10, 15, 5, -25)};
   case PoliticalTrait::Nationalism:
-    return {trait, PoliticalEra::Industrial, modifier(10, 0, -10, 20)};
+    return {trait, PoliticalEra::Industrial, modifier(10, 0, -10, 20), 0.20,
+            0.15};
   case PoliticalTrait::SocialReform:
     return {trait, PoliticalEra::Industrial, modifier(-5, -10, -20, 35)};
   case PoliticalTrait::SocialistMovement:
@@ -171,31 +172,31 @@ PoliticalTraitDefinition traitDefinition(PoliticalTrait trait) {
     return {trait, PoliticalEra::Industrial, modifier(-30, -20, -25, 70), 0.05,
             0.25};
   case PoliticalTrait::AuthoritarianModernization:
-    return {trait, PoliticalEra::Industrial, modifier(25, -5, -15, -5), 0.15,
-            0.15};
+    return {trait, PoliticalEra::Industrial, modifier(45, -5, -15, -5), 0.25,
+            0.25};
   case PoliticalTrait::LiberalDemocracy:
     return {trait, PoliticalEra::Modern, modifier(-15, -20, -30, 60)};
   case PoliticalTrait::SocialDemocracy:
     return {trait, PoliticalEra::Modern, modifier(-15, -20, -30, 60), 0.0,
-            0.20};
+            0.40};
   case PoliticalTrait::CommunistMovement:
-    return {trait, PoliticalEra::Modern, modifier(-45, -30, -30, 85), 0.15,
-            0.55};
+    return {trait, PoliticalEra::Modern, modifier(-75, -50, -50, 115), 0.15,
+            0.75};
   case PoliticalTrait::FascistMovement:
-    return {trait, PoliticalEra::Modern, modifier(20, -5, -20, 15), 0.20, 0.15};
+    return {trait, PoliticalEra::Modern, modifier(40, -5, -50, 25), 0.30, 0.25};
   case PoliticalTrait::MilitaryAuthoritarianism:
-    return {trait, PoliticalEra::Modern, modifier(30, 5, -20, -25), 0.25, 0.10};
+    return {trait, PoliticalEra::Modern, modifier(40, 5, -30, -25), 0.45, 0.20};
   case PoliticalTrait::OnePartyState:
-    return {trait, PoliticalEra::Modern, modifier(30, -20, -20, 15), 0.10,
+    return {trait, PoliticalEra::Modern, modifier(30, -20, -20, 15), 0.40,
             0.40};
   case PoliticalTrait::ReligiousConservatism:
     return {trait, PoliticalEra::Modern, modifier(5, 5, 30, -20)};
   case PoliticalTrait::PopulistMovement:
-    return {trait, PoliticalEra::Modern, modifier(-20, -15, -20, 55), 0.05,
-            0.20};
+    return {trait, PoliticalEra::Modern, modifier(-20, -15, -20, 55), 0.25,
+            0.25};
   case PoliticalTrait::TechnocraticGovernment:
-    return {trait, PoliticalEra::Modern, modifier(25, -10, -20, 10), 0.10,
-            0.15};
+    return {trait, PoliticalEra::Modern, modifier(25, -10, -20, 10), 0.30,
+            0.35};
   }
   return {trait, PoliticalEra::AncientClassical, {0.0, 0.0, 0.0, 0.0}};
 }

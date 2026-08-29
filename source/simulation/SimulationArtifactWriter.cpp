@@ -19,6 +19,46 @@ namespace {
 
 using geography::normalize;
 
+const char *governmentFormName(GovernmentForm form) {
+  switch (form) {
+  case GovernmentForm::Tribal:
+    return "tribal";
+  case GovernmentForm::AbsoluteMonarchy:
+    return "absolute_monarchy";
+  case GovernmentForm::FeudalMonarchy:
+    return "feudal_monarchy";
+  case GovernmentForm::ConstitutionalMonarchy:
+    return "constitutional_monarchy";
+  case GovernmentForm::ParliamentaryMonarchy:
+    return "parliamentary_monarchy";
+  case GovernmentForm::AristocraticMonarchy:
+    return "aristocratic_monarchy";
+  case GovernmentForm::ElectiveMonarchy:
+    return "elective_monarchy";
+  case GovernmentForm::TheocraticMonarchy:
+    return "theocratic_monarchy";
+  case GovernmentForm::Theocracy:
+    return "theocracy";
+  case GovernmentForm::AristocraticRepublic:
+    return "aristocratic_republic";
+  case GovernmentForm::OligarchicRepublic:
+    return "oligarchic_republic";
+  case GovernmentForm::ConstitutionalRepublic:
+    return "constitutional_republic";
+  case GovernmentForm::ParliamentaryRepublic:
+    return "parliamentary_republic";
+  case GovernmentForm::DirectDemocracy:
+    return "direct_democracy";
+  case GovernmentForm::MilitaryGovernment:
+    return "military_government";
+  case GovernmentForm::CommunistState:
+    return "communist_state";
+  case GovernmentForm::FascistState:
+    return "fascist_state";
+  }
+  return "unknown";
+}
+
 bool validateInputs(const Configuration &configuration, const Input &input,
                     const Fwg::Gfx::Image &baseMap,
                     std::vector<ValidationError> &errors,
@@ -335,8 +375,8 @@ void writeTimestepMaps(const State &state,
   paths.ownershipMaps.push_back(mapPath);
   const auto developmentPath = developmentDirectory / filename.str();
   const auto populationPath = populationDirectory / filename.str();
-  //Fwg::Gfx::Png::save(developmentFrame, developmentPath.string(), true);
-  //Fwg::Gfx::Png::save(populationFrame, populationPath.string(), true);
+  // Fwg::Gfx::Png::save(developmentFrame, developmentPath.string(), true);
+  // Fwg::Gfx::Png::save(populationFrame, populationPath.string(), true);
   paths.developmentMaps.push_back(developmentPath);
   paths.populationMaps.push_back(populationPath);
   paths.cultureMaps.push_back(outputDirectory / "culture" / filename.str());
@@ -379,6 +419,17 @@ bool writePolityStatisticsCsv(const SimulationExport &simulationExport,
     }
     output << '\n';
   }
+  output << '\n' << "government_form,population,development,score\n";
+  for (std::size_t index = 0; index < GovernmentFormCount; ++index) {
+    const auto form = static_cast<GovernmentForm>(index);
+    const auto strength = simulationExport.governmentFormStrength.find(form);
+    const auto &totals =
+        strength == simulationExport.governmentFormStrength.end()
+            ? SimulationGovernmentFormStrength{}
+            : strength->second;
+    output << governmentFormName(form) << ',' << totals.population << ','
+           << totals.development << ',' << totals.score << '\n';
+  }
   return true;
 }
 
@@ -411,10 +462,10 @@ writeSimulationArtifacts(const Configuration &configuration, const Input &input,
     //   return std::nullopt;
     const auto years = artifactYears(configuration);
     for (size_t index = 0; index < years.size(); ++index) {
-      const auto state = reconstruct(result.events, years[index]);
-      writeTimestepMaps(state, normalized, baseMap, outputDirectory,
-                        outputDirectory / "development",
-                        outputDirectory / "population", paths, index);
+      // const auto state = reconstruct(result.events, years[index]);
+      // writeTimestepMaps(state, normalized, baseMap, outputDirectory,
+      //                   outputDirectory / "development",
+      //                   outputDirectory / "population", paths, index);
     }
     return paths;
   } catch (const std::exception &exception) {
