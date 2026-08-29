@@ -166,8 +166,6 @@ struct Configuration {
   double modernGovernmentMinimumPressure = 0.25;
   double postIndustrialModernGovernmentMultiplier = 1.75;
   Year postIndustrialModernGovernmentStartYear = 1880;
-  double fascismMilitaryTraditionScale = 1.0;
-  double fascismWarPressureScale = 1.0;
   PoliticalPowerDistribution politicalPowerPersistence{0.55, 0.55, 0.55, 0.55};
   double politicalPowerConvergencePerCentury = 0.35;
   double politicalPowerVariation = 0.04;
@@ -187,6 +185,8 @@ struct Configuration {
   double governmentPopularityDriftPerCentury = 0.18;
   double governmentPopularityVariation = 0.025;
   double governmentPopularityHysteresis = 0.04;
+  double governmentTraitAffinityWeight = 2.0;
+  double governmentExplicitMovementAffinity = 1.5;
   double preModernMonarchyTargetMultiplier = 1.0;
   double modernMonarchyTargetMultiplier = 0.75;
   double preModernTheocracyTargetMultiplier = 1.0;
@@ -200,7 +200,7 @@ struct Configuration {
   Year coreClaimYears = 100;
   double directDemocracyPeopleThreshold = 0.72;
   double directDemocracyLeadThreshold = 0.20;
-  double modernGovernmentMinimumPopularity = 0.05;
+  double modernGovernmentMinimumPopularity = 0.0;
   double politicalGenericShockChancePerCentury = 0.12;
   double politicalGenericShockStrength = 0.25;
   Year politicalPressureDurationYears = 75;
@@ -684,6 +684,7 @@ struct SimulationPolityStatistics {
 };
 
 struct SimulationGovernmentFormStrength {
+  size_t polityCount = 0;
   double population = 0.0;
   double development = 0.0;
   double score = 0.0;

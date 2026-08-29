@@ -452,6 +452,7 @@ void exportSignificantPolities(SimulationExport &exported, const State &state) {
       auto &formStrength =
           exported.governmentFormStrength[
               exportedPolity->second.polity.governmentForm];
+      ++formStrength.polityCount;
       formStrength.population += exportedPolity->second.strength.population;
       formStrength.development += exportedPolity->second.strength.development;
       formStrength.score += exportedPolity->second.strength.score;

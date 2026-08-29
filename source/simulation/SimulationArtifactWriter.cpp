@@ -419,7 +419,8 @@ bool writePolityStatisticsCsv(const SimulationExport &simulationExport,
     }
     output << '\n';
   }
-  output << '\n' << "government_form,population,development,score\n";
+  output << '\n' <<
+            "government_form,polity_count,population,development,score\n";
   for (std::size_t index = 0; index < GovernmentFormCount; ++index) {
     const auto form = static_cast<GovernmentForm>(index);
     const auto strength = simulationExport.governmentFormStrength.find(form);
@@ -427,8 +428,9 @@ bool writePolityStatisticsCsv(const SimulationExport &simulationExport,
         strength == simulationExport.governmentFormStrength.end()
             ? SimulationGovernmentFormStrength{}
             : strength->second;
-    output << governmentFormName(form) << ',' << totals.population << ','
-           << totals.development << ',' << totals.score << '\n';
+    output << governmentFormName(form) << ',' << totals.polityCount << ','
+           << totals.population << ',' << totals.development << ','
+           << totals.score << '\n';
   }
   return true;
 }
