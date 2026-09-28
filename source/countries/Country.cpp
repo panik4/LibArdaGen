@@ -1,9 +1,6 @@
 #include "countries/Country.h"
 namespace Arda {
 Country::Country() {
-  colour = {static_cast<unsigned char>(RandNum::getRandom(0, 255)),
-            static_cast<unsigned char>(RandNum::getRandom(0, 255)),
-            static_cast<unsigned char>(RandNum::getRandom(0, 255))};
 }
 
 Country::Country(std::string tag, int ID, std::string name,
@@ -11,9 +8,6 @@ Country::Country(std::string tag, int ID, std::string name,
     : tag{tag}, name{name}, adjective{adjective}, flag{flag},
       Fwg::Areas::Area() {
   this->ID = ID;
-  colour = {static_cast<unsigned char>(RandNum::getRandom(0, 255)),
-            static_cast<unsigned char>(RandNum::getRandom(0, 255)),
-            static_cast<unsigned char>(RandNum::getRandom(0, 255))};
   this->flag.flip();
 }
 

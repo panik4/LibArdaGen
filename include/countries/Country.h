@@ -43,7 +43,6 @@ public:
   // the cultures and their population
   std::map<std::shared_ptr<Culture>, double> cultures;
   Gfx::Flag flag;
-  Fwg::Gfx::Colour colour;
   std::vector<Arda::Character> characters;
 
   // military

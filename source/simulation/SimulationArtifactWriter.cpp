@@ -432,6 +432,18 @@ bool writePolityStatisticsCsv(const SimulationExport &simulationExport,
            << totals.population << ',' << totals.development << ','
            << totals.score << '\n';
   }
+  output << '\n' << "political_direction,development,share\n";
+  for (const auto direction : {PoliticalDirection::Other,
+                               PoliticalDirection::Democracy,
+                               PoliticalDirection::Communism,
+                               PoliticalDirection::Fascism}) {
+    const auto strength = simulationExport.politicalDirectionStrength.find(direction);
+    const auto &totals = strength == simulationExport.politicalDirectionStrength.end()
+                             ? SimulationPoliticalDirectionStrength{}
+                             : strength->second;
+    output << static_cast<int>(direction) << ',' << totals.development << ','
+           << totals.share << '\n';
+  }
   return true;
 }
 

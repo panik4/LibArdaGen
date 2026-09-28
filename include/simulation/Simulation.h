@@ -187,6 +187,12 @@ struct Configuration {
   double governmentPopularityHysteresis = 0.04;
   double governmentTraitAffinityWeight = 2.0;
   double governmentExplicitMovementAffinity = 1.5;
+  double democracyDevelopmentTarget = 0.20;
+  double communismDevelopmentTarget = 0.20;
+  double fascismDevelopmentTarget = 0.20;
+  double governmentDirectionFeedbackStrength = 1.0;
+  double governmentDirectionMinimumMultiplier = 0.5;
+  double governmentDirectionMaximumMultiplier = 1.5;
   double preModernMonarchyTargetMultiplier = 1.0;
   double modernMonarchyTargetMultiplier = 0.75;
   double preModernTheocracyTargetMultiplier = 1.0;
@@ -284,6 +290,25 @@ enum class GovernmentForm {
 };
 inline constexpr std::size_t GovernmentFormCount =
     static_cast<std::size_t>(GovernmentForm::FascistState) + 1;
+
+enum class PoliticalDirection { Other, Democracy, Communism, Fascism };
+
+constexpr PoliticalDirection politicalDirection(GovernmentForm form) {
+  switch (form) {
+  case GovernmentForm::ConstitutionalMonarchy:
+  case GovernmentForm::ParliamentaryMonarchy:
+  case GovernmentForm::ConstitutionalRepublic:
+  case GovernmentForm::ParliamentaryRepublic:
+  case GovernmentForm::DirectDemocracy:
+    return PoliticalDirection::Democracy;
+  case GovernmentForm::CommunistState:
+    return PoliticalDirection::Communism;
+  case GovernmentForm::FascistState:
+    return PoliticalDirection::Fascism;
+  default:
+    return PoliticalDirection::Other;
+  }
+}
 
 enum class PoliticalBloc {
   CentralAuthority,
@@ -529,6 +554,11 @@ struct PolityStrength {
   double score = 0.0;
 };
 
+struct SimulationPoliticalDirectionStrength {
+  double development = 0.0;
+  double share = 0.0;
+};
+
 struct State {
   Year year = StartYear;
   std::vector<ProvinceState> provinces;
@@ -720,6 +750,8 @@ struct SimulationExport {
   std::map<PolityId, SimulationFormableExport> formables;
   std::map<GovernmentForm, SimulationGovernmentFormStrength>
       governmentFormStrength;
+  std::map<PoliticalDirection, SimulationPoliticalDirectionStrength>
+      politicalDirectionStrength;
   std::vector<WarEvent> wars;
 };
 

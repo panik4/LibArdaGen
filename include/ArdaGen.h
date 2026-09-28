@@ -61,9 +61,11 @@ struct ArdaData {
   double worldEconomicActivity = 0;
   Civilization::CivilizationLayer civLayer;
   Simulation::SimulationExport simulationExport;
+  std::map<Rank, std::vector<std::shared_ptr<Country>>> countriesByRank;
+  std::map<int, std::vector<std::shared_ptr<Country>>> countryImportanceScores;
 };
 
-class ArdaGen : public Fwg::FastWorldGenerator {
+class ArdaGen : public Fwg::FastWorldGenerator, public std::enable_shared_from_this<ArdaGen> {
 
 protected:
   Fwg::Gfx::Image typeMap;
@@ -87,8 +89,6 @@ public:
   std::vector<std::shared_ptr<SuperRegion>> superRegions;
   // countries
   std::map<std::string, std::shared_ptr<Country>> countries;
-  std::map<Rank, std::vector<std::shared_ptr<Country>>> countriesByRank;
-  std::map<int, std::vector<std::shared_ptr<Country>>> countryImportanceScores;
   Civilization::CivilizationData civData;
   // images
   Fwg::Gfx::Image countryMap;
@@ -160,7 +160,7 @@ public:
                         const Arda::Utils::ResConfig &resourceConfig);
   virtual void gatherStatistics();
   // calculate how strong each country is
-  virtual void evaluateCountries();
+  virtual void finaliseData();
   virtual void printStatistics();
 
   virtual void writeTextFiles();

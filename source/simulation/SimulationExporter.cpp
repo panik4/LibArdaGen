@@ -456,8 +456,18 @@ void exportSignificantPolities(SimulationExport &exported, const State &state) {
       formStrength.population += exportedPolity->second.strength.population;
       formStrength.development += exportedPolity->second.strength.development;
       formStrength.score += exportedPolity->second.strength.score;
+      auto &directionStrength = exported.politicalDirectionStrength[
+          politicalDirection(exportedPolity->second.polity.governmentForm)];
+      directionStrength.development +=
+          exportedPolity->second.strength.development;
     }
   }
+  double totalDirectionDevelopment = 0.0;
+  for (const auto &[direction, strength] : exported.politicalDirectionStrength)
+    totalDirectionDevelopment += strength.development;
+  if (totalDirectionDevelopment > 0.0)
+    for (auto &[direction, strength] : exported.politicalDirectionStrength)
+      strength.share = strength.development / totalDirectionDevelopment;
 }
 
 void exportPolityStatistics(SimulationExport &exported) {

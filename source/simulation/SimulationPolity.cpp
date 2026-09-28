@@ -294,6 +294,34 @@ struct PolityDevelopmentTotal {
   double development = 0.0;
 };
 
+struct PoliticalDirectionSnapshot {
+  std::array<double, 4> development{};
+  double totalDevelopment = 0.0;
+};
+
+PoliticalDirectionSnapshot calculateDirectionSnapshot(
+    const State &state, const std::vector<double> &developmentTotals,
+    const std::vector<std::vector<ProvinceId>> &territories) {
+  PoliticalDirectionSnapshot snapshot;
+  for (PolityId polityId = 0;
+       polityId < static_cast<PolityId>(state.polities.size()); ++polityId) {
+    if (static_cast<std::size_t>(polityId) >= territories.size() ||
+        territories[static_cast<std::size_t>(polityId)].empty())
+      continue;
+    const auto development = developmentTotals[static_cast<std::size_t>(polityId)];
+    if (development <= 0.0)
+      continue;
+    const auto *polity = state::findPolity(state, polityId);
+    if (!polity)
+      continue;
+    const auto direction = static_cast<std::size_t>(
+        politicalDirection(polity->governmentForm));
+    snapshot.development[direction] += development;
+    snapshot.totalDevelopment += development;
+  }
+  return snapshot;
+}
+
 PoliticalPowerDistribution normalizedPower(PoliticalPowerDistribution power) {
   double total = 0.0;
   for (auto &value : power) {
@@ -367,7 +395,8 @@ GovernmentForm
 governmentFor(Polity &polity, Year year, const Configuration &configuration,
               bool hasCoastalProvince, double stability, double navyTradition,
               double armyTradition, double development, double warPressure,
-              double centuries, GovernmentTransitionDiagnostics &diagnostics) {
+              double centuries, const PoliticalDirectionSnapshot &directionSnapshot,
+              GovernmentTransitionDiagnostics &diagnostics) {
   const auto &power = polity.politicalPower;
   const auto central =
       power[static_cast<std::size_t>(PoliticalBloc::CentralAuthority)];
@@ -420,9 +449,9 @@ governmentFor(Polity &polity, Year year, const Configuration &configuration,
              (polity.partyControl * 1.15 + people * 1.2 + central * 0.8 +
               instability * 0.45 + std::max(0.0, warPressure) * 0.2));
     setScore(GovernmentForm::FascistState,
-             (polity.partyControl * 1.15 + people * 0.65 + central * 1.2 +
-              instability * 0.2 + std::max(0.0, warPressure) * 0.45 +
-              nobility * 0.15 + polity.militaryInfluence * armyTradition));
+             (polity.partyControl * 1.15 + people * 0.45 + central * 1.0 +
+              instability * 0.2 + std::max(0.0, warPressure) * 0.25 +
+              nobility * 0.15 + 0.5 * polity.militaryInfluence * armyTradition));
     for (std::size_t index =
              static_cast<std::size_t>(GovernmentForm::MilitaryGovernment);
          index < GovernmentFormCount; ++index)
@@ -473,6 +502,30 @@ governmentFor(Polity &polity, Year year, const Configuration &configuration,
       scores[index] *= targetMultiplier(form);
       scores[index] +=
           governmentTraitAffinity(polity, form, era, configuration);
+      const auto direction = politicalDirection(form);
+      if ((direction == PoliticalDirection::Democracy ||
+           direction == PoliticalDirection::Communism ||
+           direction == PoliticalDirection::Fascism) &&
+          directionSnapshot.totalDevelopment > 0.0) {
+        const auto target =
+            direction == PoliticalDirection::Democracy
+                ? configuration.democracyDevelopmentTarget
+                : direction == PoliticalDirection::Communism
+                      ? configuration.communismDevelopmentTarget
+                      : configuration.fascismDevelopmentTarget;
+        const auto share =
+            directionSnapshot.development[static_cast<std::size_t>(direction)] /
+            directionSnapshot.totalDevelopment;
+        const auto feedback = std::clamp(
+            std::max(0.0, configuration.governmentDirectionFeedbackStrength) *
+                (target - share),
+            -1.0, 1.0);
+        const auto multiplier = std::clamp(
+            1.0 + feedback,
+            configuration.governmentDirectionMinimumMultiplier,
+            configuration.governmentDirectionMaximumMultiplier);
+        scores[index] *= multiplier;
+      }
     }
 
   const auto current = static_cast<std::size_t>(polity.governmentForm);
@@ -676,6 +729,8 @@ void updatePoliticalStates(Year nextYear, double centuries,
     developmentTotals[index] += province.development;
     ++developmentProvinceCounts[index];
   }
+  const auto directionSnapshot =
+      calculateDirectionSnapshot(state, developmentTotals, territories);
   for (const auto &war : wars) {
     if (war.year != nextYear)
       continue;
@@ -895,7 +950,8 @@ void updatePoliticalStates(Year nextYear, double centuries,
             ? 0.0
             : developmentTotals[index] /
                   static_cast<double>(developmentProvinceCounts[index]),
-        std::clamp(warPressure[index], 0.0, 1.0), centuries, diagnostics);
+        std::clamp(warPressure[index], 0.0, 1.0), centuries,
+        directionSnapshot, diagnostics);
     update.lastGovernmentTransitionYear = polity->lastGovernmentTransitionYear;
     update.lastTraitEra = polity->lastTraitEra;
     update.politicalPower = polity->politicalPower;

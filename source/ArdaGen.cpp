@@ -515,7 +515,7 @@ void ArdaGen::generateCountries(
   Fwg::Gfx::Png::save(countryMap,
                       Fwg::Cfg::Values().mapsPath + "countries/countries.png");
   mapCountries();
-  evaluateCountries();
+  finaliseData();
   Arda::Countries::saveCountries(countries,
                                  Fwg::Cfg::Values().mapsPath + "countries/");
 }
@@ -531,7 +531,7 @@ void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
   Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
                                              countries);
   mapCountries();
-  evaluateCountries();
+  finaliseData();
 }
 
 void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
@@ -545,7 +545,7 @@ void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
   Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
                                              countries);
   mapCountries();
-  evaluateCountries();
+  finaliseData();
 }
 void ArdaGen::deriveCountries(
     std::function<std::shared_ptr<Country>()> factory) {
@@ -559,7 +559,7 @@ void ArdaGen::deriveCountries(
   Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
                                              countries);
   mapCountries();
-  evaluateCountries();
+  finaliseData();
 }
 
 void ArdaGen::genNavmesh(
@@ -629,7 +629,7 @@ void ArdaGen::generateStateSpecifics() {
                            Arda::Gfx::visualiseRegions(ardaRegions));
 }
 
-void ArdaGen::evaluateCountries() {}
+void ArdaGen::finaliseData() {}
 
 Image ArdaGen::visualiseCountries(Fwg::Gfx::Image &countryBmp,
                                   const Fwg::Gfx::Image &worldMap,
