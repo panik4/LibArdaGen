@@ -47,6 +47,11 @@ void generateReligions(
 void generateCultures(
     CivilizationData &civData,
     std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces);
+bool loadCulturesFromImage(
+    CivilizationData &civData,
+    const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces,
+    const std::vector<std::shared_ptr<ArdaRegion>> &regions,
+    const Fwg::Gfx::Image &inputImage);
 void generateLanguageGroup(std::shared_ptr<CultureGroup> &cultureGroup);
 void distributeLanguages(CivilizationData &civData);
 
@@ -65,6 +70,8 @@ void deriveDevelopment(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
     const std::vector<std::shared_ptr<ArdaContinent>> &continents);
+void postProcessDevelopment(
+    const std::vector<std::shared_ptr<ArdaRegion>> &regions);
 void loadPopulation(
     const Fwg::Gfx::Image &populationMap,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,

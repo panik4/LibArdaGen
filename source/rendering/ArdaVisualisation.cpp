@@ -130,12 +130,37 @@ Fwg::Gfx::Image displayLanguageGroups(
 Fwg::Gfx::Image
 displayLocations(std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions,
                  Fwg::Gfx::Image worldMap) {
+  const auto &overlayColours = Fwg::Cfg::Values().topographyOverlayColours;
   for (auto &region : regions) {
     for (auto &location : region->locations) {
+      const char *colourKey = nullptr;
+      switch (location->type) {
+      case Fwg::Civilization::LocationType::Farm:
+        colourKey = "agriculture";
+        break;
+      case Fwg::Civilization::LocationType::Forest:
+        colourKey = "forestry";
+        break;
+      case Fwg::Civilization::LocationType::Mine:
+        colourKey = "mining";
+        break;
+      case Fwg::Civilization::LocationType::Port:
+        colourKey = "portcity";
+        break;
+      case Fwg::Civilization::LocationType::WaterPort:
+        colourKey = "waterPort";
+        break;
+      case Fwg::Civilization::LocationType::WaterNode:
+        colourKey = "waterNode";
+        break;
+      case Fwg::Civilization::LocationType::City:
+        colourKey = "urban";
+        break;
+      default:
+        continue;
+      }
       for (auto pixel : location->pixels) {
-        worldMap.setColourAtIndex(
-            pixel,
-            Fwg::Civilization::Location::locationColours.at(location->type));
+        worldMap.setColourAtIndex(pixel, overlayColours.at(colourKey));
       }
     }
   }

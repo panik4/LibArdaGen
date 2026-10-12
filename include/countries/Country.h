@@ -24,7 +24,6 @@ class Country : public Fwg::Areas::Area {
 public:
   // member variables
   std::string tag;
-  std::string name;
   std::string adjective;
   int capitalRegionID = 0;
   int capitalProvinceID = 0;
@@ -46,9 +45,9 @@ public:
   std::vector<Arda::Character> characters;
 
   // military
-  double navalFocus;
-  double airFocus;
-  double landFocus;
+  double navalFocus = 0.0;
+  double airFocus = 0.0;
+  double landFocus = 0.0;
 
   // constructors/destructors
   Country();
@@ -89,12 +88,12 @@ public:
   virtual std::shared_ptr<Culture> getPrimaryCulture() const;
 
   virtual std::string exportLine() const;
+  virtual void importLine(const std::vector<std::string> &tokens);
 
   // serialisation
-  template<class Archive>
+  template <class Archive>
   void serialize(Archive &ar, const unsigned int /*version*/);
 };
 } // namespace Arda
 
 BOOST_CLASS_EXPORT_KEY(Arda::Country)
-

@@ -15,11 +15,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ------------------------------------------------------------
 # Sources
 # ------------------------------------------------------------
-file(GLOB_RECURSE LIBARDAGEN_SOURCES
+file(GLOB_RECURSE LIBARDAGEN_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp
 )
 
-file(GLOB_RECURSE LIBARDAGEN_HEADERS
+file(GLOB_RECURSE LIBARDAGEN_HEADERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
 )

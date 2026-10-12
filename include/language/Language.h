@@ -5,6 +5,7 @@
 #include "utils/SerialisationFwd.h"
 #include "utils/Utils.h"
 #include <string>
+#include <set>
 #include <vector>
 namespace Arda {
 
@@ -21,9 +22,11 @@ public:
   Dataset reducedDataset;
   std::map<std::string, MarkovNameGenerator> markovGeneratorsByVocabulary;
   std::map<std::string, std::vector<std::string>> vocabulary;
+  std::set<std::string> generatedWords;
   void train(int seed);
 
-  void generateVocabulary();
+  std::string generateWord(const std::string &category);
+  void resetGeneratedWords();
   static std::string capitaliseName(const std::string &word);
   static std::string capitalisedWord(const std::string &word);
   static std::string lowercaseWord(const std::string &word);

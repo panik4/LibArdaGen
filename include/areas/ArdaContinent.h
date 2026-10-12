@@ -12,7 +12,6 @@ namespace Arda {
 class ArdaContinent : public Fwg::Areas::Continent {
 
 public:
-  std::string name;
   std::string adjective;
   // value between 0.0 and 1.0
   double developmentModifier = 1.0;

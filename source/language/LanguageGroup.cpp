@@ -8,7 +8,6 @@ void LanguageGroup::generate(int languageAmount, const Dataset &dataset, int see
     Language language;
     language.reducedDataset = dataset;
     language.train(seed);
-    language.generateVocabulary();
     language.fillAllLists();
 
     // languageGenerator.reduceDataset(        {mergedDataset});

@@ -73,6 +73,7 @@ public:
   getLocation(Fwg::Civilization::LocationType type);
   std::shared_ptr<Arda::Culture> getPrimaryCulture();
   std::string exportLine() const;
+  virtual void importLine(const std::vector<std::string> &tokens);
   std::map<std::shared_ptr<Arda::Culture>, double> gatherCultures() const;
   std::map<std::shared_ptr<Arda::Religion>, double> gatherReligions() const;
 

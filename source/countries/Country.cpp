@@ -5,10 +5,11 @@ Country::Country() {
 
 Country::Country(std::string tag, int ID, std::string name,
                  std::string adjective, Gfx::Flag flag)
-    : tag{tag}, name{name}, adjective{adjective}, flag{flag},
+    : tag{tag}, adjective{adjective}, flag{flag},
       Fwg::Areas::Area() {
   this->ID = ID;
   this->flag.flip();
+  this->name = name;
 }
 
 void Country::assignRegions(
@@ -193,6 +194,8 @@ std::string Country::exportLine() const {
 
   return line;
 }
+
+void Country::importLine(const std::vector<std::string> & /*tokens*/) {}
 
 template <class Archive>
 void Country::serialize(Archive &ar, const unsigned int /*version*/) {

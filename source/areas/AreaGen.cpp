@@ -1129,7 +1129,9 @@ bool generateStrategicRegions(
 void saveRegions(std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
                  const std::string &mappingPath,
                  const Fwg::Gfx::Image &regionImage) {
-  std::string fileContent = "#r;g;b;name;population\n";
+  std::string fileContent =
+      "#r;g;b;name;population;stateCategory;infrastructure;armsFactories;"
+      "civilianFactories;dockyards\n";
   for (const auto &region : ardaRegions) {
     fileContent += region->exportLine();
     fileContent += "\n";

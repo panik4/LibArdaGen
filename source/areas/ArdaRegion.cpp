@@ -80,6 +80,7 @@ std::string ArdaRegion::exportLine() const {
   retLine += std::to_string(this->totalPopulation) + ";";
   return retLine;
 }
+void ArdaRegion::importLine(const std::vector<std::string> & /*tokens*/) {}
 std::map<std::shared_ptr<Arda::Culture>, double>
 ArdaRegion::gatherCultures() const {
   std::map<std::shared_ptr<Arda::Culture>, double> cultures;

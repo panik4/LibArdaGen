@@ -69,6 +69,8 @@ class ArdaGen : public Fwg::FastWorldGenerator, public std::enable_shared_from_t
 
 protected:
   Fwg::Gfx::Image typeMap;
+  void nameGeneratedLocations();
+  void detectLocationTypeInternal(const Fwg::Civilization::LocationType &type);
 
 public:
   struct FactoryRegistry {
@@ -111,6 +113,9 @@ public:
   bool derivePopulation(Fwg::Cfg &config);
   void genEconomyData();
   void genCultureData();
+  bool loadCultures(const Fwg::Gfx::Image &inputImage);
+  bool saveCultureGroupState(const std::string &path) const;
+  bool loadCultureGroupState(const std::string &path);
   void deriveCultureData();
   void genCivilisationData();
   void clearLocations();
@@ -153,6 +158,8 @@ public:
   // apply values read from a file to override generated data
   void applyRegionInput();
   void applyCountryInput();
+  void nameCultureDependentAreas();
+  virtual void nameCountries();
   // map base provinces to generic game regions
   void mapProvinces();
   void totalResourceVal(const std::vector<float> &resPrev,

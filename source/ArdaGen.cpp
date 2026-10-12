@@ -1,9 +1,214 @@
 #include "ArdaGen.h"
-#include "simulation/SimulationExporter.h"
 #include "simulation/SimulationArtifactWriter.h"
+#include "simulation/SimulationExporter.h"
+#include <algorithm>
+#include <fstream>
+#include <sstream>
 namespace Logging = Fwg::Utils::Logging;
 namespace Arda {
 using namespace Fwg::Gfx;
+
+namespace {
+std::string encodeSidecarField(const std::string &value) {
+  std::string encoded;
+  encoded.reserve(value.size());
+  for (const unsigned char character : value) {
+    if (character == '%' || character == '\t' || character == '\n' ||
+        character == '\r') {
+      constexpr char hex[] = "0123456789ABCDEF";
+      encoded.push_back('%');
+      encoded.push_back(hex[character >> 4]);
+      encoded.push_back(hex[character & 0x0F]);
+    } else {
+      encoded.push_back(static_cast<char>(character));
+    }
+  }
+  return encoded;
+}
+
+bool decodeSidecarField(const std::string &value, std::string &decoded) {
+  decoded.clear();
+  for (std::size_t i = 0; i < value.size(); ++i) {
+    if (value[i] != '%') {
+      decoded.push_back(value[i]);
+      continue;
+    }
+    if (i + 2 >= value.size())
+      return false;
+    const auto hexValue = [](char character) -> int {
+      if (character >= '0' && character <= '9')
+        return character - '0';
+      if (character >= 'A' && character <= 'F')
+        return character - 'A' + 10;
+      if (character >= 'a' && character <= 'f')
+        return character - 'a' + 10;
+      return -1;
+    };
+    const int high = hexValue(value[i + 1]);
+    const int low = hexValue(value[i + 2]);
+    if (high < 0 || low < 0)
+      return false;
+    decoded.push_back(static_cast<char>((high << 4) | low));
+    i += 2;
+  }
+  return true;
+}
+
+std::vector<std::string> splitSidecarFields(const std::string &line) {
+  std::vector<std::string> fields;
+  std::istringstream stream(line);
+  std::string field;
+  while (std::getline(stream, field, '\t'))
+    fields.push_back(std::move(field));
+  if (!line.empty() && line.back() == '\t')
+    fields.emplace_back();
+  return fields;
+}
+
+void resetGeneratedLanguageWords(const Civilization::CivilizationData &civData) {
+  for (const auto &culture : civData.cultures) {
+    if (culture && culture->language)
+      culture->language->resetGeneratedWords();
+  }
+}
+} // namespace
+
+bool ArdaGen::saveCultureGroupState(const std::string &path) const {
+  std::ofstream output(path, std::ios::trunc);
+  if (!output)
+    return false;
+
+  output << "ARDA_CULTURE_GROUPS\t1\n";
+  for (std::size_t groupIndex = 0;
+       groupIndex < civData.cultureGroups.size(); ++groupIndex) {
+    const auto &group = civData.cultureGroups[groupIndex];
+    if (!group)
+      continue;
+    const auto colour = group->getColour();
+    const auto centre = group->getCenter();
+    std::vector<std::string> datasets;
+    const auto languageGroup = group->getLanguageGroup();
+    if (languageGroup)
+      datasets = languageGroup->mergedDataset.influences;
+
+    output << "GROUP\t" << groupIndex << '\t'
+           << encodeSidecarField(group->getName()) << '\t'
+           << (centre ? centre->ID : -1) << '\t'
+           << static_cast<int>(colour.getRed()) << '\t'
+           << static_cast<int>(colour.getGreen()) << '\t'
+           << static_cast<int>(colour.getBlue()) << '\t' << datasets.size();
+    for (const auto &dataset : datasets)
+      output << '\t' << encodeSidecarField(dataset);
+    output << '\n';
+  }
+  return output.good();
+}
+
+bool ArdaGen::loadCultureGroupState(const std::string &path) {
+  std::ifstream input(path);
+  if (!input)
+    return false;
+
+  LanguageGenerator sidecarLanguageGenerator(
+      Fwg::Cfg::Values().resourcePath + "/names/languageGroups/");
+
+  std::string line;
+  if (!std::getline(input, line) || line != "ARDA_CULTURE_GROUPS\t1")
+    return false;
+
+  struct CultureGroupState {
+    std::size_t groupIndex;
+    std::string name;
+    int centreProvinceId;
+    Fwg::Gfx::Colour colour;
+    std::vector<std::string> datasets;
+  };
+  std::vector<CultureGroupState> states;
+  while (std::getline(input, line)) {
+    if (line.empty())
+      continue;
+    const auto fields = splitSidecarFields(line);
+    if (fields.size() < 8 || fields[0] != "GROUP")
+      return false;
+
+    CultureGroupState state;
+    int red = 0;
+    int green = 0;
+    int blue = 0;
+    std::size_t datasetCount = 0;
+    try {
+      state.groupIndex = std::stoul(fields[1]);
+      if (!decodeSidecarField(fields[2], state.name))
+        return false;
+      state.centreProvinceId = std::stoi(fields[3]);
+      red = std::stoi(fields[4]);
+      green = std::stoi(fields[5]);
+      blue = std::stoi(fields[6]);
+      datasetCount = std::stoul(fields[7]);
+    } catch (const std::exception &) {
+      return false;
+    }
+    if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 ||
+        blue > 255 || fields.size() != datasetCount + 8 ||
+        state.groupIndex >= civData.cultureGroups.size())
+      return false;
+    state.colour = Fwg::Gfx::Colour(red, green, blue);
+    for (std::size_t i = 0; i < datasetCount; ++i) {
+      std::string dataset;
+      if (!decodeSidecarField(fields[i + 8], dataset) || dataset.empty())
+        return false;
+      state.datasets.push_back(std::move(dataset));
+    }
+    states.push_back(std::move(state));
+  }
+  //if (states.size() != civData.cultureGroups.size())
+  //  return false;
+
+  std::vector<std::shared_ptr<LanguageGroup>> languageGroups;
+  languageGroups.resize(states.size());
+  std::vector<bool> groupSeen(civData.cultureGroups.size(), false);
+  for (const auto &state : states) {
+    if (state.groupIndex >= groupSeen.size() || groupSeen[state.groupIndex])
+      return false;
+    groupSeen[state.groupIndex] = true;
+  }
+  if (std::find(groupSeen.begin(), groupSeen.end(), false) != groupSeen.end())
+    return false;
+
+  std::fill(groupSeen.begin(), groupSeen.end(), false);
+  for (const auto &state : states) {
+    const auto &group = civData.cultureGroups[state.groupIndex];
+    if (!group || groupSeen[state.groupIndex])
+      return false;
+    groupSeen[state.groupIndex] = true;
+    const auto centre = group->getCenter();
+    //if ((centre ? centre->ID : -1) != state.centreProvinceId)
+    //  return false;
+    for (const auto &dataset : state.datasets) {
+      if (!sidecarLanguageGenerator.datasetsByLanguage.contains(dataset))
+        return false;
+    }
+    std::vector<std::string> datasets = state.datasets;
+    auto languageGroup = std::make_shared<LanguageGroup>(
+        sidecarLanguageGenerator.generateLanguageGroup(
+            civData.cultureGroups[state.groupIndex]->getCultures().size(),
+            datasets, Fwg::Cfg::Values().mapSeed));
+    if (languageGroup->name.empty())
+      return false;
+    languageGroups[state.groupIndex] = std::move(languageGroup);
+  }
+
+  civData.languageGroups.clear();
+  for (const auto &state : states) {
+    auto &group = civData.cultureGroups[state.groupIndex];
+    group->setColour(state.colour);
+    group->setLanguageGroup(languageGroups[state.groupIndex]);
+    civData.languageGroups.push_back(languageGroups[state.groupIndex]);
+  }
+
+  nameCultureDependentAreas();
+  return true;
+}
 
 ArdaGen::ArdaGen() {
   factories.provinceFactory = []() {
@@ -78,6 +283,8 @@ void ArdaGen::mapContinents() {
   for (const auto &continent : this->areaData.continents) {
     // reinterpret FastWorldGen continent as ArdaContinent
     auto ardaContinent = std::dynamic_pointer_cast<ArdaContinent>(continent);
+    ardaContinent->ardaProvinces.clear();
+    ardaContinent->ardaRegions.clear();
     for (const auto &prov : ardaContinent->provinces) {
       ardaContinent->ardaProvinces.push_back(
           std::dynamic_pointer_cast<Arda::ArdaProvince>(prov));
@@ -163,6 +370,7 @@ void ArdaGen::applyRegionInput() {
               regionInputMap[ardaRegion->colour][4]);
         }
       }
+      ardaRegion->importLine(regionInputMap[ardaRegion->colour]);
     }
   }
   // debug visualisation of all regions, if coastal they are yellow, if sea they
@@ -229,7 +437,18 @@ Fwg::Gfx::Image ArdaGen::mapTerrain() {
       {TopographyType::MARSH, 0.50, 0.50},
       {TopographyType::WASTELAND, 0.50, 0.50},
       {TopographyType::FARMLAND, 0.50, 0.50},
+      {TopographyType::MINE, 0.00, 0.00},
+      {TopographyType::FORESTRY, 0.00, 0.00},
   };
+
+  for (const auto &region : ardaRegions) {
+    for (const auto &topoDef : topoDefs)
+      region->topographyTypes.erase(topoDef.type);
+    for (const auto &province : region->ardaProvinces) {
+      for (const auto &topoDef : topoDefs)
+        province->topographyTypes.erase(topoDef.type);
+    }
+  }
 
   // Process all regions
   for (auto &region : ardaRegions) {
@@ -306,6 +525,9 @@ bool ArdaGen::loadNaturalFeatures(Fwg::Cfg &config,
 bool ArdaGen::loadDevelopment(Fwg::Cfg &config, const std::string &path) {
   Civilization::loadDevelopment(Fwg::IO::Reader::readGenericImage(path, config),
                                 ardaProvinces, ardaRegions, ardaContinents);
+
+  generateEconomyData(civData, ardaProvinces, ardaRegions, ardaContinents,
+                      ardaConfig.targetWorldPopulation);
   gatherStatistics();
   return true;
 }
@@ -329,6 +551,8 @@ bool ArdaGen::loadPopulation(Fwg::Cfg &config,
   Civilization::loadPopulation(inputPop, ardaProvinces, ardaRegions,
                                ardaContinents,
                                ardaConfig.targetWorldPopulation);
+  generateEconomyData(civData, ardaProvinces, ardaRegions, ardaContinents,
+                      ardaConfig.targetWorldPopulation);
   gatherStatistics();
 
   return true;
@@ -368,6 +592,27 @@ void ArdaGen::genCultureData() {
   gatherStatistics();
 }
 
+bool ArdaGen::loadCultures(const Fwg::Gfx::Image &inputImage) {
+  const auto &config = Fwg::Cfg::Values();
+  if (!config.validateResolution(inputImage.width(), inputImage.height()) ||
+      inputImage.size() != config.processingArea) {
+    Fwg::Utils::Logging::logLine(
+        "Resolution of culture map does not have correct resolution");
+    return false;
+  }
+  if (!Arda::Civilization::loadCulturesFromImage(civData, ardaProvinces,
+                                                 ardaRegions, inputImage))
+    return false;
+
+  Arda::Gfx::displayCultureGroups(ardaProvinces);
+  Arda::Gfx::displayCultures(ardaProvinces);
+  nameCultureDependentAreas();
+  Arda::Areas::saveRegions(ardaRegions, config.mapsPath + "areas/",
+                           Arda::Gfx::visualiseRegions(ardaRegions));
+  gatherStatistics();
+  return true;
+}
+
 void ArdaGen::deriveCultureData() {
   Fwg::Utils::Randomisation::resetRandomisation();
   Arda::Civilization::deriveCultureData(ardaData.simulationExport, civData,
@@ -396,8 +641,8 @@ void ArdaGen::genCivilisationData() {
   ardaData.simulationExport =
       Arda::Simulation::SimulationExporter::exportFinalState(
           result.finalState, simulation.getProvinceRegions(),
-            result.polityHistory, result.events, result.wars, provinceAreas,
-            simulation.getConfiguration());
+          result.polityHistory, result.events, result.wars, provinceAreas,
+          simulation.getConfiguration());
   Arda::Simulation::artifacts::writePolityStatisticsCsv(
       ardaData.simulationExport,
       Fwg::Cfg::Values().mapsPath + "simulation/polity_statistics.csv",
@@ -422,6 +667,7 @@ void ArdaGen::genLocations() {
   Fwg::Civilization::Locations::generateLocations(
       areaData.regions, terrainData, climateData, provinceMap, areaData,
       ardaConfig.locationConfig);
+  nameGeneratedLocations();
   locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   Fwg::Gfx::Png::save(locationMap,
                       Fwg::Cfg::Values().mapsPath + "world/locations.png");
@@ -446,14 +692,22 @@ void ArdaGen::genLocationType(const Fwg::Civilization::LocationType &type) {
   Fwg::Civilization::Locations::generateLocationCategory(
       areaData.regions, terrainData, climateData, provinceMap, areaData,
       ardaConfig.locationConfig, type);
+  nameGeneratedLocations();
   locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   Fwg::Gfx::Png::save(locationMap,
                       Fwg::Cfg::Values().mapsPath + "world/locations.png");
   Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
                                                   ardaProvinces);
+  // TODO Is this required mapTerrain();
 }
 
 void ArdaGen::detectLocationType(const Fwg::Civilization::LocationType &type) {
+  detectLocationTypeInternal(type);
+  nameGeneratedLocations();
+}
+
+void ArdaGen::detectLocationTypeInternal(
+    const Fwg::Civilization::LocationType &type) {
   auto topotype = Arda::Civilization::TopographyType::CITY;
   if (type == Fwg::Civilization::LocationType::Farm) {
     topotype = Arda::Civilization::TopographyType::FARMLAND;
@@ -475,13 +729,38 @@ void ArdaGen::detectLocationType(const Fwg::Civilization::LocationType &type) {
   mapTerrain();
 }
 
+void ArdaGen::nameGeneratedLocations() {
+  resetGeneratedLanguageWords(civData);
+  for (const auto &region : ardaRegions) {
+    if (!region)
+      continue;
+
+    const auto culture = region->getPrimaryCulture();
+    const auto language = culture ? culture->language : nullptr;
+    for (std::size_t i = 0; i < region->locations.size(); ++i) {
+      const auto &location = region->locations[i];
+      if (!location)
+        continue;
+
+      std::string name;
+      if (language)
+        name = language->generateAreaName("");
+      if (name.empty())
+        name = "region_" + std::to_string(region->ID) + "_location_" +
+               std::to_string(i + 1);
+      location->name = std::move(name);
+    }
+  }
+}
+
 void ArdaGen::loadLocations(const Fwg::Gfx::Image &inputImage) {
   auto &cfg = Fwg::Cfg::Values();
   clearLocations();
   loadNaturalFeatures(cfg, inputImage);
-  detectLocationType(Fwg::Civilization::LocationType::Farm);
-  detectLocationType(Fwg::Civilization::LocationType::City);
-  detectLocationType(Fwg::Civilization::LocationType::Port);
+  detectLocationTypeInternal(Fwg::Civilization::LocationType::Farm);
+  detectLocationTypeInternal(Fwg::Civilization::LocationType::City);
+  detectLocationTypeInternal(Fwg::Civilization::LocationType::Port);
+  nameGeneratedLocations();
   // detectLocationType(Fwg::Civilization::LocationType::Mine);
   // detectLocationType(Fwg::Civilization::LocationType::Forest);
   Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
@@ -515,7 +794,6 @@ void ArdaGen::generateCountries(
   Fwg::Gfx::Png::save(countryMap,
                       Fwg::Cfg::Values().mapsPath + "countries/countries.png");
   mapCountries();
-  finaliseData();
   Arda::Countries::saveCountries(countries,
                                  Fwg::Cfg::Values().mapsPath + "countries/");
 }
@@ -531,7 +809,7 @@ void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
   Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
                                              countries);
   mapCountries();
-  finaliseData();
+  nameCountries();
 }
 
 void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
@@ -545,8 +823,31 @@ void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
   Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
                                              countries);
   mapCountries();
-  finaliseData();
+  nameCountries();
 }
+
+void ArdaGen::nameCultureDependentAreas() {
+  resetGeneratedLanguageWords(civData);
+  Civilization::nameRegions(ardaRegions);
+  Civilization::nameContinents(ardaContinents, ardaRegions);
+  Civilization::nameSuperRegions(superRegions, ardaRegions);
+  // nameCountries();
+}
+
+void ArdaGen::nameCountries() {
+  resetGeneratedLanguageWords(civData);
+  for (auto &[tag, country] : countries) {
+    if (!country)
+      continue;
+    country->gatherCultureShares();
+    const auto culture = country->getPrimaryCulture();
+    if (!culture || !culture->language)
+      continue;
+    country->name = culture->language->generateGenericCapitalizedWord();
+    country->adjective = culture->language->getAdjectiveForm(country->name);
+  }
+}
+
 void ArdaGen::deriveCountries(
     std::function<std::shared_ptr<Country>()> factory) {
   // generate country data
@@ -559,7 +860,6 @@ void ArdaGen::deriveCountries(
   Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
                                              countries);
   mapCountries();
-  finaliseData();
 }
 
 void ArdaGen::genNavmesh(
@@ -606,6 +906,7 @@ bool ArdaGen::generateStrategicRegions(
     superRegions.clear();
     return false;
   }
+  resetGeneratedLanguageWords(civData);
   Civilization::nameSuperRegions(superRegions, ardaRegions);
   return true;
 }
@@ -619,6 +920,7 @@ bool ArdaGen::loadStrategicRegions(
     superRegions.clear();
     return false;
   }
+  resetGeneratedLanguageWords(civData);
   Civilization::nameSuperRegions(superRegions, ardaRegions);
   return true;
 }
@@ -775,6 +1077,7 @@ void ArdaGen::save(const std::string &path) {
   ar << ardaContinents << ardaRegions << ardaProvinces << superRegions;
   ar << countries << civData << nData;
   ar << typeMap << countryMap << superRegionMap;
+  ar << ardaData.civLayer;
 }
 
 void ArdaGen::load(const std::string &path) {
@@ -788,6 +1091,7 @@ void ArdaGen::load(const std::string &path) {
   ar >> ardaContinents >> ardaRegions >> ardaProvinces >> superRegions;
   ar >> countries >> civData >> nData;
   ar >> typeMap >> countryMap >> superRegionMap;
+  ar >> ardaData.civLayer;
   mapProvinces();
   mapRegions();
   mapContinents();

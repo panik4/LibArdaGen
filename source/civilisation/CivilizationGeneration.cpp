@@ -1,4 +1,5 @@
 #include "civilisation/CivilizationGeneration.h"
+#include <tuple>
 
 namespace Arda::Civilization {
 void generateEconomyData(
@@ -151,6 +152,26 @@ void generateFullCivilisationData(
                     continents, superRegions);
 }
 
+void postProcessDevelopment(
+    const std::vector<std::shared_ptr<ArdaRegion>> &regions) {
+  for (const auto &region : regions) {
+    if (!region)
+      continue;
+
+    double totalDevelopment = 0.0;
+    std::size_t provinceCount = 0;
+    for (const auto &province : region->ardaProvinces) {
+      if (!province)
+        continue;
+      totalDevelopment += province->averageDevelopment;
+      ++provinceCount;
+    }
+
+    region->averageDevelopment =
+        provinceCount > 0 ? totalDevelopment / provinceCount : 0.0;
+  }
+}
+
 void loadDevelopment(
     const Fwg::Gfx::Image &developmentMap,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
@@ -165,6 +186,7 @@ void loadDevelopment(
           255.0;
     }
   }
+  postProcessDevelopment(regions);
 }
 
 void generateDevelopment(
@@ -221,15 +243,7 @@ void generateDevelopment(
       }
     }
   }
-  for (auto &region : regions) {
-    auto totalDevelopment = 0.0;
-    for (const auto province : region->ardaProvinces) {
-      totalDevelopment += province->averageDevelopment;
-    }
-
-    region->averageDevelopment =
-        totalDevelopment / region->ardaProvinces.size();
-  }
+  postProcessDevelopment(regions);
 }
 
 void deriveDevelopment(
@@ -247,17 +261,7 @@ void deriveDevelopment(
         exportedProvince->second.normalizedDevelopment;
   }
 
-  for (const auto &region : regions) {
-    if (!region || region->ardaProvinces.empty())
-      continue;
-    auto totalDevelopment = 0.0;
-    for (const auto &province : region->ardaProvinces) {
-      if (province)
-        totalDevelopment += province->averageDevelopment;
-    }
-    region->averageDevelopment =
-        totalDevelopment / static_cast<double>(region->ardaProvinces.size());
-  }
+  postProcessDevelopment(regions);
 }
 
 void postProcessPopulation(
@@ -580,6 +584,102 @@ void generateCultures(
   }
 }
 
+bool loadCulturesFromImage(
+    CivilizationData &civData,
+    const std::vector<std::shared_ptr<ArdaProvince>> &ardaProvinces,
+    const std::vector<std::shared_ptr<ArdaRegion>> &regions,
+    const Fwg::Gfx::Image &inputImage) {
+  using ColourKey = std::tuple<int, int, int>;
+  struct CulturePaletteEntry {
+    Fwg::Gfx::Colour colour;
+    std::shared_ptr<ArdaProvince> center;
+  };
+
+  std::map<ColourKey, CulturePaletteEntry> palette;
+  std::map<int, ColourKey> regionCultures;
+  for (const auto &region : regions) {
+    if (!region || !region->isLand())
+      continue;
+
+    std::map<ColourKey, std::size_t> colourCounts;
+    for (const auto &province : region->ardaProvinces) {
+      if (!province || !province->isLand())
+        continue;
+      for (const int pixel : province->getNonOwningPixelView()) {
+        if (pixel < 0 || static_cast<std::size_t>(pixel) >= inputImage.size())
+          continue;
+        const auto &colour = inputImage[pixel];
+        const ColourKey key{colour.getRed(), colour.getGreen(),
+                            colour.getBlue()};
+        ++colourCounts[key];
+        palette.try_emplace(key, CulturePaletteEntry{colour, province});
+      }
+    }
+
+    if (colourCounts.empty())
+      continue;
+    const auto dominantColour =
+        std::max_element(colourCounts.begin(), colourCounts.end(),
+                         [](const auto &left, const auto &right) {
+                           if (left.second != right.second)
+                             return left.second < right.second;
+                           return left.first > right.first;
+                         });
+    regionCultures.emplace(region->ID, dominantColour->first);
+  }
+
+  if (palette.empty())
+    return false;
+
+  for (auto &cultureGroup : civData.cultureGroups) {
+    if (cultureGroup)
+      cultureGroup->clear();
+  }
+  civData.cultures.clear();
+  civData.cultureGroups.clear();
+  civData.languageGroups.clear();
+  for (const auto &province : ardaProvinces) {
+    if (province)
+      province->cultures.clear();
+  }
+
+  std::map<ColourKey, std::shared_ptr<Culture>> culturesByColour;
+  for (const auto &[key, entry] : palette) {
+    auto culture = std::make_shared<Culture>();
+    culture->colour = entry.colour;
+    culture->centerOfCulture = entry.center;
+    auto group = std::make_shared<CultureGroup>("", entry.colour);
+    group->setCenter(entry.center);
+    group->addCulture(culture);
+    culture->cultureGroup = group;
+    group->determineVisualType();
+    culture->visualType = group->getVisualType();
+    culturesByColour.emplace(key, culture);
+    civData.cultures.push_back(culture);
+    civData.cultureGroups.push_back(group);
+  }
+
+  for (const auto &region : regions) {
+    if (!region || !region->isLand())
+      continue;
+    const auto regionCulture = regionCultures.find(region->ID);
+    if (regionCulture == regionCultures.end()) {
+      continue;
+    }
+    const auto culture = culturesByColour.find(regionCulture->second);
+    if (culture == culturesByColour.end())
+      continue;
+    for (const auto &province : region->ardaProvinces) {
+      if (!province || !province->isLand())
+        continue;
+      province->cultures.emplace(culture->second, 1.0);
+    }
+  }
+
+  distributeLanguages(civData);
+  return true;
+}
+
 void generateLanguageGroup(std::shared_ptr<CultureGroup> &cultureGroup) {
 
   //// now generate at least as many languages as we have cultures
@@ -638,6 +738,11 @@ void nameRegions(std::vector<std::shared_ptr<ArdaRegion>> &regions) {
     usedRegionNames.insert(region->name);
     for (auto &province : region->ardaProvinces) {
       province->name = language->generateAreaName("");
+      for (auto &location : province->locations) {
+        if (location) {
+          location->name = language->generateAreaName("");
+        }
+      }
     }
   }
 }

@@ -93,8 +93,7 @@ void distributeCountries(
     for (auto &region : country->ownedRegions) {
       region->owner = country;
       region->cores.push_back(country);
-      region->claims.push_back(
-          {country, ClaimSource::HistoricalOwnership});
+      region->claims.push_back({country, ClaimSource::HistoricalOwnership});
     }
   }
   Fwg::Utils::Logging::logLine("Distributing Assigning Regions");
@@ -109,9 +108,9 @@ void distributeCountries(
             ardaRegions, ardaRegion, config.width, config.height);
         gR->owner->addRegion(ardaRegion);
         ardaRegion->owner = gR->owner;
-         ardaRegion->cores.push_back(gR->owner);
-         ardaRegion->claims.push_back(
-             {gR->owner, ClaimSource::HistoricalOwnership});
+        ardaRegion->cores.push_back(gR->owner);
+        ardaRegion->claims.push_back(
+            {gR->owner, ClaimSource::HistoricalOwnership});
       }
     }
   }
@@ -203,6 +202,7 @@ void loadCountriesFromText(
       existingCountry->tag = inputCountryMap.at(colour)[3];
       existingCountry->name = inputCountryMap.at(colour)[4];
       existingCountry->adjective = inputCountryMap.at(colour)[5];
+      existingCountry->importLine(tokens);
     } else {
       // we always expect to find every single country that we currently have
       // in the mapentry. We log that we can't find it, and create an empty
@@ -215,6 +215,7 @@ void loadCountriesFromText(
       country->adjective = tokens[5];
       country->flag = Arda::Gfx::Flag(82, 52);
       country->colour = colour;
+      country->importLine(tokens);
       countries.insert({country->tag, country});
     }
   }
@@ -305,9 +306,9 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
         language->getAdjectiveForm(country.second->name);
     for (auto &region : country.second->ownedRegions) {
       region->owner = country.second;
-       region->cores.push_back(country.second);
-       region->claims.push_back(
-           {country.second, ClaimSource::HistoricalOwnership});
+      region->cores.push_back(country.second);
+      region->claims.push_back(
+          {country.second, ClaimSource::HistoricalOwnership});
     }
     generateCountrySpecifics(generationAge, countries);
   }
@@ -453,7 +454,10 @@ void deriveCountries(
 
 void saveCountries(std::map<std::string, std::shared_ptr<Country>> &countries,
                    const std::string &mappingPath) {
-  std::string fileContent = "#r;g;b;tag;name;adjective\n";
+  std::string fileContent =
+      "#r;g;b;tag;name;adjective;HOI4 fullName;ideology;allowElections;"
+      "fascism;democratic;communism;neutrality;lastElection;warSupport;"
+      "stability;convoyAmount;researchSlots\n";
   for (const auto &country : countries) {
     fileContent += country.second->exportLine();
     fileContent += "\n";

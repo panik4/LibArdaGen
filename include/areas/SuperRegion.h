@@ -19,8 +19,6 @@ class SuperRegion : public Fwg::Areas::Area {
 public:
   SuperRegion();
 
-  // member variables
-  std::string name;
   // containers
   std::vector<std::shared_ptr<ArdaRegion>> ardaRegions;
   std::vector<Cluster> regionClusters;

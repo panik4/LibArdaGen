@@ -55,6 +55,7 @@ public:
 
   std::vector<std::shared_ptr<Culture>> getCultures() { return cultures; }
   std::string getName() { return name; }
+  void setColour(const Fwg::Gfx::Colour &value) { colour = value; }
   Fwg::Gfx::Colour getColour() { return colour; }
   std::shared_ptr<Arda::LanguageGroup> getLanguageGroup() {
     return languageGroup;

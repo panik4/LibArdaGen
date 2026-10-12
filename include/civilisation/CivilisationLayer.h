@@ -1,4 +1,6 @@
 #pragma once
+#include <boost/serialization/unordered_map.hpp>
+#include <boost/serialization/vector.hpp>
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
@@ -42,6 +44,11 @@ struct CivilizationLayer {
 
   struct TileTopo {
     Mask flags = 0;
+
+    template <class Archive>
+    void serialize(Archive &ar, const unsigned int /*version*/) {
+      ar &flags;
+    }
 
     void set(TopographyType type) {
       flags |= (1u << static_cast<uint8_t>(type));
@@ -153,6 +160,12 @@ struct CivilizationLayer {
   }
 
   std::vector<float> wastelandChance;
+
+  template <class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar &tiles &extraData &wastelandChance;
+  }
+
   void clear() {
     tiles.clear();
     extraData.clear();
