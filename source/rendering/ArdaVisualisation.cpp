@@ -217,7 +217,10 @@ Fwg::Gfx::Image generateStrategicRegionTemplate(
     const std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions) {
   const auto &cfg = Fwg::Cfg::Values();
   Fwg::Gfx::Image resultImage(cfg.width, cfg.height, 24);
-  Fwg::Gfx::regionMap(regions, provinces, resultImage);
+  const Fwg::Areas::AreaGenerationContext areaContext(
+      cfg.areaConfig, cfg.width, cfg.height, cfg.baseArea,
+      cfg.terrainConfig.landPercentage);
+  Fwg::Gfx::regionMap(regions, provinces, resultImage, areaContext);
   Fwg::Gfx::applyAreaBorders(resultImage, regions, {255, 255, 255});
 
   Fwg::Gfx::Png::save(

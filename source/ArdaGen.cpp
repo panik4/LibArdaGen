@@ -787,8 +787,9 @@ void ArdaGen::generateCountries(
   }
   //  first gather generic neighbours, they will be mapped to hoi4 countries
   //  in mapCountries
-  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
-                                             countries);
+  Arda::Countries::evaluateCountryNeighbours(
+      areaData.regions, ardaRegions, countries,
+      areaGenerationContext(Fwg::Cfg::Values()));
   Fwg::Utils::Logging::logLine("Visualising Countries");
   visualiseCountries(countryMap, worldMap);
   Fwg::Gfx::Png::save(countryMap,
@@ -806,8 +807,9 @@ void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
                                            ardaRegions, countries, civData,
                                            nData, Fwg::Parsing::readFile(path));
   }
-  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
-                                             countries);
+  Arda::Countries::evaluateCountryNeighbours(
+      areaData.regions, ardaRegions, countries,
+      areaGenerationContext(Fwg::Cfg::Values()));
   mapCountries();
   nameCountries();
 }
@@ -820,8 +822,9 @@ void ArdaGen::loadCountries(std::function<std::shared_ptr<Country>()> factory,
                                    ardaRegions, countries, civData, nData,
                                    inputImage);
   }
-  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
-                                             countries);
+  Arda::Countries::evaluateCountryNeighbours(
+      areaData.regions, ardaRegions, countries,
+      areaGenerationContext(Fwg::Cfg::Values()));
   mapCountries();
   nameCountries();
 }
@@ -857,8 +860,9 @@ void ArdaGen::deriveCountries(
                                      ardaConfig.numCountries, ardaRegions,
                                      countries, ardaProvinces, civData, nData);
   }
-  Arda::Countries::evaluateCountryNeighbours(areaData.regions, ardaRegions,
-                                             countries);
+  Arda::Countries::evaluateCountryNeighbours(
+      areaData.regions, ardaRegions, countries,
+      areaGenerationContext(Fwg::Cfg::Values()));
   mapCountries();
 }
 

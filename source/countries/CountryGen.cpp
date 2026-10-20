@@ -124,9 +124,10 @@ void distributeCountries(
 void evaluateCountryNeighbours(
     std::vector<std::shared_ptr<Fwg::Areas::Region>> &baseRegions,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
-    std::map<std::string, std::shared_ptr<Country>> &countries) {
+    std::map<std::string, std::shared_ptr<Country>> &countries,
+    const Fwg::Areas::AreaGenerationContext &areaContext) {
   Fwg::Utils::Logging::logLine("Evaluating Country Neighbours");
-  Fwg::Areas::Regions::evaluateRegionNeighbours(baseRegions);
+  Fwg::Areas::Regions::evaluateRegionNeighbours(baseRegions, areaContext);
 
   for (auto &c : countries) {
     c.second->neighbourCountries.clear();

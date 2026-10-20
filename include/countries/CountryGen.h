@@ -1,5 +1,6 @@
 #pragma once
 #include "RandNum.h"
+#include "areas/AreaGenerationContext.h"
 #include "areas/ArdaContinent.h"
 #include "areas/ArdaProvince.h"
 #include "areas/ArdaRegion.h"
@@ -37,7 +38,8 @@ void distributeCountries(
 void evaluateCountryNeighbours(
     std::vector<std::shared_ptr<Fwg::Areas::Region>> &baseRegions,
     std::vector<std::shared_ptr<ArdaRegion>> &ardaRegions,
-    std::map<std::string, std::shared_ptr<Country>> &countries);
+    std::map<std::string, std::shared_ptr<Country>> &countries,
+    const Fwg::Areas::AreaGenerationContext &areaContext);
 
 void loadCountriesFromText(
     const Arda::Utils::GenerationAge &generationAge,

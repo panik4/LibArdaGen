@@ -97,7 +97,7 @@ detectWastelands(Fwg::Terrain::TerrainData &terrainData,
     float avgRegionHabitability =
         totalRegionHabitability /
         static_cast<float>(region->getNonOwningPixelView().size());
-    if (avgRegionHabitability < config.lowDensityHabitatThreshold) {
+    if (avgRegionHabitability < config.areaConfig.segments.lowDensityHabitatThreshold) {
       region->topographyTypes.insert(
           Arda::Civilization::TopographyType::WASTELAND);
       std::cout << "Region " << region->name

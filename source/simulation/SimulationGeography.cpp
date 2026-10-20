@@ -47,7 +47,7 @@ SeaRouteMap buildWeightedSeaRoutes(
   }
 
   std::map<ProvinceId, double> depths;
-  const auto seaLevel = static_cast<double>(Fwg::Cfg::Values().seaLevel);
+  const auto seaLevel = static_cast<double>(Fwg::Cfg::Values().terrainConfig.seaLevel);
   for (const auto &[provinceId, province] : provinces) {
     double depth = 0.0;
     size_t samples = 0;
