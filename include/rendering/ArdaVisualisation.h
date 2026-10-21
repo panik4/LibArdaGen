@@ -4,6 +4,7 @@
 #include "civilisation/CivilisationLayer.h"
 #include "countries/Country.h"
 #include "rendering/Visualization.h"
+#include "civilisation/CivilizationConfig.h"
 
 namespace Arda::Gfx {
 Fwg::Gfx::Image displayDevelopment(
@@ -35,7 +36,9 @@ Fwg::Gfx::Image displayConnections(
 Fwg::Gfx::Image
 displayWorldOverlayMap(const Fwg::Climate::ClimateData &climateData,
                        const Fwg::Gfx::Image &worldMap,
-                       const Arda::Civilization::CivilizationLayer &civLayer);
+                       const Arda::Civilization::CivilizationLayer &civLayer,
+                       const Arda::Civilization::CivilizationConfig &config,
+                       const Fwg::Gfx::Colour &wastelandColour);
 Fwg::Gfx::Image generateStrategicRegionTemplate(
     const std::vector<std::shared_ptr<Fwg::Areas::Province>> &provinces,
     const std::vector<std::shared_ptr<Fwg::Areas::Region>> &regions);

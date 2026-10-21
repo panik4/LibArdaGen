@@ -5,6 +5,10 @@ project(LibArdaGen
     LANGUAGES CXX
 )
 
+if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    include(CTest)
+endif()
+
 # ------------------------------------------------------------
 # C++ standard
 # ------------------------------------------------------------

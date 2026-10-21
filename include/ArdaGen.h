@@ -7,6 +7,7 @@
 #include "areas/AreaGen.h"
 #include "areas/SuperRegion.h"
 #include "civilisation/CivilizationGeneration.h"
+#include "civilisation/CivilizationConfig.h"
 #include "civilisation/NaturalFeatures.h"
 #include "civilization/Location.h"
 #include "civilization/NavmeshGeneration.h"
@@ -32,6 +33,15 @@ struct ArdaConfig {
   double targetWorldPopulation = 3'000'000'000;
   double targetWorldGdp = 8'000'000'000'000;
   Fwg::Civilization::LocationConfig locationConfig;
+  Civilization::CivilizationConfig civilizationConfig;
+  template <class Archive>
+  void serialize(Archive &ar, const unsigned int /*version*/) {
+    ar & generationAge & numCountries & worldPopulationFactor &
+        worldIndustryFactor & resourceFactor & superRegionFactor &
+        superRegionMinDistanceFactor & targetWorldPopulation & targetWorldGdp &
+        locationConfig & civilizationConfig;
+  }
+  void validate() const { civilizationConfig.validate(); }
   void calculateTargetWorldPopulation() {
     targetWorldPopulation =
         Arda::Utils::ageConfigs[generationAge].targetWorldPopulation *
@@ -82,6 +92,10 @@ public:
   ArdaConfig ardaConfig;
   ArdaStats ardaStats;
   ArdaData ardaData;
+  bool saveConfigurationSnapshot(const std::string &path,
+                                 Fwg::Cfg &config) override;
+  bool loadConfigurationSnapshot(const std::string &path,
+                                 Fwg::Cfg &config) override;
 
   // containers
   Arda::Names::NameData nData;

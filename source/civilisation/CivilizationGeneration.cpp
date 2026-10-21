@@ -192,13 +192,16 @@ void loadDevelopment(
 void generateDevelopment(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
-    const std::vector<std::shared_ptr<ArdaContinent>> &continents) {
+    const std::vector<std::shared_ptr<ArdaContinent>> &continents,
+    const CivilizationConfig &civilizationConfig,
+    const Fwg::Civilization::CivilizationGenerationContext &context) {
   Fwg::Utils::Logging::logLine("Generating State Development");
-  auto &config = Fwg::Cfg::Values();
+  civilizationConfig.validate();
+  context.validate();
   Fwg::Utils::Randomisation::resetRandomisation();
 
-  const auto height = config.height;
-  const auto width = config.width;
+  const auto height = context.height;
+  const auto width = context.width;
   FastNoiseLite noiseGenerator;
   noiseGenerator.SetFractalOctaves(11);
   noiseGenerator.SetFractalGain(0.5);
@@ -206,14 +209,15 @@ void generateDevelopment(
       FastNoiseLite::NoiseType_ValueCubic); // Set the desired noise type
   noiseGenerator.SetFractalType(FastNoiseLite::FractalType_PingPong);
   // sparse trees means more frequent, but smaller patches
-  noiseGenerator.SetSeed(config.mapSeed);
-  noiseGenerator.SetFrequency(0.02 / config.sizeFactor);
+  noiseGenerator.SetSeed(context.seed);
+  noiseGenerator.SetFrequency(0.02 / context.sizeFactor);
   auto developmentNoise = Fwg::Noise::genNoise(noiseGenerator, height, width,
                                                0.0, 0.0, 0.0, 0.2, 0.0, false);
   for (auto &continent : continents) {
-    if (config.randomDevelopment) {
+    if (civilizationConfig.randomDevelopment) {
       continent->developmentModifier = RandNum::getRandom<double>(
-          config.minimumDevelopment, config.maximumDevelopment);
+          civilizationConfig.minimumDevelopment,
+          civilizationConfig.maximumDevelopment);
     }
     for (auto &province : continent->ardaProvinces) {
       province->averageDevelopment = 0.001f;
@@ -323,10 +327,10 @@ void generatePopulation(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
     const std::vector<std::shared_ptr<ArdaContinent>> &continents,
-    double targetWorldPopulation) {
+    double targetWorldPopulation, const CivilizationConfig &civilizationConfig) {
   Fwg::Utils::Logging::logLine("Generating Population");
   Fwg::Utils::Randomisation::resetRandomisation();
-  const auto &config = Fwg::Cfg::Values();
+  civilizationConfig.validate();
 
   double worldPopulationFactorSum = 0.0;
   for (auto &province : provinces) {
@@ -337,8 +341,9 @@ void generatePopulation(
             Arda::Civilization::TopographyType::WASTELAND)) {
       province->populationDensity = std::clamp(
           static_cast<double>(province->habitability) *
-              ((config.developmentInfluence) +
-               (config.developmentInfluence * province->averageDevelopment)),
+              ((civilizationConfig.developmentInfluence) +
+               (civilizationConfig.developmentInfluence *
+                province->averageDevelopment)),
           0.0, 1.0);
       // add all the population density times the size to get the total of the
       // world

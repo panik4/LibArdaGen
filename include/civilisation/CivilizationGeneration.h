@@ -1,10 +1,12 @@
 #pragma once
 #include "FastWorldGenerator.h"
+#include "civilization/CivilizationGenerationContext.h"
 #include "areas/ArdaContinent.h"
 #include "areas/ArdaRegion.h"
 #include "areas/AreaGen.h"
 #include "civilisation/ArdaCivilisations.h"
 #include "civilisation/CivilisationLayer.h"
+#include "civilisation/CivilizationConfig.h"
 #include "culture/CultureGroup.h"
 #include "culture/Religion.h"
 #include "language/LanguageGenerator.h"
@@ -64,7 +66,9 @@ void loadDevelopment(
 void generateDevelopment(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
-    const std::vector<std::shared_ptr<ArdaContinent>> &continents);
+    const std::vector<std::shared_ptr<ArdaContinent>> &continents,
+    const CivilizationConfig &config,
+    const Fwg::Civilization::CivilizationGenerationContext &context);
 void deriveDevelopment(
     Simulation::SimulationExport simulationExport,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
@@ -84,7 +88,7 @@ void generatePopulation(
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,
     const std::vector<std::shared_ptr<ArdaRegion>> &regions,
     const std::vector<std::shared_ptr<ArdaContinent>> &continents,
-    double targetWorldPopulation);
+    double targetWorldPopulation, const CivilizationConfig &config);
 void derivePopulation(
     Simulation::SimulationExport simulationExport, CivilizationData &civData,
     const std::vector<std::shared_ptr<Arda::ArdaProvince>> &provinces,

@@ -195,17 +195,18 @@ Fwg::Gfx::Image displayConnections(
 Fwg::Gfx::Image
 displayWorldOverlayMap(const Fwg::Climate::ClimateData &climateData,
                        const Fwg::Gfx::Image &worldMap,
-                       const Arda::Civilization::CivilizationLayer &civLayer) {
+                       const Arda::Civilization::CivilizationLayer &civLayer,
+                       const Arda::Civilization::CivilizationConfig &config,
+                       const Fwg::Gfx::Colour &wastelandColour) {
   Fwg::Utils::Logging::logLine("Visualising World Overlay Map");
 
   // overlay the wasteland on the world map
   Fwg::Gfx::Image overlayMap(worldMap);
-  const auto &config = Fwg::Cfg::Values();
   for (size_t i = 0; i < civLayer.wastelandChance.size(); i++) {
     if (civLayer.wastelandChance[i] > config.wastelandThreshold) {
       overlayMap.setColourAtIndex(
-          i, overlayMap[i] * 0.5f + config.colours.at("wasteland") *
-                                        (0.5f * civLayer.wastelandChance[i]));
+          i, overlayMap[i] * 0.5f +
+                 wastelandColour * (0.5f * civLayer.wastelandChance[i]));
     }
   }
 

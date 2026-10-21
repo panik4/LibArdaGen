@@ -2,8 +2,10 @@
 #include "simulation/SimulationArtifactWriter.h"
 #include "simulation/SimulationExporter.h"
 #include <algorithm>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 namespace Logging = Fwg::Utils::Logging;
 namespace Arda {
 using namespace Fwg::Gfx;
@@ -523,7 +525,7 @@ bool ArdaGen::loadNaturalFeatures(Fwg::Cfg &config,
 }
 
 bool ArdaGen::loadDevelopment(Fwg::Cfg &config, const std::string &path) {
-  Civilization::loadDevelopment(Fwg::IO::Reader::readGenericImage(path, config),
+  Civilization::loadDevelopment(Fwg::IO::Reader::readGenericImage(path, config.imageReadContext()),
                                 ardaProvinces, ardaRegions, ardaContinents);
 
   generateEconomyData(civData, ardaProvinces, ardaRegions, ardaContinents,
@@ -533,7 +535,10 @@ bool ArdaGen::loadDevelopment(Fwg::Cfg &config, const std::string &path) {
 }
 bool ArdaGen::genDevelopment(Fwg::Cfg &config) {
   Fwg::Utils::Randomisation::resetRandomisation();
-  Civilization::generateDevelopment(ardaProvinces, ardaRegions, ardaContinents);
+  ardaConfig.civilizationConfig.validate();
+  Civilization::generateDevelopment(ardaProvinces, ardaRegions, ardaContinents,
+                                    ardaConfig.civilizationConfig,
+                                    config.civilizationGenerationContext());
   gatherStatistics();
   return true;
 }
@@ -562,7 +567,8 @@ bool ArdaGen::genPopulation(Fwg::Cfg &config) {
   ardaConfig.calculateTargetWorldPopulation();
   Civilization::generatePopulation(civData, ardaProvinces, ardaRegions,
                                    ardaContinents,
-                                   ardaConfig.targetWorldPopulation);
+                                   ardaConfig.targetWorldPopulation,
+                                   ardaConfig.civilizationConfig);
   gatherStatistics();
 
   return true;
@@ -666,7 +672,8 @@ void ArdaGen::genLocations() {
   locationMap.clear();
   Fwg::Civilization::Locations::generateLocations(
       areaData.regions, terrainData, climateData, provinceMap, areaData,
-      ardaConfig.locationConfig);
+      ardaConfig.locationConfig,
+      Fwg::Cfg::Values().civilizationGenerationContext());
   nameGeneratedLocations();
   locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   Fwg::Gfx::Png::save(locationMap,
@@ -691,7 +698,8 @@ void ArdaGen::genLocationType(const Fwg::Civilization::LocationType &type) {
   ardaData.civLayer.clear(typeMap.at(type));
   Fwg::Civilization::Locations::generateLocationCategory(
       areaData.regions, terrainData, climateData, provinceMap, areaData,
-      ardaConfig.locationConfig, type);
+      ardaConfig.locationConfig, type,
+      Fwg::Cfg::Values().civilizationGenerationContext());
   nameGeneratedLocations();
   locationMap = Arda::Gfx::displayLocations(areaData.regions, worldMap);
   Fwg::Gfx::Png::save(locationMap,
@@ -723,7 +731,8 @@ void ArdaGen::detectLocationTypeInternal(
 
   Fwg::Civilization::Locations::detectLocationsFromPixels(
       ardaData.civLayer.getAll(topotype), provinceMap, areaData,
-      areaData.regions, type);
+      areaData.regions, type,
+      Fwg::Cfg::Values().civilizationGenerationContext());
   // Arda::Civilization::applyCivilisationTopography(ardaData.civLayer,
   //                                                 ardaProvinces);
   mapTerrain();
@@ -883,10 +892,12 @@ void ArdaGen::genNavmesh(
       defaultInputSet.push_back(regionLocationSet);
     }
     Fwg::Civilization::Locations::generateConnections(
-        defaultInputSet, terrainData, climateData, inputNavigationAreas);
+        defaultInputSet, terrainData, climateData, inputNavigationAreas,
+        Fwg::Cfg::Values().civilizationGenerationContext());
   } else {
     Fwg::Civilization::Locations::generateConnections(
-        inputSet, terrainData, climateData, inputNavigationAreas);
+        inputSet, terrainData, climateData, inputNavigationAreas,
+        Fwg::Cfg::Values().civilizationGenerationContext());
   }
   // navmeshMap = Fwg::Gfx::displayConnections(areaData.regions, locationMap);
 }
@@ -895,9 +906,11 @@ bool ArdaGen::genWastelands(Fwg::Cfg &config) {
   Arda::NaturalFeatures::detectWastelands(terrainData, climateData, ardaRegions,
                                           ardaData.civLayer, config);
   auto worldOverlayMap = Arda::Gfx::displayWorldOverlayMap(
-      climateData, worldMap, ardaData.civLayer);
+      climateData, worldMap, ardaData.civLayer,
+      ardaConfig.civilizationConfig,
+      config.colours.at("wasteland"));
   Fwg::Gfx::Png::save(worldOverlayMap, config.mapsPath + "worldOverlayMap.png",
-                      true);
+                      true, LCT_RGBA, 8, 255, config.username);
 
   return true;
 }
@@ -1070,6 +1083,56 @@ void ArdaGen::printStatistics() {
 void ArdaGen::writeTextFiles() {}
 void ArdaGen::writeLocalisation() {}
 void ArdaGen::writeImages() {}
+
+bool ArdaGen::saveConfigurationSnapshot(const std::string &path,
+                                        Fwg::Cfg &config) {
+  try {
+    ardaConfig.validate();
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    if (!file)
+      return false;
+    {
+      OutputArchive archive(file);
+      std::uint32_t magic = 0x41524441;
+      std::uint32_t version = 1;
+      archive & magic & version & config & ardaConfig;
+    }
+    file.flush();
+    return static_cast<bool>(file);
+  } catch (const std::exception &exception) {
+    Logging::logLine("Failed to save generator configuration: ",
+                     exception.what());
+    return false;
+  }
+}
+
+bool ArdaGen::loadConfigurationSnapshot(const std::string &path,
+                                        Fwg::Cfg &config) {
+  try {
+    std::ifstream file(path, std::ios::binary);
+    if (!file)
+      return false;
+    InputArchive archive(file);
+    std::uint32_t magic = 0;
+    std::uint32_t version = 0;
+    archive & magic & version;
+    if (magic != 0x41524441 || version != 1)
+      return false;
+
+    Fwg::Cfg loadedConfig;
+    ArdaConfig loadedArdaConfig;
+    archive & loadedConfig & loadedArdaConfig;
+    loadedConfig.sanityCheck();
+    loadedArdaConfig.validate();
+    config.replaceWith(loadedConfig);
+    ardaConfig = std::move(loadedArdaConfig);
+    return true;
+  } catch (const std::exception &exception) {
+    Logging::logLine("Failed to load generator configuration: ",
+                     exception.what());
+    return false;
+  }
+}
 
 void ArdaGen::save(const std::string &path) {
   std::ofstream file(path, std::ios::binary);
