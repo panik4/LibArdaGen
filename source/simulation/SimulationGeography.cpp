@@ -3,12 +3,14 @@
 #include "civilisation/CivilisationLayer.h"
 #include "utils/Cfg.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <functional>
 #include <limits>
 #include <queue>
 #include <sstream>
 #include <type_traits>
+#include <unordered_map>
 
 namespace Arda::Simulation::geography {
 namespace {
@@ -69,78 +71,97 @@ SeaRouteMap buildWeightedSeaRoutes(
   for (const auto &[provinceId, province] : provinces)
     if (isEligible(province) && province->isCoastalToOcean())
       coastalEndpoints.insert(provinceId);
+  if (coastalEndpoints.empty())
+    return {};
 
-  SeaRouteMap routes;
-  for (const auto sourceId : coastalEndpoints) {
-    if (!provinces.contains(sourceId))
+  // Compact indices follow province-ID order, preserving priority-queue ties.
+  // Edge eligibility and weights are independent of the coastal source.
+  struct Edge {
+    size_t target;
+    double cost;
+  };
+  std::map<ProvinceId, size_t> nodeIndices;
+  std::vector<uint8_t> seaNodes;
+  seaNodes.reserve(provinces.size());
+  for (const auto &[provinceId, province] : provinces) {
+    nodeIndices.emplace(provinceId, nodeIndices.size());
+    seaNodes.push_back(province->isSea());
+  }
+  std::vector<std::vector<Edge>> edges(provinces.size());
+  for (const auto &[provinceId, current] : provinces) {
+    if (!current->isSea() && !coastalEndpoints.contains(provinceId))
       continue;
-    std::priority_queue<std::pair<double, ProvinceId>,
-                        std::vector<std::pair<double, ProvinceId>>,
-                        std::greater<>>
-        queue;
-    std::map<ProvinceId, double> distances;
-    distances[sourceId] = 0.0;
-    queue.push({0.0, sourceId});
+    auto &outgoing = edges[nodeIndices.at(provinceId)];
+    outgoing.reserve(current->provinceNeighbours.size());
+    for (const auto &neighbour : current->provinceNeighbours) {
+      if (!neighbour || neighbour->isLake() ||
+          (!neighbour->isSea() && !coastalEndpoints.contains(neighbour->ID)))
+        continue;
+      const auto neighbourId = neighbour->ID;
+      if (!provinces.contains(neighbourId))
+        continue;
+      const auto dx = static_cast<double>(current->position.widthCenter -
+                                          neighbour->position.widthCenter);
+      const auto dy = static_cast<double>(current->position.heightCenter -
+                                          neighbour->position.heightCenter);
+      const auto transitionDistance = std::sqrt(dx * dx + dy * dy);
+      const auto depthIt = depths.find(neighbourId);
+      const auto normalizedDepth = seaLevel > 0.0 && depthIt != depths.end()
+                                       ? depthIt->second / seaLevel
+                                       : 0.0;
+      const auto currentDepthIt = depths.find(provinceId);
+      const auto currentNormalizedDepth =
+          seaLevel > 0.0 && currentDepthIt != depths.end()
+              ? currentDepthIt->second / seaLevel
+              : 0.0;
+      const auto currentMultiplier =
+          current->isSea() ? 1.0 + currentNormalizedDepth : 1.0;
+      const auto neighbourMultiplier =
+          neighbour->isSea() ? 1.0 + normalizedDepth : 1.0;
+      const auto cost = transitionDistance *
+                        std::max(currentMultiplier, neighbourMultiplier);
+      outgoing.push_back({nodeIndices.at(neighbourId), cost});
+    }
+  }
+
+  std::vector<std::pair<ProvinceId, size_t>> endpoints;
+  endpoints.reserve(coastalEndpoints.size());
+  for (const auto id : coastalEndpoints)
+    endpoints.emplace_back(id, nodeIndices.at(id));
+  std::vector<double> distances(provinces.size());
+  std::vector<uint8_t> reached(provinces.size());
+  SeaRouteMap routes;
+  for (const auto &[sourceId, sourceIndex] : endpoints) {
+    std::fill(reached.begin(), reached.end(), 0);
+    std::priority_queue<std::pair<double, size_t>,
+                        std::vector<std::pair<double, size_t>>,
+                        std::greater<>> queue;
+    distances[sourceIndex] = 0.0;
+    reached[sourceIndex] = 1;
+    queue.push({0.0, sourceIndex});
     while (!queue.empty()) {
-      const auto [distance, provinceId] = queue.top();
+      const auto [distance, index] = queue.top();
       queue.pop();
-      if (distance > distances.at(provinceId))
+      if (distance > distances[index])
         continue;
-      const auto currentIt = provinces.find(provinceId);
-      if (currentIt == provinces.end())
+      // Other coastal land provinces remain endpoints, never transit nodes.
+      if (index != sourceIndex && !seaNodes[index])
         continue;
-      const auto &current = currentIt->second;
-      if (provinceId != sourceId && !current->isSea())
-        continue;
-      for (const auto &neighbour : current->provinceNeighbours) {
-        if (!neighbour || neighbour->isLake() ||
-            (!neighbour->isSea() &&
-             (neighbour->ID != sourceId &&
-              !coastalEndpoints.contains(neighbour->ID))))
+      for (const auto &edge : edges[index]) {
+        const auto candidateDistance = distance + edge.cost;
+        if (reached[edge.target] && distances[edge.target] <= candidateDistance)
           continue;
-        const auto neighbourId = neighbour->ID;
-        const auto neighbourIt = provinces.find(neighbourId);
-        if (neighbourIt == provinces.end())
-          continue;
-        const auto dx = static_cast<double>(current->position.widthCenter -
-                                            neighbour->position.widthCenter);
-        const auto dy = static_cast<double>(current->position.heightCenter -
-                                            neighbour->position.heightCenter);
-        const auto transitionDistance = std::sqrt(dx * dx + dy * dy);
-        const auto depthIt = depths.find(neighbourId);
-        const auto normalizedDepth = seaLevel > 0.0 && depthIt != depths.end()
-                                         ? depthIt->second / seaLevel
-                                         : 0.0;
-        const auto currentDepthIt = depths.find(provinceId);
-        const auto currentNormalizedDepth =
-            seaLevel > 0.0 && currentDepthIt != depths.end()
-                ? currentDepthIt->second / seaLevel
-                : 0.0;
-        const auto currentMultiplier =
-            current->isSea() ? 1.0 + currentNormalizedDepth : 1.0;
-        const auto neighbourMultiplier =
-            neighbour->isSea() ? 1.0 + normalizedDepth : 1.0;
-        const auto cost = transitionDistance *
-                          std::max(currentMultiplier, neighbourMultiplier);
-        const auto candidateDistance = distance + cost;
-        if (const auto existing = distances.find(neighbourId);
-            existing != distances.end() &&
-            existing->second <= candidateDistance)
-          continue;
-        distances[neighbourId] = candidateDistance;
-        queue.push({candidateDistance, neighbourId});
+        distances[edge.target] = candidateDistance;
+        reached[edge.target] = 1;
+        queue.push({candidateDistance, edge.target});
       }
     }
-    for (const auto &[targetId, distance] : distances) {
-      const auto targetIt = provinces.find(targetId);
-      if (targetIt == provinces.end())
-        continue;
-      const auto &target = targetIt->second;
-      if (targetId != sourceId && target->isCoastalToOcean() &&
-          !target->isSea())
-        routes[sourceId].push_back({targetId, distance});
+    auto &sourceRoutes = routes[sourceId];
+    for (const auto &[targetId, targetIndex] : endpoints) {
+      if (targetId != sourceId && reached[targetIndex])
+        sourceRoutes.push_back({targetId, distances[targetIndex]});
     }
-    std::sort(routes[sourceId].begin(), routes[sourceId].end(),
+    std::sort(sourceRoutes.begin(), sourceRoutes.end(),
               [](const auto &left, const auto &right) {
                 if (left.distance != right.distance)
                   return left.distance < right.distance;
@@ -150,7 +171,8 @@ SeaRouteMap buildWeightedSeaRoutes(
   return routes;
 }
 
-detail::NormalizedInput normalize(const Input &input) {
+detail::NormalizedInput normalize(const Input &input, bool buildSeaRoutes) {
+  const auto geographyStart = std::chrono::steady_clock::now();
   detail::NormalizedInput normalized;
   std::map<ProvinceId, RegionId> allProvinceRegions;
 
@@ -269,7 +291,16 @@ detail::NormalizedInput normalize(const Input &input) {
     normalized.environments[provinceId] = environment;
   }
 
-  const auto weightedRoutes =
+  if (!buildSeaRoutes)
+    return normalized;
+
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: geography normalization = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - geographyStart).count(), " ms");
+  Fwg::Utils::Logging::logLine("History setup: building maritime routes");
+  const auto routesStart = std::chrono::steady_clock::now();
+  auto weightedRoutes =
       buildWeightedSeaRoutes(input.continents, input.terrainData);
   size_t weightedRouteCount = 0;
   double weightedMinimumDistance = std::numeric_limits<double>::max();
@@ -291,29 +322,44 @@ detail::NormalizedInput normalize(const Input &input) {
             << " maxDistance=" << weightedMaximumDistance;
     Fwg::Utils::Logging::logLine(message.str());
   }
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: maritime route construction = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - routesStart).count(), " ms");
+  const auto routeNormalizationStart = std::chrono::steady_clock::now();
   size_t normalizedRouteCount = 0;
   size_t normalizedCrossLandmassRoutes = 0;
-  for (const auto &[sourceId, routes] : weightedRoutes) {
+  struct RouteTarget {
+    int landMassID;
+    std::vector<SeaRoute> *incoming = nullptr;
+  };
+  std::unordered_map<ProvinceId, RouteTarget> routeTargets;
+  routeTargets.reserve(normalized.provinces.size());
+  for (const auto &[provinceId, province] : normalized.provinces)
+    if (province && normalized.environments.contains(provinceId))
+      routeTargets.emplace(provinceId, RouteTarget{province->landMassID});
+  for (auto &[sourceId, routes] : weightedRoutes) {
     const auto sourceProvince = normalized.provinces.find(sourceId);
     if (sourceProvince == normalized.provinces.end() || !sourceProvince->second)
       continue;
+    size_t retained = 0;
     for (const auto &route : routes) {
-      const auto environment = normalized.environments.find(route.provinceId);
-      const auto targetProvince = normalized.provinces.find(route.provinceId);
-      if (environment == normalized.environments.end() ||
-          targetProvince == normalized.provinces.end() ||
-          !targetProvince->second)
+      const auto target = routeTargets.find(route.provinceId);
+      if (target == routeTargets.end())
         continue;
-      normalized.seaRoutesFrom[sourceId].push_back(route);
-      normalized.seaRoutesTo[route.provinceId].push_back(
-          {sourceId, route.distance});
+      if (!target->second.incoming)
+        target->second.incoming = &normalized.seaRoutesTo[route.provinceId];
+      target->second.incoming->push_back({sourceId, route.distance});
+      routes[retained++] = route;
       ++normalizedRouteCount;
       if (sourceProvince->second->landMassID >= 0 &&
-          targetProvince->second->landMassID >= 0 &&
-          sourceProvince->second->landMassID !=
-              targetProvince->second->landMassID)
+          target->second.landMassID >= 0 &&
+          sourceProvince->second->landMassID != target->second.landMassID)
         ++normalizedCrossLandmassRoutes;
     }
+    routes.resize(retained);
+    if (!routes.empty())
+      normalized.seaRoutesFrom.emplace(sourceId, std::move(routes));
   }
   for (auto &[targetId, routes] : normalized.seaRoutesTo)
     std::sort(routes.begin(), routes.end(),
@@ -331,6 +377,10 @@ detail::NormalizedInput normalize(const Input &input) {
             << " crossLandmassRoutes=" << normalizedCrossLandmassRoutes;
     Fwg::Utils::Logging::logLine(message.str());
   }
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: maritime route normalization = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - routeNormalizationStart).count(), " ms");
 
   return normalized;
 }

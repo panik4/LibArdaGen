@@ -149,17 +149,13 @@ void exportCoresAndClaims(SimulationExport &exported, const State &state,
                           const std::vector<Event> &events,
                           const SimulationPolityHistory &polityHistory,
                           const Configuration &configuration) {
-  const auto addClaim = [&exported](PolityId polityId, RegionId regionId,
+  std::set<std::tuple<PolityId, RegionId, ClaimSource>> seenClaims;
+  const auto addClaim = [&exported, &seenClaims](PolityId polityId, RegionId regionId,
                                     ClaimSource source) {
     if (polityId == NoPolity || regionId < 0)
       return;
     auto &records = exported.claimRecords;
-    if (std::none_of(records.begin(), records.end(),
-                     [polityId, regionId, source](const auto &record) {
-                       return record.polityId == polityId &&
-                              record.regionId == regionId &&
-                              record.source == source;
-                     }))
+    if (seenClaims.emplace(polityId, regionId, source).second)
       records.push_back({polityId, regionId, source});
     appendRegion(exported.claims[polityId], regionId);
   };

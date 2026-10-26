@@ -175,15 +175,20 @@ Fwg::Gfx::Image displayConnections(
   for (auto &region : regions) {
     for (auto &loc : region->locations) {
       for (auto &conn : loc->connections) {
+        if (conn.second.source.expired() || conn.second.destination.expired() ||
+            conn.second.startPixel < 0 || conn.second.endPixel < 0 ||
+            conn.second.startPixel >= connectionMap.size() ||
+            conn.second.endPixel >= connectionMap.size())
+          continue;
         for (int x = 0; x < conn.second.connectingPixels.size(); x++) {
           connectionMap.setColourAtIndex(conn.second.connectingPixels[x],
                                          {255, 255, 255 - x});
+        }
           // Paint sourceLoc and destLoc
           connectionMap.setColourAtIndex(
-              conn.second.source->position.weightedCenter, {0, 255, 255});
+              conn.second.startPixel, {0, 255, 255});
           connectionMap.setColourAtIndex(
-              conn.second.destination->position.weightedCenter, {255, 0, 0});
-        }
+              conn.second.endPixel, {255, 0, 0});
       }
     }
   }

@@ -20,6 +20,7 @@
 #include "RandNum.h"
 #include "utils/Cfg.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <functional>
@@ -160,14 +161,25 @@ HistorySimulation::HistorySimulation(Configuration configuration)
 
 Result HistorySimulation::runSimulation(const Input &input) {
   detail::SimulationRun run;
+  Fwg::Utils::Logging::logLine("History setup: preparing simulation input");
+  const auto inputStart = std::chrono::steady_clock::now();
   if (!setup::prepareInput(configuration, input, provinceRegions,
                            provinceNeighbours, run))
-    return run.result;
+    return std::move(run.result);
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: prepare input total = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - inputStart).count(), " ms");
   run.state.year = configuration.startYear;
+  const auto worldStart = std::chrono::steady_clock::now();
   setup::initializeWorld(configuration, run);
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: initialize world total = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - worldStart).count(), " ms");
   execution::simulateYears(configuration, run);
   execution::finalize(configuration, provinceRegions, run);
-  return run.result;
+  return std::move(run.result);
 }
 
 State HistorySimulation::reconstruct(const std::vector<Event> &events,

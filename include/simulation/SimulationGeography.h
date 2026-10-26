@@ -8,6 +8,6 @@ SeaRouteMap buildWeightedSeaRoutes(
     const std::vector<std::shared_ptr<ArdaContinent>> &continents,
     const Fwg::Terrain::TerrainData *terrainData);
 
-detail::NormalizedInput normalize(const Input &input);
+detail::NormalizedInput normalize(const Input &input, bool buildSeaRoutes = true);
 
 } // namespace Arda::Simulation::geography

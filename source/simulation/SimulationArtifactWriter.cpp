@@ -72,7 +72,7 @@ bool validateInputs(const Configuration &configuration, const Input &input,
     return false;
   }
 
-  normalized = normalize(input);
+  normalized = normalize(input, false);
   if (!normalized.errors.empty()) {
     errors.insert(errors.end(), normalized.errors.begin(),
                   normalized.errors.end());

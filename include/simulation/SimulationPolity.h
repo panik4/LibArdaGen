@@ -1,6 +1,7 @@
 #pragma once
 
 #include "simulation/SimulationInternal.h"
+#include <span>
 
 namespace Arda::Simulation::polity {
 
@@ -19,7 +20,7 @@ void dissolveEmpty(Year nextYear, State &state,
 void updatePoliticalStates(Year nextYear, double centuries,
                            const Configuration &configuration, State &state,
                            const detail::AppendEvent &append,
-                           const std::vector<WarEvent> &wars,
+                           std::span<const WarEvent> wars,
                            GovernmentTransitionDiagnostics &diagnostics);
 
 void captureTimelineSnapshot(Year year, const detail::NormalizedInput &normalized,

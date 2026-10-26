@@ -882,6 +882,8 @@ void ArdaGen::genNavmesh(
   Fwg::Utils::Randomisation::resetRandomisation();
   // no input means we default to all locations in a region
   if (inputSet.size() == 0) {
+    Fwg::Civilization::Locations::ensureWaterNodes(
+        areaData.regions, terrainData, Fwg::Cfg::Values().civilizationGenerationContext());
     std::vector<Fwg::Civilization::Locations::AreaLocationSet> defaultInputSet;
     for (auto &region : areaData.regions) {
       Fwg::Civilization::Locations::AreaLocationSet regionLocationSet;

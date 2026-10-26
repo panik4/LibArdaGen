@@ -2,15 +2,49 @@
 
 #include "simulation/SimulationGeography.h"
 #include "simulation/SimulationRandom.h"
+#include "utils/Cfg.h"
 
 #include <algorithm>
 #include <array>
+#include <bit>
+#include <chrono>
 #include <cmath>
 #include <numeric>
 #include <set>
 
 namespace Arda::Simulation::setup {
 namespace {
+
+// Counts eligible sources in province-ID order, preserving random rank selection
+// without rebuilding or walking the entire expansion frontier.
+class ExpansionFrontier {
+public:
+  explicit ExpansionFrontier(size_t size) : counts(size + 1) {}
+
+  void add(size_t index, int delta) {
+    total += delta;
+    for (++index; index < counts.size(); index += index & (~index + 1))
+      counts[index] += delta;
+  }
+
+  int size() const { return total; }
+
+  size_t select(size_t rank) const {
+    size_t index = 0;
+    for (size_t step = std::bit_floor(counts.size() - 1); step; step >>= 1) {
+      const auto next = index + step;
+      if (next < counts.size() && static_cast<size_t>(counts[next]) <= rank) {
+        index = next;
+        rank -= static_cast<size_t>(counts[next]);
+      }
+    }
+    return index;
+  }
+
+private:
+  std::vector<int> counts;
+  int total = 0;
+};
 
 PoliticalPowerDistribution initialPoliticalPower() {
   PoliticalPowerDistribution power{};
@@ -69,6 +103,7 @@ bool prepareInput(
 
 void initializeWorld(const Configuration &configuration,
                      detail::SimulationRun &run) {
+  const auto superRegionStart = std::chrono::steady_clock::now();
   run.state.geography = run.normalized.provinces;
   const auto totalRegions = std::max<size_t>(1, run.normalized.regions.size());
   SuperRegionId nextSuperRegion = 0;
@@ -129,6 +164,11 @@ void initializeWorld(const Configuration &configuration,
                                  superRegion.neighbours.end());
   }
 
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: superregion initialization = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - superRegionStart).count(), " ms");
+  const auto territoryStart = std::chrono::steady_clock::now();
   std::vector<ProvinceId> provinceIds;
   provinceIds.reserve(run.normalized.provinces.size());
   for (const auto &[provinceId, province] : run.normalized.provinces)
@@ -140,6 +180,9 @@ void initializeWorld(const Configuration &configuration,
     std::swap(shuffledProvinceIds[index - 1], shuffledProvinceIds[swapIndex]);
   }
   const auto seedCount = std::min<size_t>(1000, shuffledProvinceIds.size());
+  Fwg::Utils::Logging::logLine(
+      "History setup: assigning initial territory (provinces=",
+      provinceIds.size(), ", seeds=", seedCount, ")");
   std::map<ProvinceId, PolityId> provinceOwners;
   std::vector<std::vector<ProvinceId>> polityProvinces(seedCount);
   for (size_t index = 0; index < seedCount; ++index) {
@@ -150,32 +193,47 @@ void initializeWorld(const Configuration &configuration,
   }
   std::set<ProvinceId> unassigned(shuffledProvinceIds.begin() + seedCount,
                                   shuffledProvinceIds.end());
-  while (!unassigned.empty()) {
-    std::vector<ProvinceId> expandable;
-    for (const auto &[provinceId, polityId] : provinceOwners) {
-      (void)polityId;
-      for (const auto neighbourId : run.normalized.neighbours.at(provinceId))
-        if (unassigned.contains(neighbourId)) {
-          expandable.push_back(provinceId);
-          break;
-        }
+  if (!unassigned.empty()) {
+    std::map<ProvinceId, size_t> provinceIndices;
+    for (size_t index = 0; index < provinceIds.size(); ++index)
+      provinceIndices.emplace(provinceIds[index], index);
+    std::vector<size_t> unassignedNeighbourCounts(provinceIds.size());
+    std::vector<std::vector<size_t>> incomingNeighbours(provinceIds.size());
+    ExpansionFrontier frontier(provinceIds.size());
+    for (size_t index = 0; index < provinceIds.size(); ++index) {
+      const auto provinceId = provinceIds[index];
+      for (const auto neighbourId : run.normalized.neighbours.at(provinceId)) {
+        incomingNeighbours[provinceIndices.at(neighbourId)].push_back(index);
+        if (unassigned.contains(neighbourId))
+          ++unassignedNeighbourCounts[index];
+      }
+      if (provinceOwners.contains(provinceId) && unassignedNeighbourCounts[index])
+        frontier.add(index, 1);
     }
-    if (expandable.empty())
-      break;
-    const auto source = expandable[static_cast<size_t>(RandNum::getRandom<int>(
-        static_cast<int>(expandable.size())))];
-    std::vector<ProvinceId> candidates;
-    const auto owner = provinceOwners.at(source);
-    for (const auto neighbourId : run.normalized.neighbours.at(source))
-      if (unassigned.contains(neighbourId))
-        candidates.push_back(neighbourId);
-    if (candidates.empty())
-      continue;
-    const auto assigned = candidates[static_cast<size_t>(RandNum::getRandom<int>(
-        static_cast<int>(candidates.size())))];
-    provinceOwners[assigned] = owner;
-    polityProvinces[static_cast<size_t>(owner)].push_back(assigned);
-    unassigned.erase(assigned);
+    while (!unassigned.empty() && frontier.size() > 0) {
+      const auto source = provinceIds[frontier.select(
+          static_cast<size_t>(RandNum::getRandom<int>(frontier.size())))];
+      std::vector<ProvinceId> candidates;
+      const auto owner = provinceOwners.at(source);
+      for (const auto neighbourId : run.normalized.neighbours.at(source))
+        if (unassigned.contains(neighbourId))
+          candidates.push_back(neighbourId);
+      const auto assigned = candidates[static_cast<size_t>(RandNum::getRandom<int>(
+          static_cast<int>(candidates.size())))];
+      const auto assignedIndex = provinceIndices.at(assigned);
+      unassigned.erase(assigned);
+      // Reverse edges also handle directed adjacency. Update before marking the
+      // new province owned, so a self-edge cannot remove an inactive source.
+      for (const auto index : incomingNeighbours[assignedIndex]) {
+        if (--unassignedNeighbourCounts[index] == 0 &&
+            provinceOwners.contains(provinceIds[index]))
+          frontier.add(index, -1);
+      }
+      provinceOwners[assigned] = owner;
+      polityProvinces[static_cast<size_t>(owner)].push_back(assigned);
+      if (unassignedNeighbourCounts[assignedIndex])
+        frontier.add(assignedIndex, 1);
+    }
   }
   for (const auto provinceId : unassigned) {
     const auto polityId = static_cast<PolityId>(polityProvinces.size());
@@ -184,6 +242,12 @@ void initializeWorld(const Configuration &configuration,
   }
   run.nextPolity = static_cast<PolityId>(polityProvinces.size());
 
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: initial territory allocation = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - territoryStart).count(),
+      " ms | polities=", polityProvinces.size());
+  const auto polityStart = std::chrono::steady_clock::now();
   for (size_t index = 0; index < polityProvinces.size(); ++index) {
     const auto polityId = static_cast<PolityId>(index);
     const auto provinceId = polityProvinces[index].front();
@@ -224,6 +288,11 @@ void initializeWorld(const Configuration &configuration,
     createPolity.lastTraitEra = PoliticalEra::AncientClassical;
     run.append(std::move(createPolity));
   }
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: polity initialization = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - polityStart).count(), " ms");
+  const auto provinceStart = std::chrono::steady_clock::now();
   for (const auto &[provinceId, province] : run.normalized.provinces) {
     const auto polityId = provinceOwners.at(provinceId);
     const auto cultureId = run.nextCulture++;
@@ -276,11 +345,20 @@ void initializeWorld(const Configuration &configuration,
                 NoPolity, NoPolity, -1, NoReligion, environmentalCapacity, 0.0,
                 "initial carrying capacity"});
   }
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: province initialization = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - provinceStart).count(), " ms");
+  const auto regionalPhaseStart = std::chrono::steady_clock::now();
   for (const auto &[regionId, provinces] : run.normalized.regions)
     run.append({configuration.startYear, EventType::SetRegionalPhase, -1,
                 regionId, NoPolity, NoPolity, -1, NoReligion,
                 static_cast<double>(static_cast<int>(RegionalPhase::Neutral)),
                 0.0, "initial regional phase"});
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: regional phase initialization = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - regionalPhaseStart).count(), " ms");
 }
 
 } // namespace Arda::Simulation::setup

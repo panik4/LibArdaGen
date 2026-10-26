@@ -3,16 +3,16 @@
 #include "simulation/SimulationArtifacts.h"
 #include "simulation/SimulationCulture.h"
 #include "simulation/SimulationDevelopment.h"
-#include "simulation/SimulationEvents.h"
 #include "simulation/SimulationPolity.h"
-#include "simulation/SimulationState.h"
 #include "simulation/SimulationValidation.h"
 #include "simulation/SimulationWarfare.h"
 
 #include "utils/Cfg.h"
 #include <algorithm>
+#include <chrono>
 #include <functional>
 #include <map>
+#include <span>
 #include <sstream>
 
 namespace Arda::Simulation::execution {
@@ -47,8 +47,13 @@ void logYearProgress(Year year, Year targetYear,
 
 void simulateYears(const Configuration &configuration,
                    detail::SimulationRun &run) {
+  const auto snapshotStart = std::chrono::steady_clock::now();
   polity::captureTimelineSnapshot(configuration.startYear, run.normalized,
                                   run.state, run.result.polityTimeline);
+  Fwg::Utils::Logging::logLine(
+      "History setup timing: initial timeline snapshot = ",
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - snapshotStart).count(), " ms");
   for (Year year = configuration.startYear; year < configuration.targetYear;) {
     const Year nextYear =
         std::min(year + stepFor(configuration, year), configuration.targetYear);
@@ -68,18 +73,20 @@ void simulateYears(const Configuration &configuration,
                   configuration.regionPhaseDurationYears))
       development::updateRegionalPhases(year, nextYear, configuration,
                                         run.normalized, run.append);
-    auto territories = state::territoriesByPolity(run.state);
     development::updateProvinceGrowth(
         nextYear, centuries, configuration, run.normalized, run.state,
-        run.growthPotential, run.baseCapacity, run.append, territories);
+        run.growthPotential, run.baseCapacity, run.append);
     development::updatePolityStrengths(nextYear, run.state, run.append);
     culture::integrate(nextYear, centuries, configuration, run.state,
                        run.append);
+    const auto firstCurrentWar = run.result.wars.size();
     warfare::resolveWars(nextYear, centuries, configuration, run.normalized,
                          run.state, run.append, run.result.wars, run.nextWarId,
                          run.result.events);
     polity::updatePoliticalStates(nextYear, centuries, configuration, run.state,
-                                  run.append, run.result.wars,
+                                  run.append,
+                                  std::span<const WarEvent>(run.result.wars)
+                                      .subspan(firstCurrentWar),
                                   run.result.governmentTransitions);
     culture::evolveAndReligions(nextYear, centuries, configuration,
                                 run.normalized, run.state, run.append,
@@ -104,7 +111,6 @@ void finalize(const Configuration &configuration,
        validation::validateState(run.state, configuration, provinceRegions,
                                  configuration.targetYear, true))
     run.result.errors.push_back(error);
-  State eventState;
   Year previousYear = configuration.startYear;
   for (const auto &event : run.result.events) {
     if (event.year < configuration.startYear ||
@@ -123,7 +129,6 @@ void finalize(const Configuration &configuration,
            event.regionId >= 0 ? std::optional<RegionId>(event.regionId)
                                : std::nullopt});
     previousYear = event.year;
-    events::apply(eventState, event);
   }
 }
 

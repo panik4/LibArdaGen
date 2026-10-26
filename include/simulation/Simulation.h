@@ -220,6 +220,8 @@ struct Configuration {
   double traitAcquisitionPressure = 1.0;
   double traitRemovalThreshold = 0.05;
   double traitStrengthConvergencePerCentury = 0.20;
+  // Detailed route and settlement diagnostics; yearly progress stays enabled.
+  bool enableWarfareDiagnostics = false;
 };
 
 struct SimulationClaimExport {

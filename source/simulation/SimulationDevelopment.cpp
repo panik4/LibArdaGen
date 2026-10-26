@@ -129,8 +129,8 @@ void updateProvinceGrowth(
     const Year nextYear, double centuries, const Configuration &configuration,
     const NormalizedInput &normalized, State &state,
     const std::map<ProvinceId, double> &growthPotential,
-    const std::map<ProvinceId, double> &baseCapacity, const AppendEvent &append,
-    std::vector<std::vector<ProvinceId>> &territories) {
+    const std::map<ProvinceId, double> &baseCapacity, const AppendEvent &append) {
+  const auto eraMultiplier = capacityEraMultiplier(configuration, nextYear);
   for (ProvinceId provinceId = 0;
        provinceId < static_cast<ProvinceId>(state.provinces.size()); ++provinceId) {
     const auto *province = state::findProvince(state, provinceId);
@@ -158,7 +158,7 @@ void updateProvinceGrowth(
              ? configuration.superRegionNeighbourInfluence
              : 0.0);
     const double capacity = baseCapacity.at(provinceId) *
-                            capacityEraMultiplier(configuration, nextYear) *
+                            eraMultiplier *
                              (1.0 + province->development * 0.05) *
                             phaseMultiplier(phase) * superRegionMultiplier;
     const double densityFactor = std::clamp(
@@ -194,7 +194,7 @@ void updateProvinceGrowth(
     state.superRegions[superRegionId].development += developmentChange;
     append({nextYear, EventType::UpdateCarryingCapacity, provinceId, regionId,
             NoPolity, NoPolity, -1, NoReligion, capacity,
-            capacityEraMultiplier(configuration, nextYear),
+            eraMultiplier,
             "era-adjusted carrying capacity"});
     if (population != province->population) {
       append({nextYear, EventType::UpdatePopulation, provinceId, -1, NoPolity,
@@ -205,9 +205,6 @@ void updateProvinceGrowth(
               NoPolity, -1, NoReligion, development, 0.0,
               "development growth"});
     }
-    if (province->owner >= 0 &&
-        static_cast<std::size_t>(province->owner) < territories.size())
-      territories[static_cast<std::size_t>(province->owner)].push_back(provinceId);
   }
 }
 

@@ -710,7 +710,7 @@ void captureTimelineSnapshot(
 void updatePoliticalStates(Year nextYear, double centuries,
                            const Configuration &configuration, State &state,
                            const AppendEvent &append,
-                           const std::vector<WarEvent> &wars,
+                           std::span<const WarEvent> wars,
                            GovernmentTransitionDiagnostics &diagnostics) {
   const auto territories = state::territoriesByPolity(state);
   const auto centralizationTargets =
