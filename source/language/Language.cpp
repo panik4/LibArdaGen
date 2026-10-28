@@ -98,7 +98,7 @@ void Language::fillAllLists() {
     maleNames.push_back(getRandomCapitalisedWordFromVocabulary("MaleNames"));
     femaleNames.push_back(
         getRandomCapitalisedWordFromVocabulary("FemaleNames"));
-    surnames.push_back(generateGenericCapitalizedWord());
+    surnames.push_back(getRandomCapitalisedWordFromVocabulary("Surnames"));
     names.push_back(generateGenericCapitalizedWord());
   }
 }

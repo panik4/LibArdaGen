@@ -8,7 +8,9 @@ void LanguageGroup::generate(int languageAmount, const Dataset &dataset,
   for (int i = 0; i < languageAmount; i++) {
     Language language;
     language.reducedDataset = dataset;
-    language.train(seed);
+    const auto languageSeed =
+        static_cast<unsigned int>(seed) + static_cast<unsigned int>(i);
+    language.train(static_cast<int>(languageSeed));
     language.fillAllLists();
 
     // languageGenerator.reduceDataset(        {mergedDataset});

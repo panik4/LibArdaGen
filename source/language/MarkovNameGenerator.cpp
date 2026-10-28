@@ -7,6 +7,8 @@ MarkovNameGenerator::MarkovNameGenerator(int order, int seed)
 void MarkovNameGenerator::train(const std::vector<std::string> &names) {
   chain.clear();
   starters.clear();
+  if (order <= 0)
+    return;
 
   for (const auto &name : names) {
     std::string padded = "^" + name + "$"; // ^ and $ mark start/end
@@ -32,33 +34,35 @@ char MarkovNameGenerator::getNextChar(const std::string &key) {
 }
 
 std::string MarkovNameGenerator::generate(int minLength, int maxLength) {
-  if (starters.empty())
-    return "";
+  if (order <= 0 || minLength < 0 || maxLength < minLength ||
+      maxLength < order || starters.empty())
+    return {};
 
   std::uniform_int_distribution<> startDist(0, starters.size() - 1);
-  std::string key = starters[startDist(rng)];
-  std::string result = key;
+  for (int attempt = 0; attempt < 100; ++attempt) {
+    std::string key = starters[startDist(rng)];
+    std::string result = key;
 
-  while (true) {
-    char next = getNextChar(key);
-    if (next == '$' || result.size() >= static_cast<size_t>(maxLength))
-      break;
+    while (true) {
+      char next = getNextChar(key);
+      if (next == '$' || result.size() >= static_cast<size_t>(maxLength))
+        break;
 
-    result += next;
-    key = result.substr(result.size() - order, order);
+      result += next;
+      key = result.substr(result.size() - order, order);
+    }
+
+    // Strip start marker and validate length.
+    std::string clean;
+    clean.reserve(result.size());
+    for (char c : result) {
+      if (c != '^')
+        clean += c;
+    }
+    result = std::move(clean);
+    if (result.size() >= static_cast<size_t>(minLength))
+      return result;
   }
 
-  // Strip start marker and validate length
-  // result.erase(std::remove(result.begin(), result.end(), '^'), result.end());
-  std::string clean;
-  clean.reserve(result.size());
-  for (char c : result) {
-    if (c != '^')
-      clean += c;
-  }
-  result = std::move(clean);
-  if (result.size() < static_cast<size_t>(minLength))
-    return generate(minLength, maxLength); // retry
-
-  return result;
+  return {};
 }
