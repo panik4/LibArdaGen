@@ -49,7 +49,8 @@ SeaRouteMap buildWeightedSeaRoutes(
   }
 
   std::map<ProvinceId, double> depths;
-  const auto seaLevel = static_cast<double>(Fwg::Cfg::Values().terrainConfig.seaLevel);
+  const auto seaLevel =
+      static_cast<double>(Fwg::Cfg::Values().terrainConfig.seaLevel);
   for (const auto &[provinceId, province] : provinces) {
     double depth = 0.0;
     size_t samples = 0;
@@ -118,8 +119,8 @@ SeaRouteMap buildWeightedSeaRoutes(
           current->isSea() ? 1.0 + currentNormalizedDepth : 1.0;
       const auto neighbourMultiplier =
           neighbour->isSea() ? 1.0 + normalizedDepth : 1.0;
-      const auto cost = transitionDistance *
-                        std::max(currentMultiplier, neighbourMultiplier);
+      const auto cost =
+          transitionDistance * std::max(currentMultiplier, neighbourMultiplier);
       outgoing.push_back({nodeIndices.at(neighbourId), cost});
     }
   }
@@ -134,8 +135,8 @@ SeaRouteMap buildWeightedSeaRoutes(
   for (const auto &[sourceId, sourceIndex] : endpoints) {
     std::fill(reached.begin(), reached.end(), 0);
     std::priority_queue<std::pair<double, size_t>,
-                        std::vector<std::pair<double, size_t>>,
-                        std::greater<>> queue;
+                        std::vector<std::pair<double, size_t>>, std::greater<>>
+        queue;
     distances[sourceIndex] = 0.0;
     reached[sourceIndex] = 1;
     queue.push({0.0, sourceIndex});
@@ -297,7 +298,9 @@ detail::NormalizedInput normalize(const Input &input, bool buildSeaRoutes) {
   Fwg::Utils::Logging::logLine(
       "History setup timing: geography normalization = ",
       std::chrono::duration<double, std::milli>(
-          std::chrono::steady_clock::now() - geographyStart).count(), " ms");
+          std::chrono::steady_clock::now() - geographyStart)
+          .count(),
+      " ms");
   Fwg::Utils::Logging::logLine("History setup: building maritime routes");
   const auto routesStart = std::chrono::steady_clock::now();
   auto weightedRoutes =
@@ -325,7 +328,9 @@ detail::NormalizedInput normalize(const Input &input, bool buildSeaRoutes) {
   Fwg::Utils::Logging::logLine(
       "History setup timing: maritime route construction = ",
       std::chrono::duration<double, std::milli>(
-          std::chrono::steady_clock::now() - routesStart).count(), " ms");
+          std::chrono::steady_clock::now() - routesStart)
+          .count(),
+      " ms");
   const auto routeNormalizationStart = std::chrono::steady_clock::now();
   size_t normalizedRouteCount = 0;
   size_t normalizedCrossLandmassRoutes = 0;
@@ -380,7 +385,9 @@ detail::NormalizedInput normalize(const Input &input, bool buildSeaRoutes) {
   Fwg::Utils::Logging::logLine(
       "History setup timing: maritime route normalization = ",
       std::chrono::duration<double, std::milli>(
-          std::chrono::steady_clock::now() - routeNormalizationStart).count(), " ms");
+          std::chrono::steady_clock::now() - routeNormalizationStart)
+          .count(),
+      " ms");
 
   return normalized;
 }

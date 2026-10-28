@@ -20,7 +20,8 @@ validateState(const State &state, const Configuration &configuration,
     const auto *province = state::findProvince(state, provinceId);
     if (!province)
       continue;
-    if (province->owner == NoPolity || !state::findPolity(state, province->owner))
+    if (province->owner == NoPolity ||
+        !state::findPolity(state, province->owner))
       errors.push_back({year, "Province has no valid owner", provinceId, {}});
     if (province->culture < 0 || !state.cultures.contains(province->culture))
       errors.push_back({year, "Province has no valid culture", provinceId, {}});
@@ -44,8 +45,8 @@ validateState(const State &state, const Configuration &configuration,
            provinceId,
            {}});
     const auto culturalPopulation = std::accumulate(
-        province->culturePopulations.begin(), province->culturePopulations.end(),
-        0.0,
+        province->culturePopulations.begin(),
+        province->culturePopulations.end(), 0.0,
         [](double total, const auto &entry) { return total + entry.second; });
     if (std::abs(culturalPopulation - province->population) >
         std::max(0.001, province->population * 0.001))

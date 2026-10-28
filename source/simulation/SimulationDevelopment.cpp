@@ -125,23 +125,19 @@ void updateRegionalPhases(Year year, Year nextYear,
   }
 }
 
-void updateProvinceGrowth(
-    const Year nextYear, double centuries, const Configuration &configuration,
-    const NormalizedInput &normalized, State &state,
-    const std::map<ProvinceId, double> &growthPotential,
-    const std::map<ProvinceId, double> &baseCapacity, const AppendEvent &append) {
+void updateProvinceGrowth(const Year nextYear, double centuries,
+                          const Configuration &configuration,
+                          const NormalizedInput &normalized, State &state,
+                          const std::map<ProvinceId, double> &growthPotential,
+                          const std::map<ProvinceId, double> &baseCapacity,
+                          const AppendEvent &append) {
   const auto eraMultiplier = capacityEraMultiplier(configuration, nextYear);
-  for (ProvinceId provinceId = 0;
-       provinceId < static_cast<ProvinceId>(state.provinces.size()); ++provinceId) {
-    const auto *province = state::findProvince(state, provinceId);
-    if (!province)
-      continue;
-    const auto potential = growthPotential.at(provinceId);
-    const auto regionId = normalized.provinceRegions.at(provinceId);
-    const auto phase = state.regionalPhases.contains(regionId)
-                           ? state.regionalPhases.at(regionId)
-                           : RegionalPhase::Neutral;
-    const auto superRegionId = state.regionSuperRegions.at(regionId);
+  // Phases are fixed during growth; province and neighbour values remain live.
+  std::map<SuperRegionId, double> superRegionMultipliers;
+  const auto superRegionFactor = [&](SuperRegionId superRegionId) {
+    if (const auto cached = superRegionMultipliers.find(superRegionId);
+        cached != superRegionMultipliers.end())
+      return cached->second;
     const auto superPhase = state.superRegions.at(superRegionId).phase;
     const bool bordersBoomingSuperRegion =
         std::any_of(state.superRegions.at(superRegionId).neighbours.begin(),
@@ -157,19 +153,35 @@ void updateProvinceGrowth(
         (bordersBoomingSuperRegion && superPhase != SuperRegionPhase::Booming
              ? configuration.superRegionNeighbourInfluence
              : 0.0);
-    const double capacity = baseCapacity.at(provinceId) *
-                            eraMultiplier *
-                             (1.0 + province->development * 0.05) *
+    superRegionMultipliers.emplace(superRegionId, superRegionMultiplier);
+    return superRegionMultiplier;
+  };
+  for (ProvinceId provinceId = 0;
+       provinceId < static_cast<ProvinceId>(state.provinces.size());
+       ++provinceId) {
+    const auto *province = state::findProvince(state, provinceId);
+    if (!province)
+      continue;
+    const auto potential = growthPotential.at(provinceId);
+    const auto regionId = normalized.provinceRegions.at(provinceId);
+    const auto phase = state.regionalPhases.contains(regionId)
+                           ? state.regionalPhases.at(regionId)
+                           : RegionalPhase::Neutral;
+    const auto superRegionId = state.regionSuperRegions.at(regionId);
+    const double superRegionMultiplier = superRegionFactor(superRegionId);
+    const double capacity = baseCapacity.at(provinceId) * eraMultiplier *
+                            (1.0 + province->development * 0.05) *
                             phaseMultiplier(phase) * superRegionMultiplier;
     const double densityFactor = std::clamp(
         1.0 - province->population / std::max(capacity, 1.0), 0.0, 1.0);
-    const auto immigrationHeadroom =
-        std::any_of(normalized.neighbours.at(provinceId).begin(),
-                    normalized.neighbours.at(provinceId).end(),
-                    [&](const auto neighbourId) {
-                      const auto *neighbour = state::findProvince(state, neighbourId);
-                      return neighbour && neighbour->carryingCapacity > neighbour->population;
-                    });
+    const auto immigrationHeadroom = std::any_of(
+        normalized.neighbours.at(provinceId).begin(),
+        normalized.neighbours.at(provinceId).end(),
+        [&](const auto neighbourId) {
+          const auto *neighbour = state::findProvince(state, neighbourId);
+          return neighbour &&
+                 neighbour->carryingCapacity > neighbour->population;
+        });
     const double phaseGrowth = phaseMultiplier(phase) * superRegionMultiplier;
     const double immigrationBonus = immigrationHeadroom ? 1.0 : 0.0;
     const double emigrationPenalty =
@@ -193,8 +205,7 @@ void updateProvinceGrowth(
         std::max(0.0, province->development + developmentChange);
     state.superRegions[superRegionId].development += developmentChange;
     append({nextYear, EventType::UpdateCarryingCapacity, provinceId, regionId,
-            NoPolity, NoPolity, -1, NoReligion, capacity,
-            eraMultiplier,
+            NoPolity, NoPolity, -1, NoReligion, capacity, eraMultiplier,
             "era-adjusted carrying capacity"});
     if (population != province->population) {
       append({nextYear, EventType::UpdatePopulation, provinceId, -1, NoPolity,
@@ -209,10 +220,11 @@ void updateProvinceGrowth(
 }
 
 void updatePolityStrengths(const Year nextYear, State &state,
-                           const AppendEvent &append) {
+                           const AppendEvent &append, bool onlyChanged) {
   std::map<PolityId, PolityStrength> strengths;
   for (ProvinceId provinceId = 0;
-       provinceId < static_cast<ProvinceId>(state.provinces.size()); ++provinceId) {
+       provinceId < static_cast<ProvinceId>(state.provinces.size());
+       ++provinceId) {
     const auto *province = state::findProvince(state, provinceId);
     if (!province)
       continue;
@@ -222,6 +234,14 @@ void updatePolityStrengths(const Year nextYear, State &state,
   }
   for (auto &[polityId, strength] : strengths) {
     strength.score = strength.population * 0.01 + strength.development * 10.0;
+    if (onlyChanged) {
+      const auto previous = state.polityStrengths.find(polityId);
+      if (previous != state.polityStrengths.end() &&
+          previous->second.population == strength.population &&
+          previous->second.development == strength.development &&
+          previous->second.score == strength.score)
+        continue;
+    }
     append({nextYear,
             EventType::UpdatePolityStrength,
             -1,

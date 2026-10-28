@@ -8,11 +8,16 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace Arda::Simulation {
@@ -434,6 +439,7 @@ enum class EventType {
   PolityUpdate
 };
 
+// Transient producer input. Retained history uses compact EventStore payloads.
 struct Event {
   Year year = StartYear;
   EventType type = EventType::InitializeProvince;
@@ -474,6 +480,384 @@ struct Event {
   double partyControl = 0.0;
   double desiredPartyControl = 0.0;
   std::map<int, double> politicalMovements;
+};
+
+struct EventHeader {
+  Year year;
+  EventType type;
+  size_t payloadIndex;
+  uint32_t descriptionId;
+};
+
+template <EventType Type> struct EventPayload;
+
+template <> struct EventPayload<EventType::InitializeProvince> {
+  ProvinceId provinceId = -1;
+  RegionId regionId = -1;
+  PolityId polityId = NoPolity;
+  CultureId cultureId = -1;
+  ReligionId religionId = NoReligion;
+  double value = 0.0;
+  double secondaryValue = 0.0;
+  Fwg::Gfx::Colour colour;
+  bool coastal = false;
+  bool island = false;
+  bool overseas = false;
+  bool colony = false;
+  int landMassID = -1;
+  int continentId = -1;
+};
+
+template <> struct EventPayload<EventType::CreatePolity> {
+  PolityId polityId = NoPolity;
+  int parentId = -1;
+  Fwg::Gfx::Colour colour;
+  double armyTradition = 0.0;
+  double navyTradition = 0.0;
+  double stability = 0.5;
+  double centralization = 0.0;
+  GovernmentForm governmentForm = GovernmentForm::Tribal;
+  double centralizationAffinity = 1.0;
+  Year lastGovernmentTransitionYear = StartYear;
+  PoliticalPowerDistribution politicalPower{0.25, 0.25, 0.25, 0.25};
+  PoliticalPowerDistribution desiredPoliticalPower{0.25, 0.25, 0.25, 0.25};
+  std::vector<PoliticalTraitState> politicalTraits;
+  std::vector<PoliticalPressureState> politicalPressures;
+  std::array<double, GovernmentFormCount> governmentPopularity{};
+  PoliticalEra lastTraitEra = PoliticalEra::AncientClassical;
+  double militaryInfluence = 0.0;
+  double desiredMilitaryInfluence = 0.0;
+  double partyControl = 0.0;
+  double desiredPartyControl = 0.0;
+  std::map<int, double> politicalMovements;
+};
+
+template <> struct EventPayload<EventType::CreateSuccessorPolity> {
+  PolityId polityId = NoPolity;
+  int parentId = -1;
+  Fwg::Gfx::Colour colour;
+  double armyTradition = 0.0;
+  double navyTradition = 0.0;
+  double stability = 0.5;
+  double centralization = 0.0;
+  GovernmentForm governmentForm = GovernmentForm::Tribal;
+  double centralizationAffinity = 1.0;
+  Year lastGovernmentTransitionYear = StartYear;
+  PoliticalPowerDistribution politicalPower{0.25, 0.25, 0.25, 0.25};
+  PoliticalPowerDistribution desiredPoliticalPower{0.25, 0.25, 0.25, 0.25};
+  std::vector<PoliticalTraitState> politicalTraits;
+  std::vector<PoliticalPressureState> politicalPressures;
+  std::array<double, GovernmentFormCount> governmentPopularity{};
+  PoliticalEra lastTraitEra = PoliticalEra::AncientClassical;
+  double militaryInfluence = 0.0;
+  double desiredMilitaryInfluence = 0.0;
+  double partyControl = 0.0;
+  double desiredPartyControl = 0.0;
+  std::map<int, double> politicalMovements;
+};
+
+template <> struct EventPayload<EventType::TransferProvince> {
+  ProvinceId provinceId = -1;
+  RegionId regionId = -1;
+  PolityId polityId = NoPolity;
+  PolityId previousPolityId = NoPolity;
+  int warId = -1;
+  bool overseas = false;
+  bool colony = false;
+};
+
+template <> struct EventPayload<EventType::DissolvePolity> {
+  PolityId polityId = NoPolity;
+};
+
+template <> struct EventPayload<EventType::CreateCulture> {
+  ProvinceId provinceId = -1;
+  CultureId cultureId = -1;
+  int parentId = -1;
+  Fwg::Gfx::Colour colour;
+};
+
+template <> struct EventPayload<EventType::SetCulture> {
+  ProvinceId provinceId = -1;
+  CultureId cultureId = -1;
+};
+
+template <> struct EventPayload<EventType::SetPrimaryCulture> {
+  PolityId polityId = NoPolity;
+  CultureId cultureId = -1;
+};
+
+template <> struct EventPayload<EventType::CreateReligion> {
+  ProvinceId provinceId = -1;
+  ReligionId religionId = NoReligion;
+  int parentId = -1;
+  Fwg::Gfx::Colour colour;
+};
+
+template <> struct EventPayload<EventType::SetReligion> {
+  ProvinceId provinceId = -1;
+  ReligionId religionId = NoReligion;
+};
+
+template <> struct EventPayload<EventType::UpdatePopulation> {
+  ProvinceId provinceId = -1;
+  double value = 0.0;
+};
+
+template <> struct EventPayload<EventType::UpdatePolityStrength> {
+  PolityId polityId = NoPolity;
+  double value = 0.0;
+  double secondaryValue = 0.0;
+  double score = 0.0;
+};
+
+template <> struct EventPayload<EventType::UpdateDevelopment> {
+  ProvinceId provinceId = -1;
+  double value = 0.0;
+};
+
+template <> struct EventPayload<EventType::UpdateCarryingCapacity> {
+  ProvinceId provinceId = -1;
+  RegionId regionId = -1;
+  double value = 0.0;
+  double secondaryValue = 0.0;
+};
+
+template <> struct EventPayload<EventType::MigratePopulation> {
+  ProvinceId provinceId = -1;
+  RegionId regionId = -1;
+  double value = 0.0;
+};
+
+template <> struct EventPayload<EventType::SetRegionalPhase> {
+  RegionId regionId = -1;
+  double value = 0.0;
+};
+
+template <> struct EventPayload<EventType::SetSuperRegion> {
+  RegionId regionId = -1;
+  double value = 0.0;
+};
+
+template <> struct EventPayload<EventType::CreateSuperRegion> {
+  RegionId regionId = -1;
+  PolityId polityId = NoPolity;
+};
+
+template <> struct EventPayload<EventType::SetSuperRegionPhase> {
+  RegionId regionId = -1;
+  double value = 0.0;
+};
+
+template <> struct EventPayload<EventType::MigrateCulturePopulation> {
+  ProvinceId provinceId = -1;
+  RegionId regionId = -1;
+  CultureId cultureId = -1;
+  double value = 0.0;
+};
+
+template <> struct EventPayload<EventType::ConvertCulturePopulation> {
+  ProvinceId provinceId = -1;
+  CultureId cultureId = -1;
+  int parentId = -1;
+  double value = 0.0;
+};
+
+template <> struct EventPayload<EventType::ColonizeProvince> {
+  ProvinceId provinceId = -1;
+  RegionId regionId = -1;
+  PolityId polityId = NoPolity;
+  PolityId previousPolityId = NoPolity;
+  int warId = -1;
+  bool overseas = false;
+  bool colony = false;
+};
+
+template <> struct EventPayload<EventType::ConsolidateRegion> {
+  ProvinceId provinceId = -1;
+  RegionId regionId = -1;
+  PolityId polityId = NoPolity;
+  PolityId previousPolityId = NoPolity;
+  int warId = -1;
+  bool overseas = false;
+  bool colony = false;
+};
+
+template <> struct EventPayload<EventType::SetCapital> {
+  ProvinceId provinceId = -1;
+  PolityId polityId = NoPolity;
+};
+
+template <> struct EventPayload<EventType::PolityUpdate> {
+  PolityId polityId = NoPolity;
+  double armyTradition = 0.0;
+  double navyTradition = 0.0;
+  double stability = 0.5;
+  double centralization = 0.0;
+  GovernmentForm governmentForm = GovernmentForm::Tribal;
+  double centralizationAffinity = 1.0;
+  Year lastGovernmentTransitionYear = StartYear;
+  PoliticalPowerDistribution politicalPower{0.25, 0.25, 0.25, 0.25};
+  PoliticalPowerDistribution desiredPoliticalPower{0.25, 0.25, 0.25, 0.25};
+  std::vector<PoliticalTraitState> politicalTraits;
+  std::vector<PoliticalPressureState> politicalPressures;
+  std::array<double, GovernmentFormCount> governmentPopularity{};
+  PoliticalEra lastTraitEra = PoliticalEra::AncientClassical;
+  double militaryInfluence = 0.0;
+  double desiredMilitaryInfluence = 0.0;
+  double partyControl = 0.0;
+  double desiredPartyControl = 0.0;
+  std::map<int, double> politicalMovements;
+};
+
+class EventStore {
+public:
+  size_t append(Event &&event);
+  [[nodiscard]] size_t size() const { return chronology.size(); }
+  [[nodiscard]] bool empty() const { return chronology.empty(); }
+  [[nodiscard]] const EventHeader &header(size_t index) const {
+    return chronology.at(index);
+  }
+  [[nodiscard]] std::string_view description(uint32_t id) const {
+    return descriptions.at(id);
+  }
+
+  template <class Visitor>
+  decltype(auto) visit(size_t index, Visitor &&visitor) const {
+    const auto &entry = header(index);
+    switch (entry.type) {
+    case EventType::InitializeProvince:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsInitializeProvince.at(entry.payloadIndex));
+    case EventType::CreatePolity:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsCreatePolity.at(entry.payloadIndex));
+    case EventType::CreateSuccessorPolity:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsCreateSuccessorPolity.at(entry.payloadIndex));
+    case EventType::TransferProvince:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsTransferProvince.at(entry.payloadIndex));
+    case EventType::DissolvePolity:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsDissolvePolity.at(entry.payloadIndex));
+    case EventType::CreateCulture:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsCreateCulture.at(entry.payloadIndex));
+    case EventType::SetCulture:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsSetCulture.at(entry.payloadIndex));
+    case EventType::SetPrimaryCulture:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsSetPrimaryCulture.at(entry.payloadIndex));
+    case EventType::CreateReligion:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsCreateReligion.at(entry.payloadIndex));
+    case EventType::SetReligion:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsSetReligion.at(entry.payloadIndex));
+    case EventType::UpdatePopulation:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsUpdatePopulation.at(entry.payloadIndex));
+    case EventType::UpdatePolityStrength:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsUpdatePolityStrength.at(entry.payloadIndex));
+    case EventType::UpdateDevelopment:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsUpdateDevelopment.at(entry.payloadIndex));
+    case EventType::UpdateCarryingCapacity:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsUpdateCarryingCapacity.at(entry.payloadIndex));
+    case EventType::MigratePopulation:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsMigratePopulation.at(entry.payloadIndex));
+    case EventType::SetRegionalPhase:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsSetRegionalPhase.at(entry.payloadIndex));
+    case EventType::SetSuperRegion:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsSetSuperRegion.at(entry.payloadIndex));
+    case EventType::CreateSuperRegion:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsCreateSuperRegion.at(entry.payloadIndex));
+    case EventType::SetSuperRegionPhase:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsSetSuperRegionPhase.at(entry.payloadIndex));
+    case EventType::MigrateCulturePopulation:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsMigrateCulturePopulation.at(entry.payloadIndex));
+    case EventType::ConvertCulturePopulation:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsConvertCulturePopulation.at(entry.payloadIndex));
+    case EventType::ColonizeProvince:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsColonizeProvince.at(entry.payloadIndex));
+    case EventType::ConsolidateRegion:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsConsolidateRegion.at(entry.payloadIndex));
+    case EventType::SetCapital:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsSetCapital.at(entry.payloadIndex));
+    case EventType::PolityUpdate:
+      return std::forward<Visitor>(visitor)(
+          entry, recordsPolityUpdate.at(entry.payloadIndex));
+    }
+    throw std::invalid_argument("Unknown simulation event type");
+  }
+  template <class Visitor> void forEach(Visitor &&visitor) const {
+    for (size_t index = 0; index < size(); ++index)
+      visit(index, visitor);
+  }
+  [[nodiscard]] Event materialize(size_t index) const;
+  [[nodiscard]] size_t bufferBytes() const;
+  // Estimate includes nested allocations, but excludes allocator bookkeeping.
+  [[nodiscard]] size_t dynamicBytesEstimate() const;
+
+private:
+  std::vector<EventHeader> chronology;
+  std::vector<std::string> descriptions;
+  std::unordered_map<std::string, uint32_t> descriptionIds;
+  std::vector<EventPayload<EventType::InitializeProvince>>
+      recordsInitializeProvince;
+  std::vector<EventPayload<EventType::CreatePolity>> recordsCreatePolity;
+  std::vector<EventPayload<EventType::CreateSuccessorPolity>>
+      recordsCreateSuccessorPolity;
+  std::vector<EventPayload<EventType::TransferProvince>>
+      recordsTransferProvince;
+  std::vector<EventPayload<EventType::DissolvePolity>> recordsDissolvePolity;
+  std::vector<EventPayload<EventType::CreateCulture>> recordsCreateCulture;
+  std::vector<EventPayload<EventType::SetCulture>> recordsSetCulture;
+  std::vector<EventPayload<EventType::SetPrimaryCulture>>
+      recordsSetPrimaryCulture;
+  std::vector<EventPayload<EventType::CreateReligion>> recordsCreateReligion;
+  std::vector<EventPayload<EventType::SetReligion>> recordsSetReligion;
+  std::vector<EventPayload<EventType::UpdatePopulation>>
+      recordsUpdatePopulation;
+  std::vector<EventPayload<EventType::UpdatePolityStrength>>
+      recordsUpdatePolityStrength;
+  std::vector<EventPayload<EventType::UpdateDevelopment>>
+      recordsUpdateDevelopment;
+  std::vector<EventPayload<EventType::UpdateCarryingCapacity>>
+      recordsUpdateCarryingCapacity;
+  std::vector<EventPayload<EventType::MigratePopulation>>
+      recordsMigratePopulation;
+  std::vector<EventPayload<EventType::SetRegionalPhase>>
+      recordsSetRegionalPhase;
+  std::vector<EventPayload<EventType::SetSuperRegion>> recordsSetSuperRegion;
+  std::vector<EventPayload<EventType::CreateSuperRegion>>
+      recordsCreateSuperRegion;
+  std::vector<EventPayload<EventType::SetSuperRegionPhase>>
+      recordsSetSuperRegionPhase;
+  std::vector<EventPayload<EventType::MigrateCulturePopulation>>
+      recordsMigrateCulturePopulation;
+  std::vector<EventPayload<EventType::ConvertCulturePopulation>>
+      recordsConvertCulturePopulation;
+  std::vector<EventPayload<EventType::ColonizeProvince>>
+      recordsColonizeProvince;
+  std::vector<EventPayload<EventType::ConsolidateRegion>>
+      recordsConsolidateRegion;
+  std::vector<EventPayload<EventType::SetCapital>> recordsSetCapital;
+  std::vector<EventPayload<EventType::PolityUpdate>> recordsPolityUpdate;
 };
 
 struct Polity {
@@ -570,6 +954,8 @@ struct State {
   std::map<RegionId, RegionalPhase> regionalPhases;
   std::map<RegionId, SuperRegionId> regionSuperRegions;
   std::map<SuperRegionId, DevelopmentSuperRegion> superRegions;
+  // Current owners have current totals; ownerless polities retain their last
+  // recorded totals for historical export selection.
   std::map<PolityId, PolityStrength> polityStrengths;
   std::map<PolityId, std::set<ProvinceId>> coastalProvinceIds;
   std::map<ProvinceId, std::shared_ptr<ArdaProvince>> geography;
@@ -638,7 +1024,7 @@ struct GovernmentTransitionDiagnostics {
 };
 
 struct Result {
-  std::vector<Event> events;
+  EventStore events;
   std::vector<WarEvent> wars;
   std::map<EventType, std::size_t> eventCounts;
   std::vector<ValidationError> errors;
@@ -657,8 +1043,7 @@ public:
   explicit HistorySimulation(Configuration configuration = {});
 
   [[nodiscard]] Result runSimulation(const Input &input);
-  [[nodiscard]] State reconstruct(const std::vector<Event> &events,
-                                  Year year) const;
+  [[nodiscard]] State reconstruct(const EventStore &events, Year year) const;
   [[nodiscard]] std::vector<ValidationError>
   validate(const State &state, Year year, bool requireWholeRegions) const;
   [[nodiscard]] std::optional<ArtifactPaths>

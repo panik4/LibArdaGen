@@ -4,6 +4,6 @@
 
 namespace Arda::Simulation::events {
 
-void apply(State &state, const Event &event);
+void apply(State &state, const EventStore &events, size_t index);
 
 } // namespace Arda::Simulation::events

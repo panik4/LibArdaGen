@@ -17,13 +17,15 @@ void updateRegionalPhases(Year year, Year nextYear,
                           const Configuration &configuration,
                           const detail::NormalizedInput &normalized,
                           const detail::AppendEvent &append);
-void updateProvinceGrowth(
-    Year nextYear, double centuries, const Configuration &configuration,
-    const detail::NormalizedInput &normalized, State &state,
-    const std::map<ProvinceId, double> &growthPotential,
-    const std::map<ProvinceId, double> &baseCapacity,
-    const detail::AppendEvent &append);
+void updateProvinceGrowth(Year nextYear, double centuries,
+                          const Configuration &configuration,
+                          const detail::NormalizedInput &normalized,
+                          State &state,
+                          const std::map<ProvinceId, double> &growthPotential,
+                          const std::map<ProvinceId, double> &baseCapacity,
+                          const detail::AppendEvent &append);
 void updatePolityStrengths(Year nextYear, State &state,
-                           const detail::AppendEvent &append);
+                           const detail::AppendEvent &append,
+                           bool onlyChanged = false);
 
 } // namespace Arda::Simulation::development

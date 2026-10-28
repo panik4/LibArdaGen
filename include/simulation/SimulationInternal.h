@@ -28,6 +28,11 @@ struct NormalizedInput {
   std::vector<ValidationError> errors;
 };
 
+// Internal partitioning entry point, also used by algorithm regression tests.
+std::vector<PolityId> partitionSuccessors(
+    const std::vector<ProvinceId> &provinces, size_t successorCount,
+    const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours);
+
 using AppendEvent = std::function<void(Event &&)>;
 
 } // namespace Arda::Simulation::detail

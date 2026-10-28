@@ -289,33 +289,30 @@ PoliticalPowerDistribution randomizedPoliticalPower() {
   return power;
 }
 
-struct PolityDevelopmentTotal {
-  std::size_t provinceCount = 0;
-  double development = 0.0;
-};
-
 struct PoliticalDirectionSnapshot {
   std::array<double, 4> development{};
   double totalDevelopment = 0.0;
 };
 
-PoliticalDirectionSnapshot calculateDirectionSnapshot(
-    const State &state, const std::vector<double> &developmentTotals,
-    const std::vector<std::vector<ProvinceId>> &territories) {
+PoliticalDirectionSnapshot
+calculateDirectionSnapshot(const State &state,
+                           const std::vector<double> &developmentTotals,
+                           const std::vector<size_t> &provinceCounts) {
   PoliticalDirectionSnapshot snapshot;
   for (PolityId polityId = 0;
        polityId < static_cast<PolityId>(state.polities.size()); ++polityId) {
-    if (static_cast<std::size_t>(polityId) >= territories.size() ||
-        territories[static_cast<std::size_t>(polityId)].empty())
+    if (static_cast<std::size_t>(polityId) >= provinceCounts.size() ||
+        provinceCounts[static_cast<std::size_t>(polityId)] == 0)
       continue;
-    const auto development = developmentTotals[static_cast<std::size_t>(polityId)];
+    const auto development =
+        developmentTotals[static_cast<std::size_t>(polityId)];
     if (development <= 0.0)
       continue;
     const auto *polity = state::findPolity(state, polityId);
     if (!polity)
       continue;
-    const auto direction = static_cast<std::size_t>(
-        politicalDirection(polity->governmentForm));
+    const auto direction =
+        static_cast<std::size_t>(politicalDirection(polity->governmentForm));
     snapshot.development[direction] += development;
     snapshot.totalDevelopment += development;
   }
@@ -344,26 +341,18 @@ void addPoliticalPressure(Polity &polity, PoliticalPressureType type,
 
 std::vector<double>
 calculateCentralizationTargets(const State &state,
-                               const Configuration &configuration) {
-  std::vector<PolityDevelopmentTotal> polityTotals(state.polities.size());
-  for (const auto &province : state.provinces) {
-    if (!province.initialized || province.owner < 0 ||
-        province.owner >= static_cast<PolityId>(polityTotals.size()))
-      continue;
-    auto &totals = polityTotals[static_cast<size_t>(province.owner)];
-    ++totals.provinceCount;
-    totals.development += province.development;
-  }
-
-  std::vector<double> targets(polityTotals.size(), 0.0);
+                               const Configuration &configuration,
+                               const std::vector<double> &developmentTotals,
+                               const std::vector<size_t> &provinceCounts) {
+  std::vector<double> targets(state.polities.size(), 0.0);
   const auto maximum =
       std::clamp(configuration.centralizationMaximum, 0.0, 1.0);
-  for (size_t polityId = 0; polityId < polityTotals.size(); ++polityId) {
-    const auto &totals = polityTotals[polityId];
-    if (totals.provinceCount == 0)
+  for (size_t polityId = 0; polityId < provinceCounts.size(); ++polityId) {
+    if (provinceCounts[polityId] == 0)
       continue;
     const auto averageDevelopment =
-        totals.development / static_cast<double>(totals.provinceCount);
+        developmentTotals[polityId] /
+        static_cast<double>(provinceCounts[polityId]);
     const auto *polity =
         state::findPolity(state, static_cast<PolityId>(polityId));
     const auto affinity =
@@ -395,7 +384,8 @@ GovernmentForm
 governmentFor(Polity &polity, Year year, const Configuration &configuration,
               bool hasCoastalProvince, double stability, double navyTradition,
               double armyTradition, double development, double warPressure,
-              double centuries, const PoliticalDirectionSnapshot &directionSnapshot,
+              double centuries,
+              const PoliticalDirectionSnapshot &directionSnapshot,
               GovernmentTransitionDiagnostics &diagnostics) {
   const auto &power = polity.politicalPower;
   const auto central =
@@ -451,7 +441,8 @@ governmentFor(Polity &polity, Year year, const Configuration &configuration,
     setScore(GovernmentForm::FascistState,
              (polity.partyControl * 1.15 + people * 0.45 + central * 1.0 +
               instability * 0.2 + std::max(0.0, warPressure) * 0.25 +
-              nobility * 0.15 + 0.5 * polity.militaryInfluence * armyTradition));
+              nobility * 0.15 +
+              0.5 * polity.militaryInfluence * armyTradition));
     for (std::size_t index =
              static_cast<std::size_t>(GovernmentForm::MilitaryGovernment);
          index < GovernmentFormCount; ++index)
@@ -507,12 +498,11 @@ governmentFor(Polity &polity, Year year, const Configuration &configuration,
            direction == PoliticalDirection::Communism ||
            direction == PoliticalDirection::Fascism) &&
           directionSnapshot.totalDevelopment > 0.0) {
-        const auto target =
-            direction == PoliticalDirection::Democracy
-                ? configuration.democracyDevelopmentTarget
-                : direction == PoliticalDirection::Communism
-                      ? configuration.communismDevelopmentTarget
-                      : configuration.fascismDevelopmentTarget;
+        const auto target = direction == PoliticalDirection::Democracy
+                                ? configuration.democracyDevelopmentTarget
+                            : direction == PoliticalDirection::Communism
+                                ? configuration.communismDevelopmentTarget
+                                : configuration.fascismDevelopmentTarget;
         const auto share =
             directionSnapshot.development[static_cast<std::size_t>(direction)] /
             directionSnapshot.totalDevelopment;
@@ -521,8 +511,7 @@ governmentFor(Polity &polity, Year year, const Configuration &configuration,
                 (target - share),
             -1.0, 1.0);
         const auto multiplier = std::clamp(
-            1.0 + feedback,
-            configuration.governmentDirectionMinimumMultiplier,
+            1.0 + feedback, configuration.governmentDirectionMinimumMultiplier,
             configuration.governmentDirectionMaximumMultiplier);
         scores[index] *= multiplier;
       }
@@ -611,15 +600,26 @@ std::vector<PolityId> contiguousSuccessorAssignments(
     unassigned.erase(seedIndex);
     frontiers[successor].push_back(seedIndex);
   }
+  // Assignments only accumulate, so exhausted vertices and edges stay
+  // exhausted.
+  std::vector<size_t> frontierHeads(successorCount);
+  std::vector<size_t> neighbourHeads(provinceIds.size());
+  std::vector<size_t> territoryCounts(successorCount, 1);
   while (!unassigned.empty()) {
     bool assigned = false;
     for (size_t successor = 0;
          successor < successorCount && !unassigned.empty(); ++successor) {
+      // Each successor gets a full turn, independently of earlier claims this
+      // pass.
+      bool successorAssigned = false;
       auto &frontier = frontiers[successor];
-      for (size_t frontierIndex = 0; frontierIndex < frontier.size();
-           ++frontierIndex) {
+      for (size_t &frontierIndex = frontierHeads[successor];
+           frontierIndex < frontier.size(); ++frontierIndex) {
         const auto provinceId = provinceIds[frontier[frontierIndex]];
-        for (const auto neighbourId : neighbours.at(provinceId)) {
+        const auto &adjacent = neighbours.at(provinceId);
+        auto &neighbourIndex = neighbourHeads[frontier[frontierIndex]];
+        while (neighbourIndex < adjacent.size()) {
+          const auto neighbourId = adjacent[neighbourIndex++];
           const auto candidate = indices.find(neighbourId);
           if (candidate == indices.end() ||
               !unassigned.contains(candidate->second))
@@ -628,9 +628,11 @@ std::vector<PolityId> contiguousSuccessorAssignments(
           unassigned.erase(candidate->second);
           frontier.push_back(candidate->second);
           assigned = true;
+          successorAssigned = true;
+          ++territoryCounts[successor];
           break;
         }
-        if (assigned)
+        if (successorAssigned)
           break;
       }
     }
@@ -640,14 +642,13 @@ std::vector<PolityId> contiguousSuccessorAssignments(
     size_t successor = 0;
     size_t smallestTerritory = provinceIds.size();
     for (size_t candidate = 0; candidate < successorCount; ++candidate) {
-      const auto territorySize =
-          std::count(assignments.begin(), assignments.end(),
-                     static_cast<PolityId>(candidate));
+      const auto territorySize = territoryCounts[candidate];
       if (territorySize < smallestTerritory) {
         smallestTerritory = territorySize;
         successor = candidate;
       }
     }
+    ++territoryCounts[successor];
     assignments[orphan] = static_cast<PolityId>(successor);
     unassigned.erase(orphan);
     frontiers[successor].push_back(orphan);
@@ -659,11 +660,31 @@ std::vector<PolityId> contiguousSuccessorAssignments(
 void captureTimelineSnapshot(
     Year year, const NormalizedInput &normalized, const State &state,
     std::map<PolityId, std::vector<PolityTimelineSnapshot>> &timeline) {
-  const auto territories = state::territoriesByPolity(state);
+  struct Totals {
+    double population = 0.0;
+    double development = 0.0;
+    double area = 0.0;
+    size_t count = 0;
+  };
+  std::vector<Totals> totals(state.polities.size());
+  for (ProvinceId id = 0; id < static_cast<ProvinceId>(state.provinces.size());
+       ++id) {
+    const auto *province = state::findProvince(state, id);
+    if (!province || province->owner < 0 ||
+        static_cast<size_t>(province->owner) >= totals.size())
+      continue;
+    auto &sum = totals[static_cast<size_t>(province->owner)];
+    sum.population += province->population;
+    sum.development += province->development;
+    ++sum.count;
+    const auto environment = normalized.environments.find(id);
+    if (environment != normalized.environments.end())
+      sum.area += static_cast<double>(environment->second.area);
+  }
   for (PolityId polityId = 0;
        polityId < static_cast<PolityId>(state.polities.size()); ++polityId) {
     const auto *polity = state::findPolity(state, polityId);
-    if (!polity || territories[static_cast<size_t>(polityId)].empty())
+    if (!polity || totals[static_cast<size_t>(polityId)].count == 0)
       continue;
 
     PolityTimelineSnapshot snapshot;
@@ -685,24 +706,12 @@ void captureTimelineSnapshot(
     snapshot.partyControl = polity->partyControl;
     snapshot.desiredPartyControl = polity->desiredPartyControl;
 
-    double area = 0.0;
-    for (const auto provinceId : territories[static_cast<size_t>(polityId)]) {
-      const auto *province = state::findProvince(state, provinceId);
-      if (!province)
-        continue;
-      snapshot.population += province->population;
-      snapshot.development += province->development;
-      const auto environment = normalized.environments.find(provinceId);
-      if (environment != normalized.environments.end())
-        area += static_cast<double>(environment->second.area);
-    }
-    snapshot.development /=
-        static_cast<double>(territories[static_cast<size_t>(polityId)].size());
+    const auto &sum = totals[static_cast<size_t>(polityId)];
+    snapshot.population = sum.population;
+    snapshot.development = sum.development / static_cast<double>(sum.count);
     snapshot.populationDensity =
-        area > 0.0 ? snapshot.population / area
-                   : snapshot.population /
-                         static_cast<double>(
-                             territories[static_cast<size_t>(polityId)].size());
+        sum.area > 0.0 ? snapshot.population / sum.area
+                       : snapshot.population / static_cast<double>(sum.count);
     timeline[polityId].push_back(std::move(snapshot));
   }
 }
@@ -712,9 +721,6 @@ void updatePoliticalStates(Year nextYear, double centuries,
                            const AppendEvent &append,
                            std::span<const WarEvent> wars,
                            GovernmentTransitionDiagnostics &diagnostics) {
-  const auto territories = state::territoriesByPolity(state);
-  const auto centralizationTargets =
-      calculateCentralizationTargets(state, configuration);
   std::vector<double> armyGains(state.polities.size());
   std::vector<double> navyGains(state.polities.size());
   std::vector<double> developmentTotals(state.polities.size());
@@ -729,8 +735,10 @@ void updatePoliticalStates(Year nextYear, double centuries,
     developmentTotals[index] += province.development;
     ++developmentProvinceCounts[index];
   }
-  const auto directionSnapshot =
-      calculateDirectionSnapshot(state, developmentTotals, territories);
+  const auto centralizationTargets = calculateCentralizationTargets(
+      state, configuration, developmentTotals, developmentProvinceCounts);
+  const auto directionSnapshot = calculateDirectionSnapshot(
+      state, developmentTotals, developmentProvinceCounts);
   for (const auto &war : wars) {
     if (war.year != nextYear)
       continue;
@@ -759,7 +767,7 @@ void updatePoliticalStates(Year nextYear, double centuries,
        polityId < static_cast<PolityId>(state.polities.size()); ++polityId) {
     auto *polity = state::findPolity(state, polityId);
     if (!polity || !polity->initialized || polity->dissolvedYear ||
-        territories[static_cast<size_t>(polityId)].empty())
+        developmentProvinceCounts[static_cast<size_t>(polityId)] == 0)
       continue;
     const auto index = static_cast<size_t>(polityId);
     const auto coastal = !state::coastalProvincesOf(state, polityId).empty();
@@ -950,8 +958,8 @@ void updatePoliticalStates(Year nextYear, double centuries,
             ? 0.0
             : developmentTotals[index] /
                   static_cast<double>(developmentProvinceCounts[index]),
-        std::clamp(warPressure[index], 0.0, 1.0), centuries,
-        directionSnapshot, diagnostics);
+        std::clamp(warPressure[index], 0.0, 1.0), centuries, directionSnapshot,
+        diagnostics);
     update.lastGovernmentTransitionYear = polity->lastGovernmentTransitionYear;
     update.lastTraitEra = polity->lastTraitEra;
     update.politicalPower = polity->politicalPower;
@@ -1200,15 +1208,27 @@ void consolidateRegions(const Year nextYear, const Configuration &configuration,
 
 void dissolveEmpty(const Year nextYear, State &state,
                    const AppendEvent &append) {
-  const auto territories = state::territoriesByPolity(state);
+  std::vector<bool> ownsProvince(state.polities.size());
+  for (const auto &province : state.provinces)
+    if (province.initialized && province.owner >= 0 &&
+        static_cast<size_t>(province.owner) < ownsProvince.size())
+      ownsProvince[static_cast<size_t>(province.owner)] = true;
   for (PolityId polityId = 0;
        polityId < static_cast<PolityId>(state.polities.size()); ++polityId) {
     const auto *polity = state::findPolity(state, polityId);
     if (polity && !polity->dissolvedYear &&
-        territories[static_cast<std::size_t>(polityId)].empty())
+        !ownsProvince[static_cast<size_t>(polityId)])
       append({nextYear, EventType::DissolvePolity, -1, -1, polityId, NoPolity,
               -1, NoReligion, 0.0, 0.0, "annexed or dissolved"});
   }
 }
 
 } // namespace Arda::Simulation::polity
+
+namespace Arda::Simulation::detail {
+std::vector<PolityId> partitionSuccessors(
+    const std::vector<ProvinceId> &provinces, size_t count,
+    const std::map<ProvinceId, std::vector<ProvinceId>> &neighbours) {
+  return polity::contiguousSuccessorAssignments(provinces, count, neighbours);
+}
+} // namespace Arda::Simulation::detail

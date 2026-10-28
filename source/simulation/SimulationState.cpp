@@ -80,7 +80,8 @@ std::vector<std::vector<ProvinceId>> territoriesByPolity(const State &state) {
     if (const auto *province = findProvince(state, provinceId);
         province && province->owner >= 0 &&
         static_cast<std::size_t>(province->owner) < territories.size())
-      territories[static_cast<std::size_t>(province->owner)].push_back(provinceId);
+      territories[static_cast<std::size_t>(province->owner)].push_back(
+          provinceId);
   return territories;
 }
 
@@ -102,7 +103,7 @@ void setCapital(State &state, PolityId polityId, ProvinceId provinceId) {
 }
 
 const std::shared_ptr<ArdaProvince> &capitalOf(const State &state,
-                                                PolityId polityId) {
+                                               PolityId polityId) {
   static const std::shared_ptr<ArdaProvince> empty;
   const auto *polity = findPolity(state, polityId);
   return polity ? polity->capital : empty;

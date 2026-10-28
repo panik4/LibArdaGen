@@ -67,7 +67,8 @@ std::vector<std::string> splitSidecarFields(const std::string &line) {
   return fields;
 }
 
-void resetGeneratedLanguageWords(const Civilization::CivilizationData &civData) {
+void resetGeneratedLanguageWords(
+    const Civilization::CivilizationData &civData) {
   for (const auto &culture : civData.cultures) {
     if (culture && culture->language)
       culture->language->resetGeneratedWords();
@@ -81,8 +82,8 @@ bool ArdaGen::saveCultureGroupState(const std::string &path) const {
     return false;
 
   output << "ARDA_CULTURE_GROUPS\t1\n";
-  for (std::size_t groupIndex = 0;
-       groupIndex < civData.cultureGroups.size(); ++groupIndex) {
+  for (std::size_t groupIndex = 0; groupIndex < civData.cultureGroups.size();
+       ++groupIndex) {
     const auto &group = civData.cultureGroups[groupIndex];
     if (!group)
       continue;
@@ -111,8 +112,8 @@ bool ArdaGen::loadCultureGroupState(const std::string &path) {
   if (!input)
     return false;
 
-  LanguageGenerator sidecarLanguageGenerator(
-      Fwg::Cfg::Values().resourcePath + "/names/languageGroups/");
+  LanguageGenerator sidecarLanguageGenerator(Fwg::Cfg::Values().resourcePath +
+                                             "/names/languageGroups/");
 
   std::string line;
   if (!std::getline(input, line) || line != "ARDA_CULTURE_GROUPS\t1")
@@ -163,8 +164,8 @@ bool ArdaGen::loadCultureGroupState(const std::string &path) {
     }
     states.push_back(std::move(state));
   }
-  //if (states.size() != civData.cultureGroups.size())
-  //  return false;
+  // if (states.size() != civData.cultureGroups.size())
+  //   return false;
 
   std::vector<std::shared_ptr<LanguageGroup>> languageGroups;
   languageGroups.resize(states.size());
@@ -184,8 +185,8 @@ bool ArdaGen::loadCultureGroupState(const std::string &path) {
       return false;
     groupSeen[state.groupIndex] = true;
     const auto centre = group->getCenter();
-    //if ((centre ? centre->ID : -1) != state.centreProvinceId)
-    //  return false;
+    // if ((centre ? centre->ID : -1) != state.centreProvinceId)
+    //   return false;
     for (const auto &dataset : state.datasets) {
       if (!sidecarLanguageGenerator.datasetsByLanguage.contains(dataset))
         return false;
@@ -525,8 +526,9 @@ bool ArdaGen::loadNaturalFeatures(Fwg::Cfg &config,
 }
 
 bool ArdaGen::loadDevelopment(Fwg::Cfg &config, const std::string &path) {
-  Civilization::loadDevelopment(Fwg::IO::Reader::readGenericImage(path, config.imageReadContext()),
-                                ardaProvinces, ardaRegions, ardaContinents);
+  Civilization::loadDevelopment(
+      Fwg::IO::Reader::readGenericImage(path, config.imageReadContext()),
+      ardaProvinces, ardaRegions, ardaContinents);
 
   generateEconomyData(civData, ardaProvinces, ardaRegions, ardaContinents,
                       ardaConfig.targetWorldPopulation);
@@ -565,10 +567,9 @@ bool ArdaGen::loadPopulation(Fwg::Cfg &config,
 bool ArdaGen::genPopulation(Fwg::Cfg &config) {
   Fwg::Utils::Randomisation::resetRandomisation();
   ardaConfig.calculateTargetWorldPopulation();
-  Civilization::generatePopulation(civData, ardaProvinces, ardaRegions,
-                                   ardaContinents,
-                                   ardaConfig.targetWorldPopulation,
-                                   ardaConfig.civilizationConfig);
+  Civilization::generatePopulation(
+      civData, ardaProvinces, ardaRegions, ardaContinents,
+      ardaConfig.targetWorldPopulation, ardaConfig.civilizationConfig);
   gatherStatistics();
 
   return true;
@@ -883,7 +884,8 @@ void ArdaGen::genNavmesh(
   // no input means we default to all locations in a region
   if (inputSet.size() == 0) {
     Fwg::Civilization::Locations::ensureWaterNodes(
-        areaData.regions, terrainData, Fwg::Cfg::Values().civilizationGenerationContext());
+        areaData.regions, terrainData,
+        Fwg::Cfg::Values().civilizationGenerationContext());
     std::vector<Fwg::Civilization::Locations::AreaLocationSet> defaultInputSet;
     for (auto &region : areaData.regions) {
       Fwg::Civilization::Locations::AreaLocationSet regionLocationSet;
@@ -908,8 +910,7 @@ bool ArdaGen::genWastelands(Fwg::Cfg &config) {
   Arda::NaturalFeatures::detectWastelands(terrainData, climateData, ardaRegions,
                                           ardaData.civLayer, config);
   auto worldOverlayMap = Arda::Gfx::displayWorldOverlayMap(
-      climateData, worldMap, ardaData.civLayer,
-      ardaConfig.civilizationConfig,
+      climateData, worldMap, ardaData.civLayer, ardaConfig.civilizationConfig,
       config.colours.at("wasteland"));
   Fwg::Gfx::Png::save(worldOverlayMap, config.mapsPath + "worldOverlayMap.png",
                       true, LCT_RGBA, 8, 255, config.username);

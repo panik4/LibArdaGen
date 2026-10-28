@@ -34,7 +34,8 @@ void integrate(const Year nextYear, double centuries,
   for (const auto &[polityId, strength] : state.polityStrengths)
     stabilityThreshold = std::max(stabilityThreshold, strength.score * 0.5);
   for (ProvinceId provinceId = 0;
-       provinceId < static_cast<ProvinceId>(state.provinces.size()); ++provinceId) {
+       provinceId < static_cast<ProvinceId>(state.provinces.size());
+       ++provinceId) {
     const auto *province = state::findProvince(state, provinceId);
     if (!province || !state.polityStrengths.contains(province->owner) ||
         state.polityStrengths.at(province->owner).score < stabilityThreshold ||
@@ -42,7 +43,7 @@ void integrate(const Year nextYear, double centuries,
       continue;
     const auto dominantCulture = state.dominantCultureOf(provinceId);
     for (const auto &[cultureId, culturalPopulation] :
-          province->culturePopulations) {
+         province->culturePopulations) {
       if (cultureId == dominantCulture)
         continue;
       const auto conversion = culturalPopulation *
@@ -64,7 +65,8 @@ void evolveAndReligions(const Year nextYear, double centuries,
   if (nextYear < configuration.classicalStartYear)
     return;
   for (ProvinceId provinceId = 0;
-       provinceId < static_cast<ProvinceId>(state.provinces.size()); ++provinceId) {
+       provinceId < static_cast<ProvinceId>(state.provinces.size());
+       ++provinceId) {
     const auto *province = state::findProvince(state, provinceId);
     if (!province)
       continue;
@@ -82,7 +84,7 @@ void evolveAndReligions(const Year nextYear, double centuries,
       const auto religionId = nextReligion++;
       append({nextYear, EventType::CreateReligion, provinceId, -1, NoPolity,
               NoPolity, -1, religionId, 0.0, 0.0, "religion split",
-               province->religion, randomColour()});
+              province->religion, randomColour()});
       append({nextYear, EventType::SetReligion, provinceId, -1, NoPolity,
               NoPolity, -1, religionId, 0.0, 0.0, "religion schism"});
     }
@@ -90,13 +92,16 @@ void evolveAndReligions(const Year nextYear, double centuries,
       const auto *neighbour = state::findProvince(state, neighbourId);
       if (!neighbour)
         continue;
-      if (province->religion == NoReligion && neighbour->religion != NoReligion &&
+      if (province->religion == NoReligion &&
+          neighbour->religion != NoReligion &&
           chance(configuration.religionSpreadChance * centuries)) {
         append({nextYear, EventType::SetReligion, provinceId, -1, NoPolity,
-                NoPolity, -1, neighbour->religion, 0.0, 0.0, "religion spread"});
+                NoPolity, -1, neighbour->religion, 0.0, 0.0,
+                "religion spread"});
         break;
       }
-      if (province->religion != NoReligion && neighbour->religion != NoReligion &&
+      if (province->religion != NoReligion &&
+          neighbour->religion != NoReligion &&
           province->religion != neighbour->religion &&
           chance(configuration.religionConversionChance * centuries)) {
         append({nextYear, EventType::SetReligion, provinceId, -1, NoPolity,
@@ -135,16 +140,20 @@ void evolveAndReligions(const Year nextYear, double centuries,
         nextYear >= configuration.maritimeExpansionStartYear) {
       double closestSeaDistance = std::numeric_limits<double>::max();
       const auto routesToProvince = normalized.seaRoutesTo.find(provinceId);
+      const auto maritimeRange =
+          warfare::maritimeRangeForYear(nextYear, configuration);
       if (routesToProvince != normalized.seaRoutesTo.end())
         for (const auto &route : routesToProvince->second) {
+          if (route.distance > maritimeRange)
+            break;
           if (route.distance >= closestSeaDistance)
             continue;
           const auto *source = state::findProvince(state, route.provinceId);
-          if (source && source->owner == province->owner && source->coastal)
+          if (source && source->owner == province->owner && source->coastal) {
             closestSeaDistance = route.distance;
+            break;
+          }
         }
-      const auto maritimeRange =
-          warfare::maritimeRangeForYear(nextYear, configuration);
       if (closestSeaDistance <= maritimeRange &&
           chance(configuration.overseasCultureAdoptionChance * centuries *
                  std::exp(-closestSeaDistance / maritimeRange)))
@@ -158,7 +167,8 @@ void evolveAndReligions(const Year nextYear, double centuries,
               NoPolity, primaryCulture, NoReligion, 0.0, 0.0,
               overseasAdoption ? "overseas primary culture adoption"
                                : "polity primary culture expansion"});
-    } else if (province->culture != primaryCulture && !primaryCultureNeighbour &&
+    } else if (province->culture != primaryCulture &&
+               !primaryCultureNeighbour &&
                chance(configuration.primaryCultureChangeChance * centuries)) {
       for (const auto neighbourId : normalized.neighbours.at(provinceId)) {
         const auto *neighbour = state::findProvince(state, neighbourId);

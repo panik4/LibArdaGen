@@ -258,7 +258,8 @@ bool writeEventLogFile(const ArtifactPaths &paths, const Result &result,
   eventLog << "year\ttype\tprovince\tregion\tpolity\tprevious_"
               "polity\tculture\treligion\tparent\tvalue\tsecondary_"
               "value\tscore\tred\tgreen\tblue\tdescription\n";
-  for (const auto &event : result.events)
+  for (size_t index = 0; index < result.events.size(); ++index) {
+    const auto event = makeEventLogRow(result.events, index);
     eventLog << event.year << '\t' << eventTypeName(event.type) << '\t'
              << event.provinceId << '\t' << event.regionId << '\t'
              << event.polityId << '\t' << event.previousPolityId << '\t'
@@ -269,6 +270,7 @@ bool writeEventLogFile(const ArtifactPaths &paths, const Result &result,
              << static_cast<int>(event.colour.getGreen()) << '\t'
              << static_cast<int>(event.colour.getBlue()) << '\t'
              << event.description << '\n';
+  }
   return true;
 }
 
@@ -419,8 +421,8 @@ bool writePolityStatisticsCsv(const SimulationExport &simulationExport,
     }
     output << '\n';
   }
-  output << '\n' <<
-            "government_form,polity_count,population,development,score\n";
+  output << '\n'
+         << "government_form,polity_count,population,development,score\n";
   for (std::size_t index = 0; index < GovernmentFormCount; ++index) {
     const auto form = static_cast<GovernmentForm>(index);
     const auto strength = simulationExport.governmentFormStrength.find(form);
@@ -433,14 +435,15 @@ bool writePolityStatisticsCsv(const SimulationExport &simulationExport,
            << totals.score << '\n';
   }
   output << '\n' << "political_direction,development,share\n";
-  for (const auto direction : {PoliticalDirection::Other,
-                               PoliticalDirection::Democracy,
-                               PoliticalDirection::Communism,
-                               PoliticalDirection::Fascism}) {
-    const auto strength = simulationExport.politicalDirectionStrength.find(direction);
-    const auto &totals = strength == simulationExport.politicalDirectionStrength.end()
-                             ? SimulationPoliticalDirectionStrength{}
-                             : strength->second;
+  for (const auto direction :
+       {PoliticalDirection::Other, PoliticalDirection::Democracy,
+        PoliticalDirection::Communism, PoliticalDirection::Fascism}) {
+    const auto strength =
+        simulationExport.politicalDirectionStrength.find(direction);
+    const auto &totals =
+        strength == simulationExport.politicalDirectionStrength.end()
+            ? SimulationPoliticalDirectionStrength{}
+            : strength->second;
     output << static_cast<int>(direction) << ',' << totals.development << ','
            << totals.share << '\n';
   }

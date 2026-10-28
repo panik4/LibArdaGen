@@ -23,8 +23,8 @@ void updatePoliticalStates(Year nextYear, double centuries,
                            std::span<const WarEvent> wars,
                            GovernmentTransitionDiagnostics &diagnostics);
 
-void captureTimelineSnapshot(Year year, const detail::NormalizedInput &normalized,
-                             const State &state,
-                             std::map<PolityId, std::vector<PolityTimelineSnapshot>> &timeline);
+void captureTimelineSnapshot(
+    Year year, const detail::NormalizedInput &normalized, const State &state,
+    std::map<PolityId, std::vector<PolityTimelineSnapshot>> &timeline);
 
 } // namespace Arda::Simulation::polity

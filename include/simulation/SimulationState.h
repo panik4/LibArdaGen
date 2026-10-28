@@ -16,12 +16,12 @@ Polity &ensurePolity(State &state, PolityId polityId);
 std::vector<std::vector<ProvinceId>> territoriesByPolity(const State &state);
 
 const std::set<ProvinceId> &coastalProvincesOf(const State &state,
-											   PolityId polityId);
+                                               PolityId polityId);
 
 void setCapital(State &state, PolityId polityId, ProvinceId provinceId);
 
 const std::shared_ptr<ArdaProvince> &capitalOf(const State &state,
-												PolityId polityId);
+                                               PolityId polityId);
 
 void refreshDominantCulture(ProvinceState &province);
 void relocateCapital(State &state, PolityId polityId);

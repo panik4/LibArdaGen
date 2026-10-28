@@ -53,7 +53,9 @@ void simulateYears(const Configuration &configuration,
   Fwg::Utils::Logging::logLine(
       "History setup timing: initial timeline snapshot = ",
       std::chrono::duration<double, std::milli>(
-          std::chrono::steady_clock::now() - snapshotStart).count(), " ms");
+          std::chrono::steady_clock::now() - snapshotStart)
+          .count(),
+      " ms");
   for (Year year = configuration.startYear; year < configuration.targetYear;) {
     const Year nextYear =
         std::min(year + stepFor(configuration, year), configuration.targetYear);
@@ -83,22 +85,22 @@ void simulateYears(const Configuration &configuration,
     warfare::resolveWars(nextYear, centuries, configuration, run.normalized,
                          run.state, run.append, run.result.wars, run.nextWarId,
                          run.result.events);
-    polity::updatePoliticalStates(nextYear, centuries, configuration, run.state,
-                                  run.append,
-                                  std::span<const WarEvent>(run.result.wars)
-                                      .subspan(firstCurrentWar),
-                                  run.result.governmentTransitions);
+    polity::updatePoliticalStates(
+        nextYear, centuries, configuration, run.state, run.append,
+        std::span<const WarEvent>(run.result.wars).subspan(firstCurrentWar),
+        run.result.governmentTransitions);
     culture::evolveAndReligions(nextYear, centuries, configuration,
                                 run.normalized, run.state, run.append,
                                 run.nextCulture, run.nextReligion);
+    polity::implode(nextYear, centuries, configuration, run.normalized,
+                    run.state, run.append, run.nextPolity);
     if (nextYear >= configuration.regionOwnershipYear)
       polity::consolidateRegions(nextYear, configuration, run.normalized,
                                  run.state, run.append);
     polity::dissolveEmpty(nextYear, run.state, run.append);
+    development::updatePolityStrengths(nextYear, run.state, run.append, true);
     polity::captureTimelineSnapshot(nextYear, run.normalized, run.state,
                                     run.result.polityTimeline);
-    polity::implode(nextYear, centuries, configuration, run.normalized,
-                    run.state, run.append, run.nextPolity);
     year = nextYear;
   }
 }
@@ -107,28 +109,28 @@ void finalize(const Configuration &configuration,
               const std::map<ProvinceId, RegionId> &provinceRegions,
               detail::SimulationRun &run) {
   run.result.finalState = run.state;
-  for (const auto &error :
-       validation::validateState(run.state, configuration, provinceRegions,
-                                 configuration.targetYear, true))
+  for (const auto &error : validation::validateState(
+           run.state, configuration, provinceRegions, configuration.targetYear,
+           configuration.targetYear >= configuration.regionOwnershipYear))
     run.result.errors.push_back(error);
   Year previousYear = configuration.startYear;
-  for (const auto &event : run.result.events) {
-    if (event.year < configuration.startYear ||
-        event.year > configuration.targetYear)
+  for (size_t index = 0; index < run.result.events.size(); ++index) {
+    const auto &header = run.result.events.header(index);
+    const auto addError = [&](const char *message) {
+      const auto event = run.result.events.materialize(index);
       run.result.errors.push_back(
-          {event.year, "Event year is outside the configured simulation range",
+          {header.year, message,
            event.provinceId >= 0 ? std::optional<ProvinceId>(event.provinceId)
                                  : std::nullopt,
            event.regionId >= 0 ? std::optional<RegionId>(event.regionId)
                                : std::nullopt});
-    if (event.year < previousYear)
-      run.result.errors.push_back(
-          {event.year, "Events are not ordered chronologically",
-           event.provinceId >= 0 ? std::optional<ProvinceId>(event.provinceId)
-                                 : std::nullopt,
-           event.regionId >= 0 ? std::optional<RegionId>(event.regionId)
-                               : std::nullopt});
-    previousYear = event.year;
+    };
+    if (header.year < configuration.startYear ||
+        header.year > configuration.targetYear)
+      addError("Event year is outside the configured simulation range");
+    if (header.year < previousYear)
+      addError("Events are not ordered chronologically");
+    previousYear = header.year;
   }
 }
 

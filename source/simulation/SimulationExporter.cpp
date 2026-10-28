@@ -101,31 +101,40 @@ struct OwnershipEpisode {
 using OwnershipEpisodes = std::map<ProvinceId, std::vector<OwnershipEpisode>>;
 
 OwnershipEpisodes buildOwnershipEpisodes(const State &state,
-                                         const std::vector<Event> &events) {
+                                         const EventStore &events) {
   OwnershipEpisodes episodes;
   std::map<ProvinceId, std::pair<PolityId, Year>> current;
-  for (const auto &event : events) {
-    const bool initializes = event.type == EventType::InitializeProvince;
-    const bool transfers = event.type == EventType::TransferProvince ||
-                           event.type == EventType::ConsolidateRegion ||
-                           event.type == EventType::ColonizeProvince;
+  for (size_t index = 0; index < events.size(); ++index) {
+    const auto type = events.header(index).type;
+    const bool initializes = type == EventType::InitializeProvince;
+    const bool transfers = type == EventType::TransferProvince ||
+                           type == EventType::ConsolidateRegion ||
+                           type == EventType::ColonizeProvince;
     if (!initializes && !transfers)
       continue;
-    if (initializes) {
-      current[event.provinceId] = {event.polityId, event.year};
-      continue;
-    }
-    const auto currentOwner = current.find(event.provinceId);
-    const auto previousOwner = currentOwner == current.end()
-                                   ? event.previousPolityId
-                                   : currentOwner->second.first;
-    const auto startYear = currentOwner == current.end()
-                               ? event.year
-                               : currentOwner->second.second;
-    if (previousOwner != NoPolity && previousOwner != event.polityId)
-      episodes[event.provinceId].push_back(
-          {previousOwner, startYear, event.year});
-    current[event.provinceId] = {event.polityId, event.year};
+    events.visit(index, [&]<EventType Type>(const EventHeader &header,
+                                            const EventPayload<Type> &event) {
+      if constexpr (Type == EventType::InitializeProvince ||
+                    Type == EventType::TransferProvince ||
+                    Type == EventType::ConsolidateRegion ||
+                    Type == EventType::ColonizeProvince) {
+        if constexpr (Type == EventType::InitializeProvince) {
+          current[event.provinceId] = {event.polityId, header.year};
+        } else {
+          const auto currentOwner = current.find(event.provinceId);
+          const auto previousOwner = currentOwner == current.end()
+                                         ? event.previousPolityId
+                                         : currentOwner->second.first;
+          const auto startYear = currentOwner == current.end()
+                                     ? header.year
+                                     : currentOwner->second.second;
+          if (previousOwner != NoPolity && previousOwner != event.polityId)
+            episodes[event.provinceId].push_back(
+                {previousOwner, startYear, header.year});
+          current[event.provinceId] = {event.polityId, header.year};
+        }
+      }
+    });
   }
   for (const auto &[provinceId, ownership] : current)
     if (ownership.first != NoPolity)
@@ -146,12 +155,13 @@ void appendRegion(const std::map<ProvinceId, RegionId> &provinceRegions,
 
 void exportCoresAndClaims(SimulationExport &exported, const State &state,
                           const std::map<ProvinceId, RegionId> &provinceRegions,
-                          const std::vector<Event> &events,
+                          const EventStore &events,
                           const SimulationPolityHistory &polityHistory,
                           const Configuration &configuration) {
   std::set<std::tuple<PolityId, RegionId, ClaimSource>> seenClaims;
-  const auto addClaim = [&exported, &seenClaims](PolityId polityId, RegionId regionId,
-                                    ClaimSource source) {
+  const auto addClaim = [&exported, &seenClaims](PolityId polityId,
+                                                 RegionId regionId,
+                                                 ClaimSource source) {
     if (polityId == NoPolity || regionId < 0)
       return;
     auto &records = exported.claimRecords;
@@ -194,13 +204,23 @@ void exportCoresAndClaims(SimulationExport &exported, const State &state,
       currentRegionOwners.try_emplace(regionId, province->owner);
   }
   std::set<RegionId> regionSimulationRegions;
-  for (const auto &event : events)
-    if (event.regionId >= 0 &&
-        event.year >= configuration.regionOwnershipYear &&
-        (event.type == EventType::ConsolidateRegion ||
-         event.type == EventType::TransferProvince ||
-         event.type == EventType::ColonizeProvince))
-      regionSimulationRegions.insert(event.regionId);
+  for (size_t index = 0; index < events.size(); ++index) {
+    const auto &header = events.header(index);
+    if (header.year >= configuration.regionOwnershipYear &&
+        (header.type == EventType::ConsolidateRegion ||
+         header.type == EventType::TransferProvince ||
+         header.type == EventType::ColonizeProvince)) {
+      events.visit(index,
+                   [&]<EventType Type>(const EventHeader &,
+                                       const EventPayload<Type> &payload) {
+                     if constexpr (Type == EventType::ConsolidateRegion ||
+                                   Type == EventType::TransferProvince ||
+                                   Type == EventType::ColonizeProvince)
+                       if (payload.regionId >= 0)
+                         regionSimulationRegions.insert(payload.regionId);
+                   });
+    }
+  }
 
   for (const auto &[regionId, historicalOwners] :
        polityHistory.historicalRegionOwners) {
@@ -241,8 +261,8 @@ void exportCoresAndClaims(SimulationExport &exported, const State &state,
       if (province->continentId >= 0)
         continents[polityId].insert(province->continentId);
     }
-    const auto *capital = state::findProvince(
-        state, polityExport.polity.capitalProvince);
+    const auto *capital =
+        state::findProvince(state, polityExport.polity.capitalProvince);
     if (capital)
       capitalLandMass[polityId] = capital->landMassID;
   }
@@ -258,12 +278,11 @@ void exportCoresAndClaims(SimulationExport &exported, const State &state,
           continue;
         cultureMatch |= primaryCultures[polityId] >= 0 &&
                         province->culture == primaryCultures[polityId];
-        capitalLandMassMatch |= capitalLandMass.contains(polityId) &&
-                                province->landMassID >= 0 &&
-                                province->landMassID == capitalLandMass[polityId];
+        capitalLandMassMatch |=
+            capitalLandMass.contains(polityId) && province->landMassID >= 0 &&
+            province->landMassID == capitalLandMass[polityId];
         detachedLandMassMatch |=
-            province->landMassID >= 0 &&
-            capitalLandMass.contains(polityId) &&
+            province->landMassID >= 0 && capitalLandMass.contains(polityId) &&
             province->landMassID != capitalLandMass[polityId] &&
             landMasses[polityId].contains(province->landMassID);
         continentMatch |= province->continentId >= 0 &&
@@ -272,11 +291,9 @@ void exportCoresAndClaims(SimulationExport &exported, const State &state,
       if (cultureMatch)
         addClaim(polityId, regionId, ClaimSource::CultureUnification);
       if (capitalLandMassMatch)
-        addClaim(polityId, regionId,
-                 ClaimSource::CapitalLandmassUnification);
+        addClaim(polityId, regionId, ClaimSource::CapitalLandmassUnification);
       if (detachedLandMassMatch)
-        addClaim(polityId, regionId,
-                 ClaimSource::DetachedLandmassUnification);
+        addClaim(polityId, regionId, ClaimSource::DetachedLandmassUnification);
       if (continentMatch)
         addClaim(polityId, regionId, ClaimSource::ContinentUnification);
       (void)polityExport;
@@ -444,16 +461,17 @@ void exportSignificantPolities(SimulationExport &exported, const State &state) {
     }
     const auto [exportedPolity, inserted] =
         exported.polities.emplace(polityId, std::move(polityExport));
-    if (inserted) {
+    if (inserted && ownsFinalProvince) {
       auto &formStrength =
-          exported.governmentFormStrength[
-              exportedPolity->second.polity.governmentForm];
+          exported.governmentFormStrength[exportedPolity->second.polity
+                                              .governmentForm];
       ++formStrength.polityCount;
       formStrength.population += exportedPolity->second.strength.population;
       formStrength.development += exportedPolity->second.strength.development;
       formStrength.score += exportedPolity->second.strength.score;
-      auto &directionStrength = exported.politicalDirectionStrength[
-          politicalDirection(exportedPolity->second.polity.governmentForm)];
+      auto &directionStrength =
+          exported.politicalDirectionStrength[politicalDirection(
+              exportedPolity->second.polity.governmentForm)];
       directionStrength.development +=
           exportedPolity->second.strength.development;
     }
@@ -492,8 +510,8 @@ void exportPolityStatistics(SimulationExport &exported) {
     if (owner == exported.polities.end())
       continue;
     ++owner->second.statistics.formableCount;
-    ++owner->second.statistics.formableCountsByRequiredProvinceCount[
-        formable.requiredProvinceIds.size()];
+    ++owner->second.statistics.formableCountsByRequiredProvinceCount
+          [formable.requiredProvinceIds.size()];
   }
 }
 
@@ -501,10 +519,10 @@ void exportPolityStatistics(SimulationExport &exported) {
 
 SimulationExport SimulationExporter::exportFinalState(
     const State &state, const std::map<ProvinceId, RegionId> &provinceRegions,
-    const SimulationPolityHistory &polityHistory,
-    const std::vector<Event> &events, const std::vector<WarEvent> &wars,
+    const SimulationPolityHistory &polityHistory, const EventStore &events,
+    const std::vector<WarEvent> &wars,
     const std::map<ProvinceId, size_t> &provinceAreas,
-     const Configuration &configuration) {
+    const Configuration &configuration) {
   SimulationExport exported;
   exported.year = state.year;
   exported.cultures = state.cultures;
@@ -516,8 +534,8 @@ SimulationExport SimulationExporter::exportFinalState(
   exportProvinceData(exported, state, provinceRegions, provinceAreas, metrics);
   exportHistoricalOwnership(exported, state, provinceRegions, polityHistory);
   exportSignificantPolities(exported, state);
-  exportCoresAndClaims(exported, state, provinceRegions, events,
-                       polityHistory, configuration);
+  exportCoresAndClaims(exported, state, provinceRegions, events, polityHistory,
+                       configuration);
   exportFormables(exported, state, provinceRegions, polityHistory);
   exportPolityStatistics(exported);
   return exported;

@@ -15,8 +15,8 @@
 namespace Arda::Simulation::setup {
 namespace {
 
-// Counts eligible sources in province-ID order, preserving random rank selection
-// without rebuilding or walking the entire expansion frontier.
+// Counts eligible sources in province-ID order, preserving random rank
+// selection without rebuilding or walking the entire expansion frontier.
 class ExpansionFrontier {
 public:
   explicit ExpansionFrontier(size_t size) : counts(size + 1) {}
@@ -167,7 +167,9 @@ void initializeWorld(const Configuration &configuration,
   Fwg::Utils::Logging::logLine(
       "History setup timing: superregion initialization = ",
       std::chrono::duration<double, std::milli>(
-          std::chrono::steady_clock::now() - superRegionStart).count(), " ms");
+          std::chrono::steady_clock::now() - superRegionStart)
+          .count(),
+      " ms");
   const auto territoryStart = std::chrono::steady_clock::now();
   std::vector<ProvinceId> provinceIds;
   provinceIds.reserve(run.normalized.provinces.size());
@@ -207,7 +209,8 @@ void initializeWorld(const Configuration &configuration,
         if (unassigned.contains(neighbourId))
           ++unassignedNeighbourCounts[index];
       }
-      if (provinceOwners.contains(provinceId) && unassignedNeighbourCounts[index])
+      if (provinceOwners.contains(provinceId) &&
+          unassignedNeighbourCounts[index])
         frontier.add(index, 1);
     }
     while (!unassigned.empty() && frontier.size() > 0) {
@@ -218,8 +221,8 @@ void initializeWorld(const Configuration &configuration,
       for (const auto neighbourId : run.normalized.neighbours.at(source))
         if (unassigned.contains(neighbourId))
           candidates.push_back(neighbourId);
-      const auto assigned = candidates[static_cast<size_t>(RandNum::getRandom<int>(
-          static_cast<int>(candidates.size())))];
+      const auto assigned = candidates[static_cast<size_t>(
+          RandNum::getRandom<int>(static_cast<int>(candidates.size())))];
       const auto assignedIndex = provinceIndices.at(assigned);
       unassigned.erase(assigned);
       // Reverse edges also handle directed adjacency. Update before marking the
@@ -245,7 +248,8 @@ void initializeWorld(const Configuration &configuration,
   Fwg::Utils::Logging::logLine(
       "History setup timing: initial territory allocation = ",
       std::chrono::duration<double, std::milli>(
-          std::chrono::steady_clock::now() - territoryStart).count(),
+          std::chrono::steady_clock::now() - territoryStart)
+          .count(),
       " ms | polities=", polityProvinces.size());
   const auto polityStart = std::chrono::steady_clock::now();
   for (size_t index = 0; index < polityProvinces.size(); ++index) {
@@ -268,16 +272,17 @@ void initializeWorld(const Configuration &configuration,
     createPolity.governmentForm = GovernmentForm::Tribal;
     createPolity.stability = configuration.initialPolityStability;
     createPolity.lastGovernmentTransitionYear = configuration.startYear;
-    createPolity.centralizationAffinity = std::clamp(
-        configuration.centralizationAffinityMinimum +
-            RandNum::getRandom<double>(1.0) *
-                (configuration.centralizationAffinityMaximum -
-                 configuration.centralizationAffinityMinimum),
-        0.0, 2.0);
+    createPolity.centralizationAffinity =
+        std::clamp(configuration.centralizationAffinityMinimum +
+                       RandNum::getRandom<double>(1.0) *
+                           (configuration.centralizationAffinityMaximum -
+                            configuration.centralizationAffinityMinimum),
+                   0.0, 2.0);
     createPolity.politicalPower = initialPoliticalPower();
     createPolity.desiredPoliticalPower = createPolity.politicalPower;
     createPolity.governmentPopularity.fill(0.0);
-    createPolity.governmentPopularity[static_cast<std::size_t>(GovernmentForm::Tribal)] = 1.0;
+    createPolity.governmentPopularity[static_cast<std::size_t>(
+        GovernmentForm::Tribal)] = 1.0;
     createPolity.militaryInfluence = RandNum::getRandom<double>(0.25);
     createPolity.desiredMilitaryInfluence = createPolity.militaryInfluence;
     createPolity.partyControl = RandNum::getRandom<double>(0.15);
@@ -291,7 +296,9 @@ void initializeWorld(const Configuration &configuration,
   Fwg::Utils::Logging::logLine(
       "History setup timing: polity initialization = ",
       std::chrono::duration<double, std::milli>(
-          std::chrono::steady_clock::now() - polityStart).count(), " ms");
+          std::chrono::steady_clock::now() - polityStart)
+          .count(),
+      " ms");
   const auto provinceStart = std::chrono::steady_clock::now();
   for (const auto &[provinceId, province] : run.normalized.provinces) {
     const auto polityId = provinceOwners.at(provinceId);
@@ -348,7 +355,9 @@ void initializeWorld(const Configuration &configuration,
   Fwg::Utils::Logging::logLine(
       "History setup timing: province initialization = ",
       std::chrono::duration<double, std::milli>(
-          std::chrono::steady_clock::now() - provinceStart).count(), " ms");
+          std::chrono::steady_clock::now() - provinceStart)
+          .count(),
+      " ms");
   const auto regionalPhaseStart = std::chrono::steady_clock::now();
   for (const auto &[regionId, provinces] : run.normalized.regions)
     run.append({configuration.startYear, EventType::SetRegionalPhase, -1,
@@ -358,7 +367,9 @@ void initializeWorld(const Configuration &configuration,
   Fwg::Utils::Logging::logLine(
       "History setup timing: regional phase initialization = ",
       std::chrono::duration<double, std::milli>(
-          std::chrono::steady_clock::now() - regionalPhaseStart).count(), " ms");
+          std::chrono::steady_clock::now() - regionalPhaseStart)
+          .count(),
+      " ms");
 }
 
 } // namespace Arda::Simulation::setup
