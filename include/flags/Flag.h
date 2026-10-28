@@ -1,12 +1,14 @@
 #pragma once
 #include "FastWorldGenerator.h"
+#include "utils/ArdaUtils.h"
+#include <set>
 #include "io/Textures.h"
 #include "parsing/ArdaParserUtils.h"
 #include "utils/SerialisationFwd.h"
 
 namespace Arda::Gfx {
 struct FlagInfo {
-  std::vector<std::string> flagColourGroups;
+  std::map<Fwg::Gfx::Colour, std::string> flagColourGroups;
   std::vector<std::string> symbolColourGroups;
   bool applySymbol;
   double symbolWidthOffset;
@@ -16,30 +18,36 @@ struct FlagInfo {
 
 struct SymbolInfo {
   bool replaceColour;
+  std::set<Arda::Utils::Ideology> allowedIdeologies;
 };
 
 class Flag {
-  // keep code shorter
-  // static cause we only want to read them from file once
+  struct BackgroundTemplate {
+    std::vector<uint8_t> image;
+    FlagInfo info;
+  };
+  struct SymbolTemplate {
+    std::vector<uint8_t> image;
+    SymbolInfo info;
+  };
+  static bool resourcesLoaded;
   static std::map<std::string, std::vector<Fwg::Gfx::Colour>> colourGroups;
-  static std::vector<std::vector<std::vector<int>>> flagTypes;
-  static std::vector<std::vector<std::vector<std::string>>> flagTypeColours;
-  static std::vector<std::vector<uint8_t>> flagTemplates;
-  static std::vector<FlagInfo> flagMetadata;
-  static std::vector<SymbolInfo> symbolMetadata;
-  static std::vector<std::vector<uint8_t>> symbolTemplates;
+  static std::vector<BackgroundTemplate> flagTemplates;
+  static std::vector<SymbolTemplate> symbolTemplates;
+  void recolourBackground(const FlagInfo &info);
+  void compositeSymbol(const FlagInfo &info, Arda::Utils::Ideology ideology);
   // containers
   std::vector<Fwg::Gfx::Colour> colours;
   std::vector<unsigned char> image;
 
 public:
   // vars
-  int width;
-  int height;
+  int width = 0;
+  int height = 0;
   // constructors/destructors
-  Flag();
-  Flag(const int width, const int height);
-  ~Flag();
+  Flag() = default;
+  Flag(const int width, const int height, Arda::Utils::Ideology ideology);
+
   // methods - image read/write
   void setPixel(const Fwg::Gfx::Colour colour, const int x, const int y);
   void setPixel(const Fwg::Gfx::Colour colour, const int index);
@@ -51,11 +59,7 @@ public:
   resize(const int width, const int height,
          const std::vector<unsigned char> &tImage, const int inWidth,
          const int inHeight);
-  // methods - read in configs
-  static void readColourGroups();
-  static void readFlagTypes();
-  static void readFlagTemplates();
-  static void readSymbolTemplates();
+  static void loadResources(const std::string &resourcePath);
 
   template<class Archive>
   void serialize(Archive &ar, const unsigned int /*version*/) {

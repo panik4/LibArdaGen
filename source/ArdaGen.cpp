@@ -235,10 +235,7 @@ ArdaGen::ArdaGen() {
 ArdaGen::ArdaGen(const std::string &configSubFolder)
     : FastWorldGenerator(configSubFolder) {
   Fwg::Utils::Logging::logLine("ArdaGen::ArdaGen");
-  Gfx::Flag::readColourGroups();
-  Gfx::Flag::readFlagTypes();
-  Gfx::Flag::readFlagTemplates();
-  Gfx::Flag::readSymbolTemplates();
+  Gfx::Flag::loadResources(Fwg::Cfg::Values().resourcePath);
   superRegionMap = Image(0, 0, 24);
   factories.provinceFactory = []() {
     return std::make_shared<Arda::ArdaProvince>();

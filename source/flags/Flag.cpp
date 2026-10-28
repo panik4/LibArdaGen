@@ -1,225 +1,181 @@
 #include "flags/Flag.h"
+#include <cmath>
+#include <limits>
 
 namespace Arda::Gfx {
-using namespace Fwg;
+namespace {
+using Colour = Fwg::Gfx::Colour;
 namespace PU = Fwg::Parsing;
+Colour pixelColour(const std::vector<uint8_t> &image, size_t i) {
+  return Colour(image[i + 2], image[i + 1], image[i]);
+}
+size_t imageSize(int width, int height) {
+  if (width <= 0 || height <= 0 ||
+      static_cast<size_t>(width) > std::numeric_limits<size_t>::max() / 4 / height)
+    throw std::runtime_error("Flag: invalid image dimensions");
+  return static_cast<size_t>(width) * height * 4;
+}
+Colour pickDistinctColour(const std::vector<Colour> &pool,
+                          const std::vector<Colour> &existing) {
+  if (pool.empty()) throw std::runtime_error("Flag: empty colour pool");
+  std::vector<Colour> valid, best;
+  int bestDistance = -1;
+  for (const auto &c : pool) {
+    int distance = 765;
+    for (const auto &e : existing) distance = std::min(distance, c.distance(e));
+    if (distance >= 90) valid.push_back(c);
+    if (distance > bestDistance) { best.clear(); bestDistance = distance; }
+    if (distance == bestDistance) best.push_back(c);
+  }
+  const auto &choices = valid.empty() ? best : valid;
+  return choices[RandNum::getRandom(choices.size())];
+}
+std::string trim(std::string s) {
+  const std::string whitespace = std::string(" ") + char(9) + char(13) + char(10);
+  const auto start = s.find_first_not_of(whitespace);
+  return start == std::string::npos ? "" :
+      s.substr(start, s.find_last_not_of(whitespace) - start + 1);
+}
+double number(const std::string &s) {
+  size_t end;
+  const auto value = std::stod(trim(s), &end);
+  if (end != trim(s).size() || !std::isfinite(value))
+    throw std::runtime_error("invalid finite number: " + s);
+  return value;
+}
+Colour parseColour(const std::string &s) {
+  auto fields = PU::getTokens(s, ',');
+  if (fields.size() != 3) throw std::runtime_error("RGB requires three channels: " + s);
+  int rgb[3];
+  for (int i = 0; i < 3; ++i) {
+    auto n = number(fields[i]);
+    if (n < 0 || n > 255 || n != std::floor(n))
+      throw std::runtime_error("invalid RGB channel: " + fields[i]);
+    rgb[i] = static_cast<int>(n);
+  }
+  return Colour(rgb[0], rgb[1], rgb[2]);
+}
+bool boolean(const std::string &s) {
+  if (trim(s) == "true") return true;
+  if (trim(s) == "false") return false;
+  throw std::runtime_error("invalid boolean: " + s);
+}
+std::vector<std::string> metadata(const std::filesystem::path &path, size_t count) {
+  auto lines = PU::getLines(path.string());
+  std::vector<std::string> data;
+  for (const auto &line : lines)
+    if (!trim(line).empty()) data.push_back(line);
+  if (data.size() != 1) throw std::runtime_error("expected one metadata line");
+  auto fields = PU::getTokens(data[0], ';');
+  for (auto &f : fields) f = trim(f);
+  if (fields.size() != count) throw std::runtime_error("incorrect metadata field count");
+  return fields;
+}
+std::vector<uint8_t> readTemplate(const std::filesystem::path &path, int w, int h) {
+  // readTGA returns pixels only, so verify dimensions from the TGA header too.
+  std::ifstream file(path, std::ios::binary);
+  unsigned char header[18]{};
+  if (!file.read(reinterpret_cast<char *>(header), 18) ||
+      (header[12] + 256 * header[13]) != w ||
+      (header[14] + 256 * header[15]) != h)
+    throw std::runtime_error("incorrect TGA dimensions: " + path.string());
+  auto pixels = Textures::readTGA(path.string());
+  if (pixels.size() != imageSize(w, h)) throw std::runtime_error("incorrect pixel buffer");
+  return pixels;
+}
+}
+bool Flag::resourcesLoaded = false;
 std::map<std::string, std::vector<Fwg::Gfx::Colour>> Flag::colourGroups;
-std::vector<std::vector<std::vector<int>>> Flag::flagTypes(7);
-std::vector<std::vector<std::vector<std::string>>> Flag::flagTypeColours(7);
-std::vector<std::vector<uint8_t>> Flag::flagTemplates;
-std::vector<std::vector<uint8_t>> Flag::symbolTemplates;
-std::vector<FlagInfo> Flag::flagMetadata;
-std::vector<SymbolInfo> Flag::symbolMetadata;
-Flag::Flag() {}
+std::vector<Flag::BackgroundTemplate> Flag::flagTemplates;
+std::vector<Flag::SymbolTemplate> Flag::symbolTemplates;
 
-Fwg::Gfx::Colour
-pickDistinctColour(const std::vector<Fwg::Gfx::Colour> &pool,
-                   const std::vector<Fwg::Gfx::Colour> &existing,
-                   int minDistance, int maxAttempts = 50) {
-  if (pool.empty()) {
-    throw std::runtime_error("pickDistinctColour: colour pool is empty");
-  }
-
-  Fwg::Gfx::Colour chosen;
-  bool valid = false;
-  int attempts = 0;
-
-  do {
-    chosen = pool[RandNum::getRandom(pool.size())];
-    valid = true;
-    for (const auto &e : existing) {
-      if (chosen.distance(e) < minDistance) {
-        valid = false;
-        break;
-      }
-    }
-  } while (!valid && ++attempts < maxAttempts);
-
-  return chosen;
+Flag::Flag(int width, int height, Arda::Utils::Ideology ideology) : width(width), height(height) {
+  if (width != 82 || height != 52) throw std::runtime_error("Flag generation requires 82x52");
+  if (!resourcesLoaded) throw std::runtime_error("Flag resources have not been initialized");
+  const auto &background = flagTemplates[RandNum::getRandom(flagTemplates.size())];
+  image = background.image;
+  recolourBackground(background.info);
+  if (background.info.applySymbol) compositeSymbol(background.info, ideology);
 }
-
-Flag::Flag(const int width, const int height) : width(width), height(height) {
-  image = std::vector<unsigned char>(width * height * 4, 0);
-  auto randomIndex = RandNum::getRandom(flagTemplates.size());
-  image = flagTemplates[randomIndex];
-  const auto &flagInfo = flagMetadata[randomIndex];
-  // get the template and map all colours to indices
-  std::map<Fwg::Gfx::Colour, std::vector<int>> colourMapping;
-  for (auto i = 0; i < image.size(); i += 4) {
-    Fwg::Gfx::Colour temp(image[i + 2], image[i + 1], image[i]);
-    colourMapping[temp].push_back(i);
+void Flag::recolourBackground(const FlagInfo &info) {
+  std::map<Colour, Colour> replacements;
+  std::vector<Colour> selected;
+  for (const auto &[source, group] : info.flagColourGroups) {
+    auto chosen = pickDistinctColour(colourGroups.at(group), selected);
+    replacements.emplace(source, chosen);
+    selected.push_back(chosen);
   }
-  // determine replacements for the colours in the template.
-  // pool of colours is taken from colour groups defined in metadata files
-  std::vector<Fwg::Gfx::Colour> replacementColours;
-  const int minDistance = 90;
-
-  for (auto &colGroup : flagInfo.flagColourGroups) {
-    const auto &pool = colourGroups[colGroup];
-    auto chosen = pickDistinctColour(pool, replacementColours, minDistance);
-    replacementColours.push_back(chosen);
-  }
-
-  // now convert the old colours to the replacement colours
-  // alpha values stay the same
-  int colIndex = 0;
-  for (const auto &mapping : colourMapping) {
-    // ensure colIndex is in range
-    colIndex = std::min<int>(colIndex,
-                             static_cast<int>(replacementColours.size() - 1));
-    for (auto index : mapping.second) {
-      setPixel(replacementColours[colIndex], index);
-    }
-    colIndex++;
-  }
-
-  if (flagInfo.applySymbol) {
-    // now load symbol templates
-    randomIndex = RandNum::getRandom(symbolTemplates.size());
-    auto symbol{symbolTemplates[randomIndex]};
-    auto symbolInfo{symbolMetadata[randomIndex]};
-
-    // now resize symbol
-    int newSize = static_cast<int>(52.0 * flagInfo.reductionFactor);
-    symbol = Flag::resize(newSize, newSize, symbol, 52, 52);
-
-    replacementColours.clear();
-    // 1. Build colour mapping from resized symbol
-    colourMapping.clear();
-    for (auto i = 0; i < symbol.size(); i += 4) {
-      if (symbol[i + 3] > 0) { // only non-transparent pixels
-        Fwg::Gfx::Colour temp(symbol[i + 2], symbol[i + 1], symbol[i]);
-        colourMapping[temp].push_back(i);
-      }
-    }
-
-    // 2. Determine final colours for each mapping
-    std::vector<Fwg::Gfx::Colour> finalColours;
-    if (symbolInfo.replaceColour) {
-      // Build avoid list from current flag pixels
-      std::vector<Fwg::Gfx::Colour> avoidColours;
-      for (size_t i = 0; i < image.size(); i += 4) {
-        if (image[i + 3] > 0) { // only non-transparent
-          Fwg::Gfx::Colour c(image[i + 2], image[i + 1], image[i]);
-          bool tooClose = false;
-          for (const auto &ec : avoidColours) {
-            if (c.distance(ec) <
-                minDistance) { // same threshold as pickDistinctColour
-              tooClose = true;
-              break;
-            }
-          }
-          if (!tooClose)
-            avoidColours.push_back(c);
-        }
-      }
-
-      // Now pick symbol colours ensuring they are distinct
-      for (const auto &colGroup : flagInfo.symbolColourGroups) {
-        const auto &pool = colourGroups[colGroup];
-        auto chosen = pickDistinctColour(pool, avoidColours, minDistance);
-        finalColours.push_back(chosen);
-        avoidColours.push_back(chosen); // also avoid same symbol colour twice
-      }
-    } else {
-      // Use original colours from symbol (BGR ordering)
-      for (const auto &mapping : colourMapping) {
-        int index = mapping.second.front();
-        Fwg::Gfx::Colour original(symbol[index + 2], // R
-                                  symbol[index + 1], // G
-                                  symbol[index]);    // B
-        finalColours.push_back(original);
-      }
-    }
-
-    // 3. Helper: blend pixel onto the flag
-    auto blendPixel = [&](const Fwg::Gfx::Colour &src, unsigned char alpha,
-                          int targetIndex) {
-      if (alpha > 127) { // or alpha > 0 if you want any visibility
-        image[targetIndex] = src.getBlue();
-        image[targetIndex + 1] = src.getGreen();
-        image[targetIndex + 2] = src.getRed();
-        image[targetIndex + 3] = 255;
-      } else {
-      }
-    };
-
-    // 4. Apply the symbol onto the flag
-    colIndex = 0;
-    const int lineSize = 328;
-    const int symbolLineSize = 52 * 4;
-
-    for (const auto &mapping : colourMapping) {
-      colIndex =
-          std::min<int>(colIndex, static_cast<int>(finalColours.size() - 1));
-      const auto &colourToUse = finalColours[colIndex];
-      for (auto byteIndex : mapping.second) {
-        int pixelIndexInSymbol = byteIndex / 4;
-        int symbolWidthPixels = static_cast<int>(52 * flagInfo.reductionFactor);
-
-        int symY = pixelIndexInSymbol / symbolWidthPixels;
-        int symX = pixelIndexInSymbol % symbolWidthPixels;
-
-        int dstY = static_cast<int>(flagInfo.symbolHeightOffset * 52) + symY;
-        int dstX =
-            static_cast<int>(flagInfo.symbolWidthOffset * this->width) + symX;
-
-        if (dstY < 0 || dstY >= this->height)
-          continue;
-        if (dstX < 0 || dstX >= this->width)
-          continue;
-
-        int dstByteIndex = (dstY * this->width + dstX) * 4;
-
-        uint8_t alpha = symbol[byteIndex + 3];
-        blendPixel(colourToUse, alpha, dstByteIndex);
-      }
-      colIndex++;
-    }
-  }
-  return;
-}
-
-Flag::~Flag() {}
-
-void Flag::setPixel(const Fwg::Gfx::Colour colour, const int x, const int y) {
-  if (Utils::Math::inRange(0, width * height * 4 + 3,
-                           (x * width + y) * 4 + 3)) {
-    for (auto i = 0; i < 3; i++)
-      image[(x * width + y) * 4 + i] = colour.getBGR()[i];
-    image[(x * width + y) * 4 + 3] = 255;
+  for (size_t i = 0; i < image.size(); i += 4) {
+    setPixel(replacements.at(pixelColour(image, i)), static_cast<int>(i));
+    image[i + 3] = 255;
   }
 }
-
-void Flag::setPixel(const Fwg::Gfx::Colour colour, const int index) {
-  if (Utils::Math::inRange(0, width * height * 4 + 3, index)) {
-    for (auto i = 0; i < 3; i++)
-      image[index + i] = colour.getBGR()[i];
-    image[index + 3] = 255;
+void Flag::compositeSymbol(const FlagInfo &info, Arda::Utils::Ideology ideology) {
+  std::vector<const SymbolTemplate *> eligible;
+  for (const auto &symbol : symbolTemplates)
+    if (symbol.info.allowedIdeologies.contains(ideology))
+      eligible.push_back(&symbol);
+  if (eligible.empty()) return;
+  const auto &entry = *eligible[RandNum::getRandom(eligible.size())];
+  const int size = static_cast<int>(52 * info.reductionFactor);
+  const auto symbol = resize(size, size, entry.image, 52, 52);
+  Colour replacement;
+  if (entry.info.replaceColour) {
+    std::vector<Colour> existing;
+    for (size_t i = 0; i < image.size(); i += 4) {
+      auto c = pixelColour(image, i);
+      if (std::find(existing.begin(), existing.end(), c) == existing.end())
+        existing.push_back(c);
+    }
+    replacement = pickDistinctColour(colourGroups.at(info.symbolColourGroups.front()), existing);
   }
-}
-
-std::vector<unsigned char> Flag::getFlag() const { return image; }
-
-std::vector<uint8_t> Flag::resize(const int width, const int height) const {
-  auto resized = std::vector<unsigned char>(width * height * 4, 0);
-  if (!width || !height || image.empty()) {
-    return resized;
-  }
-  const auto factor = this->width / width;
-  for (auto h = 0; h < height; h++) {
-    for (auto w = 0; w < width; w++) {
-      auto colourmapIndex = factor * h * this->width + factor * w;
-      colourmapIndex *= 4;
-      resized[(h * width + w) * 4] = image[colourmapIndex];
-      resized[(h * width + w) * 4 + 1] = image[colourmapIndex + 1];
-      resized[(h * width + w) * 4 + 2] = image[colourmapIndex + 2];
-      resized[(h * width + w) * 4 + 3] = image[colourmapIndex + 3];
+  for (int y = 0; y < size; ++y) {
+    for (int x = 0; x < size; ++x) {
+      int dx = static_cast<int>(info.symbolWidthOffset * width) + x;
+      int dy = static_cast<int>(info.symbolHeightOffset * height) + y;
+      if (dx < 0 || dy < 0 || dx >= width || dy >= height) continue;
+      const size_t src = (static_cast<size_t>(y) * size + x) * 4;
+      const size_t dst = (static_cast<size_t>(dy) * width + dx) * 4;
+      const auto colour = entry.info.replaceColour ? replacement : pixelColour(symbol, src);
+      const int alpha = symbol[src + 3];
+      for (int channel = 0; channel < 3; ++channel)
+        image[dst + channel] = static_cast<uint8_t>(
+            (colour.getBGR()[channel] * alpha + image[dst + channel] * (255 - alpha) + 127) / 255);
+      image[dst + 3] = 255;
     }
   }
-  return resized;
 }
-
+void Flag::setPixel(Colour colour, int x, int y) {
+  if (x < 0 || y < 0 || x >= width || y >= height) return;
+  const size_t index = (static_cast<size_t>(y) * width + x) * 4;
+  if (index > static_cast<size_t>(std::numeric_limits<int>::max())) return;
+  setPixel(colour, static_cast<int>(index));
+}
+void Flag::setPixel(Colour colour, int index) {
+  if (index < 0 || index % 4 || image.size() < 4 ||
+      static_cast<size_t>(index) > image.size() - 4) return;
+  for (int c = 0; c < 3; ++c) image[index + c] = colour.getBGR()[c];
+}
+std::vector<uint8_t> Flag::getFlag() const { return image; }
+std::vector<uint8_t> Flag::resize(int width, int height) const {
+  return resize(width, height, image, this->width, this->height);
+}
+std::vector<uint8_t> Flag::resize(int width, int height,
+                                const std::vector<uint8_t> &input, int inWidth, int inHeight) {
+  const size_t outputSize = imageSize(width, height);
+  if (input.size() != imageSize(inWidth, inHeight))
+    throw std::runtime_error("Flag resize: source buffer size mismatch");
+  std::vector<uint8_t> output(outputSize);
+  for (int y = 0; y < height; ++y)
+    for (int x = 0; x < width; ++x) {
+      const auto sy = static_cast<size_t>(y) * inHeight / height;
+      const auto sx = static_cast<size_t>(x) * inWidth / width;
+      const auto src = (sy * inWidth + sx) * 4;
+      const auto dst = (static_cast<size_t>(y) * width + x) * 4;
+      std::copy_n(input.begin() + src, 4, output.begin() + dst);
+    }
+  return output;
+}
 void Flag::flip() {
   for (auto i = 0; i < height / 2; i++) {
     for (auto w = 0; w < width; w++) {
@@ -235,118 +191,84 @@ void Flag::flip() {
   }
 }
 
-std::vector<uint8_t> Flag::resize(const int width, const int height,
-                                  const std::vector<unsigned char> &tImage,
-                                  const int inWidth, const int inHeight) {
-  const int stepSize = 4; // RGBA
-  double xFactor = static_cast<double>(inWidth) / width;
-  double yFactor = static_cast<double>(inHeight) / height;
 
-  std::vector<uint8_t> resized(width * height * stepSize);
-
-  for (int y = 0; y < height; ++y) {
-    int srcY = std::min<int>(inHeight - 1, static_cast<int>(y * yFactor));
-    for (int x = 0; x < width; ++x) {
-      int srcX = std::min<int>(inWidth - 1, static_cast<int>(x * xFactor));
-
-      int srcIndex = (srcY * inWidth + srcX) * stepSize;
-      int dstIndex = (y * width + x) * stepSize;
-
-      // Copy RGBA directly
-      for (int i = 0; i < stepSize; ++i) {
-        resized[dstIndex + i] = tImage[srcIndex + i];
+void Flag::loadResources(const std::string &resourcePath) {
+  if (resourcesLoaded) return;
+  decltype(colourGroups) groups;
+  decltype(flagTemplates) backgrounds;
+  decltype(symbolTemplates) symbols;
+  const auto root = std::filesystem::path(resourcePath) / "flags";
+  auto path = root / "colour_groups.txt";
+  try {
+    for (const auto &line : PU::getLines(path.string())) {
+      if (trim(line).empty()) continue;
+      auto fields = PU::getTokens(line, ';');
+      if (fields.size() < 2 || trim(fields[0]).empty())
+        throw std::runtime_error("palette requires a name and colours");
+      auto name = trim(fields[0]);
+      if (groups.count(name)) throw std::runtime_error("duplicate palette: " + name);
+      for (size_t i = 1; i < fields.size(); ++i)
+        groups[name].push_back(parseColour(fields[i]));
+    }
+    auto requireGroup = [&](const std::string &name) {
+      if (!groups.count(name) || groups.at(name).empty())
+        throw std::runtime_error("unknown or empty palette: " + name);
+    };
+    for (int i = 0; i < 100; ++i) {
+      path = root / "flag_presets" / (std::to_string(i) + ".tga");
+      if (!std::filesystem::exists(path)) continue;
+      auto pixels = readTemplate(path, 82, 52);
+      path.replace_extension(".txt");
+      auto fields = metadata(path, 6);
+      FlagInfo info{};
+      for (const auto &mapping : PU::getTokens(fields[0], '|')) {
+        auto pair = PU::getTokens(mapping, '=');
+        if (pair.size() != 2) throw std::runtime_error("expected explicit RGB=palette mapping");
+        auto group = trim(pair[1]);
+        requireGroup(group);
+        if (!info.flagColourGroups.emplace(parseColour(pair[0]), group).second)
+          throw std::runtime_error("duplicate RGB mapping");
       }
+      for (size_t p = 0; p < pixels.size(); p += 4)
+        if (!info.flagColourGroups.count(pixelColour(pixels, p)))
+          throw std::runtime_error("missing RGB mapping for " + pixelColour(pixels, p).toString());
+      info.applySymbol = boolean(fields[2]);
+      info.symbolColourGroups = {fields[1]};
+      requireGroup(fields[1]);
+      info.symbolWidthOffset = number(fields[3]);
+      info.symbolHeightOffset = number(fields[4]);
+      info.reductionFactor = number(fields[5]);
+      if (info.symbolWidthOffset < 0 || info.symbolWidthOffset > 1 ||
+          info.symbolHeightOffset < 0 || info.symbolHeightOffset > 1 ||
+          info.reductionFactor < 1.0 / 52 || info.reductionFactor > 1)
+        throw std::runtime_error("symbol offsets must be in [0,1], size in [1/52,1]");
+      backgrounds.push_back({std::move(pixels), std::move(info)});
     }
-  }
-  return resized;
-}
-
-void Flag::readColourGroups() {
-  auto lines =
-      PU::getLines(Fwg::Cfg::Values().resourcePath + "flags/colour_groups.txt");
-  for (const auto &line : lines) {
-    if (line.empty())
-      continue;
-
-    auto tokens = PU::getTokens(line, ';');
-    const std::string &groupName = tokens[0];
-
-    for (size_t i = 1; i < tokens.size(); ++i) {
-      auto nums = Arda::Parsing::getNumbers(tokens[i], ',', std::set<int>{});
-
-      if (nums.size() < 3) {
-        std::cerr << "Skipping invalid colour entry in group '" << groupName
-                  << "' at line: " << line << std::endl;
-        continue;
+    for (int i = 0; i < 100; ++i) {
+      path = root / "symbol_presets" / (std::to_string(i) + ".tga");
+      if (!std::filesystem::exists(path)) continue;
+      auto pixels = readTemplate(path, 52, 52);
+      path.replace_extension(".txt");
+      auto fields = metadata(path, 2);
+      SymbolInfo info{boolean(fields[0]), {}};
+      for (const auto &token : PU::getTokens(fields[1], ',')) {
+        const auto name = trim(token);
+        const auto found = Arda::Utils::stringToIdeology.find(name);
+        if (found == Arda::Utils::stringToIdeology.end())
+          throw std::runtime_error("unknown allowed ideology: " + name);
+        info.allowedIdeologies.insert(found->second);
       }
-
-      Fwg::Gfx::Colour c{static_cast<unsigned char>(nums[0]),
-                         static_cast<unsigned char>(nums[1]),
-                         static_cast<unsigned char>(nums[2])};
-      colourGroups[groupName].push_back(c);
+      if (info.allowedIdeologies.empty())
+        throw std::runtime_error("allowed ideologies must not be empty");
+      symbols.push_back({std::move(pixels), std::move(info)});
     }
+    if (backgrounds.empty()) throw std::runtime_error("no backgrounds found");
+  } catch (const std::exception &e) {
+    throw std::runtime_error("Flag resource " + path.string() + ": " + e.what());
   }
-}
-
-void Flag::readFlagTypes() {
-  auto lines =
-      PU::getLines(Fwg::Cfg::Values().resourcePath + "flags/flag_types.txt");
-  for (const auto &line : lines) {
-    if (!line.size())
-      continue;
-    auto tokens = PU::getTokens(line, ';');
-    const auto flagType = stoi(tokens[0]);
-    const auto flagTypeID = flagTypes[flagType].size();
-    const auto symbols = PU::getTokens(tokens[1], ',');
-    const auto colourGroupStrings = PU::getTokens(tokens[2], ',');
-    flagTypes[flagType].push_back(std::vector<int>{});
-    flagTypeColours[flagType].push_back(std::vector<std::string>{});
-    for (const auto &symbolRange : symbols) {
-      const auto &rangeTokens =
-          Arda::Parsing::getNumbers(symbolRange, '-', std::set<int>{});
-      for (auto x = rangeTokens[0]; x <= rangeTokens[1]; x++)
-        flagTypes[flagType][flagTypeID].push_back(x);
-    }
-    for (const auto &cGroup : colourGroupStrings)
-      flagTypeColours[flagType][flagTypeID].push_back(cGroup);
-  }
-}
-
-void Flag::readFlagTemplates() {
-  for (auto i = 0; i < 100; i++) {
-    if (std::filesystem::exists(Fwg::Cfg::Values().resourcePath +
-                                "flags/flag_presets/" + std::to_string(i) +
-                                ".tga")) {
-      flagTemplates.push_back(Gfx::Textures::readTGA(
-          Fwg::Cfg::Values().resourcePath + "flags/flag_presets/" +
-          std::to_string(i) + ".tga"));
-      // get line and immediately tokenize it
-      auto tokens = PU::getTokens(PU::getLines(Fwg::Cfg::Values().resourcePath +
-                                               "flags/flag_presets/" +
-                                               std::to_string(i) + ".txt")[0],
-                                  ';');
-      bool applySymbol = tokens[2] == "true";
-      flagMetadata.push_back(
-          {PU::getTokens(tokens[0], ','), PU::getTokens(tokens[1], ','),
-           applySymbol, stod(tokens[3]), stod(tokens[4]), stod(tokens[5])});
-    }
-  }
-}
-void Flag::readSymbolTemplates() {
-  for (int i = 0; i < 100; i++) {
-    if (std::filesystem::exists(Fwg::Cfg::Values().resourcePath +
-                                "flags/symbol_presets/" + std::to_string(i) +
-                                ".tga")) {
-      symbolTemplates.push_back(Gfx::Textures::readTGA(
-          Fwg::Cfg::Values().resourcePath + "flags/symbol_presets/" +
-          std::to_string(i) + ".tga"));
-      // get line and immediately tokenize it
-      auto tokens = PU::getTokens(PU::getLines(Fwg::Cfg::Values().resourcePath +
-                                               "flags/symbol_presets/" +
-                                               std::to_string(i) + ".txt")[0],
-                                  ';');
-      symbolMetadata.push_back({tokens[0] == "true"});
-    }
-  }
+  colourGroups = std::move(groups);
+  flagTemplates = std::move(backgrounds);
+  symbolTemplates = std::move(symbols);
+  resourcesLoaded = true;
 }
 } // namespace Arda::Gfx

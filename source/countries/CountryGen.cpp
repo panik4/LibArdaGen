@@ -44,7 +44,7 @@ void generateCountries(
     country->tag = std::to_string(i);
     country->name = "DUMMY";
     country->adjective = "";
-    country->flag = Gfx::Flag(82, 52);
+    country->flag = Gfx::Flag(82, 52, country->ideology);
 
     countries.emplace(country->tag, country);
   }
@@ -203,7 +203,10 @@ void loadCountriesFromText(
       existingCountry->tag = inputCountryMap.at(colour)[3];
       existingCountry->name = inputCountryMap.at(colour)[4];
       existingCountry->adjective = inputCountryMap.at(colour)[5];
+      const auto previousIdeology = existingCountry->ideology;
       existingCountry->importLine(tokens);
+      if (existingCountry->ideology != previousIdeology)
+        existingCountry->flag = Gfx::Flag(82, 52, existingCountry->ideology);
     } else {
       // we always expect to find every single country that we currently have
       // in the mapentry. We log that we can't find it, and create an empty
@@ -214,9 +217,9 @@ void loadCountriesFromText(
       country->tag = tokens[3];
       country->name = tokens[4];
       country->adjective = tokens[5];
-      country->flag = Arda::Gfx::Flag(82, 52);
       country->colour = colour;
       country->importLine(tokens);
+      country->flag = Gfx::Flag(82, 52, country->ideology);
       countries.insert({country->tag, country});
     }
   }
@@ -285,7 +288,7 @@ void loadCountries(const Arda::Utils::GenerationAge &generationAge,
     country->tag = std::to_string(counter);
     country->name = "";
     country->adjective = "";
-    country->flag = Arda::Gfx::Flag(82, 52);
+    country->flag = Arda::Gfx::Flag(82, 52, country->ideology);
     country->colour = entryCol;
     for (auto &region : entry.second) {
       country->addRegion(region);
@@ -354,7 +357,7 @@ void deriveCountries(
     country->tag = "P" + std::to_string(polityId);
     country->name = "Polity " + std::to_string(polityId);
     country->adjective = country->name;
-    country->flag = Gfx::Flag(82, 52);
+    country->flag = Gfx::Flag(82, 52, country->ideology);
     country->colour = polityExport.polity.colour;
     countriesByPolity.emplace(polityId, country);
     countries.emplace(country->tag, country);
