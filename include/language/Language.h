@@ -1,11 +1,9 @@
 #pragma once
-#include "RandNum.h"
 #include "language/Dataset.h"
 #include "language/MarkovNameGenerator.h"
-#include "utils/SerialisationFwd.h"
-#include "utils/Utils.h"
-#include <string>
+#include <map>
 #include <set>
+#include <string>
 #include <vector>
 namespace Arda {
 
@@ -54,7 +52,7 @@ public:
   std::vector<std::string> shipNames;
   std::vector<std::string> airplaneNames;
 
-  template<class Archive>
+  template <class Archive>
   void serialize(Archive &ar, const unsigned int /*version*/) {
     ar & name & port & articles & adjectiveEndings & cityPrefixes &
         citySuffixes;

@@ -1,9 +1,9 @@
 #pragma once
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <map>
 namespace Arda {
 
 struct Dataset {

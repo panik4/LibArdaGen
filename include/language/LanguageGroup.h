@@ -1,8 +1,8 @@
 #pragma once
 #include "language/Language.h"
-#include "utils/SerialisationFwd.h"
-#include <algorithm>
-#include <filesystem>
+#include <memory>
+#include <string>
+#include <vector>
 namespace Arda {
 class LanguageGroup {
 
@@ -12,9 +12,9 @@ public:
   Dataset mergedDataset;
   void generate(int languageAmount, const Dataset &dataset, int seed);
 
-  template<class Archive>
+  template <class Archive>
   void serialize(Archive &ar, const unsigned int /*version*/) {
-    ar &name &languages;
+    ar & name & languages;
   }
 };
 } // namespace Arda

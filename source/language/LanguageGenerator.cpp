@@ -1,4 +1,9 @@
 #include "language/LanguageGenerator.h"
+#include <algorithm>
+#include <filesystem>
+#include <iostream>
+#include <random>
+#include <utility>
 namespace Arda {
 LanguageGenerator::LanguageGenerator(const std::string &baseDir) {
 
@@ -81,7 +86,8 @@ Dataset LanguageGenerator::reduceDataset(const std::vector<Dataset> &dataset) {
 }
 
 LanguageGroup LanguageGenerator::generateLanguageGroup(
-    int languageAmount, const std::vector<std::string> &datasetsToUse, int seed) {
+    int languageAmount, const std::vector<std::string> &datasetsToUse,
+    int seed) {
 
   Arda::Dataset mergedDataset;
   if (datasetsToUse.empty()) {

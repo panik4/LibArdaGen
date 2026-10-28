@@ -18,4 +18,3 @@ private:
 
   char getNextChar(const std::string &key);
 };
-

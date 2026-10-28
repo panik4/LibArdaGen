@@ -1,4 +1,5 @@
 #include "language/MarkovNameGenerator.h"
+#include <utility>
 
 MarkovNameGenerator::MarkovNameGenerator(int order, int seed)
     : order(order), rng(seed) {}
@@ -48,7 +49,7 @@ std::string MarkovNameGenerator::generate(int minLength, int maxLength) {
   }
 
   // Strip start marker and validate length
-  //result.erase(std::remove(result.begin(), result.end(), '^'), result.end());
+  // result.erase(std::remove(result.begin(), result.end(), '^'), result.end());
   std::string clean;
   clean.reserve(result.size());
   for (char c : result) {

@@ -1,4 +1,6 @@
 #include "language/Language.h"
+#include <cctype>
+#include <utility>
 namespace Arda {
 void Language::train(int seed) {
   markovGeneratorsByVocabulary.clear();
@@ -34,9 +36,7 @@ std::string Language::generateWord(const std::string &category) {
   return duplicateFallback;
 }
 
-void Language::resetGeneratedWords() {
-  generatedWords.clear();
-}
+void Language::resetGeneratedWords() { generatedWords.clear(); }
 
 std::string Language::capitaliseName(const std::string &word) {
   // simple rule: First letter capitalised, anything after a dash or space

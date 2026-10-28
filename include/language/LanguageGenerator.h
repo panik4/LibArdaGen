@@ -1,10 +1,10 @@
 #pragma once
 #include "LanguageGroup.h"
 #include "language/Dataset.h"
-#include "language/MarkovNameGenerator.h"
 
-#include <iostream>
 #include <map>
+#include <string>
+#include <vector>
 namespace Arda {
 class LanguageGenerator {
 
@@ -17,9 +17,9 @@ public:
   Dataset reduceDataset(const std::vector<Dataset> &dataset);
   LanguageGroup
   generateLanguageGroup(int languageAmount,
-                        const std::vector<std::string> &datasetsToUse, int seed);
+                        const std::vector<std::string> &datasetsToUse,
+                        int seed);
 
   std::map<std::string, Dataset> datasetsByLanguage;
-
 };
 } // namespace Arda
