@@ -4,10 +4,11 @@
 #include "areas/ArdaContinent.h"
 #include "areas/ArdaProvince.h"
 #include "areas/ArdaRegion.h"
+#include "areas/AreaData.h"
 #include "areas/AreaGen.h"
 #include "areas/SuperRegion.h"
-#include "civilisation/CivilizationGeneration.h"
 #include "civilisation/CivilizationConfig.h"
+#include "civilisation/CivilizationGeneration.h"
 #include "civilisation/NaturalFeatures.h"
 #include "civilization/Location.h"
 #include "civilization/NavmeshGeneration.h"
@@ -68,6 +69,7 @@ struct ArdaStats {
 };
 
 struct ArdaData {
+  Arda::Areas::AreaData areaData;
   double worldEconomicActivity = 0;
   Civilization::CivilizationLayer civLayer;
   Simulation::SimulationExport simulationExport;
@@ -75,7 +77,8 @@ struct ArdaData {
   std::map<int, std::vector<std::shared_ptr<Country>>> countryImportanceScores;
 };
 
-class ArdaGen : public Fwg::FastWorldGenerator, public std::enable_shared_from_this<ArdaGen> {
+class ArdaGen : public Fwg::FastWorldGenerator,
+                public std::enable_shared_from_this<ArdaGen> {
 
 protected:
   Fwg::Gfx::Image typeMap;
@@ -99,10 +102,6 @@ public:
 
   // containers
   Arda::Names::NameData nData;
-  std::vector<std::shared_ptr<ArdaContinent>> ardaContinents;
-  std::vector<std::shared_ptr<ArdaRegion>> ardaRegions;
-  std::vector<std::shared_ptr<Arda::ArdaProvince>> ardaProvinces;
-  std::vector<std::shared_ptr<SuperRegion>> superRegions;
   // countries
   std::map<std::string, std::shared_ptr<Country>> countries;
   Civilization::CivilizationData civData;
